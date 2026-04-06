@@ -164,7 +164,7 @@ function loadLogo() {
   // We'll use a canvas trick to read the image they shared
   // For now set alt text; in GitHub Pages deployment replace src with actual logo file path
   const img = document.getElementById('logo-img');
-  img.src = "dtf-logo.png"; // when deployed, place logo as dtf-logo.png in same folder
+        img.src = "DTF_Logo.png";
   img.style.display = 'block';
 }
 
@@ -206,15 +206,20 @@ function renderExec() {
   });
   const topProds = Object.entries(byProd).sort((a,b)=>b[1]-a[1]).slice(0,8);
 
-  // --- Powder product mix by jar size (jar size filled in = powder) ---
+  // --- Powder product mix — group by jar SIZE only (strip color/material), top 10 ---
   const byJar = {};
   lots.forEach(l => {
     const j = (l.jarSize||'').trim();
     if (!j) return;
-    if (!byJar[j]) byJar[j] = 0;
-    byJar[j] += l.finalUnits;
+    // extract just the size portion: leading number+unit e.g. "25oz", "70oz", "400cc"
+    const sizeMatch = j.match(/^(\d+(?:\.\d+)?\s*(?:oz|cc|ml|lb|g))/i);
+    const sizeKey = sizeMatch ? sizeMatch[1].replace(/\s+/g,'').toLowerCase() : j;
+    // normalize capitalization for display
+    const displayKey = sizeKey.replace(/(\d+)(oz|cc|ml|lb|g)/i, (_, n, u) => `${n}${u.toLowerCase()}`);
+    if (!byJar[displayKey]) byJar[displayKey] = 0;
+    byJar[displayKey] += l.finalUnits;
   });
-  const jarEntries = Object.entries(byJar).sort((a,b)=>b[1]-a[1]);
+  const jarEntries = Object.entries(byJar).sort((a,b)=>b[1]-a[1]).slice(0,10);
 
   // --- Weekly trend (last 16 weeks) ---
   const byWeek = {};
