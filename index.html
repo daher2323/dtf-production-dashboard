@@ -184,7 +184,10 @@ function render() {
   try {
     currentView === 'exec' ? renderExec() : renderOps();
   } catch(e) {
-    document.getElementById('content').innerHTML = `<div style="padding:2rem;color:#a32d2d">Error rendering dashboard: ${e.message}</div>`;
+    document.getElementById('content').innerHTML = `<div style="padding:2rem;color:#a32d2d;font-family:monospace;font-size:12px">
+      Error: ${e.message}<br><br>
+      Stack: ${(e.stack||'').split('\n').slice(0,5).join('<br>')}
+    </div>`;
     console.error(e);
   }
 }
