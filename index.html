@@ -7,49 +7,50 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: system-ui, sans-serif; background: var(--color-background-tertiary, #f5f5f3); color: var(--color-text-primary, #1a1a1a); font-size: 14px; }
+  body { font-family: system-ui, sans-serif; background: #141618; color: #e8e6e0; font-size: 14px; }
   .shell { max-width: 1400px; margin: 0 auto; padding: 1.5rem 1.5rem; }
   .top-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 12px; }
   .brand { display: flex; align-items: center; gap: 14px; }
   .brand img { height: 54px; width: auto; }
   .brand-text { display: flex; flex-direction: column; }
-  .brand-name { font-size: 20px; font-weight: 500; line-height: 1.2; }
-  .brand-sub { font-size: 13px; color: var(--color-text-secondary, #666); margin-top: 2px; }
-  .data-range { font-size: 11px; color: var(--color-text-tertiary, #999); margin-top: 3px; }
+  .brand-name { font-size: 20px; font-weight: 500; color: #e8e6e0; line-height: 1.2; }
+  .brand-sub { font-size: 13px; color: #888780; margin-top: 2px; }
+  .data-range { font-size: 11px; color: #5f5e5a; margin-top: 3px; }
   .view-toggle { display: flex; gap: 6px; }
-  .view-toggle button { padding: 6px 18px; border-radius: 20px; border: 0.5px solid var(--color-border-secondary, rgba(0,0,0,.3)); background: transparent; cursor: pointer; font-size: 13px; color: var(--color-text-secondary, #555); transition: all .15s; }
-  .view-toggle button.active { background: var(--color-text-primary, #1a1a1a); color: var(--color-background-primary, #fff); border-color: transparent; }
-  .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 1.25rem; }
-  .metric { background: var(--color-background-secondary, #ececea); border-radius: 10px; padding: 1rem; }
-  .metric .label { font-size: 11px; color: var(--color-text-secondary, #666); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .03em; }
-  .metric .value { font-size: 24px; font-weight: 500; line-height: 1; }
-  .metric .sub { font-size: 11px; color: var(--color-text-tertiary, #999); margin-top: 4px; }
-  .metric.good .value { color: #3b6d11; }
-  .metric.warn .value { color: #a32d2d; }
-  .metric.info .value { color: #185fa5; }
-  .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
-  .chart-card { background: var(--color-background-primary, #fff); border: 0.5px solid var(--color-border-tertiary, rgba(0,0,0,.15)); border-radius: 12px; padding: 1rem; }
-  .chart-card h3 { font-size: 12px; font-weight: 500; color: var(--color-text-secondary, #666); margin-bottom: .75rem; text-transform: uppercase; letter-spacing: .04em; }
-  .full-card { background: var(--color-background-primary, #fff); border: 0.5px solid var(--color-border-tertiary, rgba(0,0,0,.15)); border-radius: 12px; padding: 1rem; margin-bottom: 1rem; }
-  .full-card h3 { font-size: 12px; font-weight: 500; color: var(--color-text-secondary, #666); margin-bottom: .75rem; text-transform: uppercase; letter-spacing: .04em; }
+  .view-toggle button { padding: 6px 18px; border-radius: 20px; border: 0.5px solid #444441; background: transparent; cursor: pointer; font-size: 13px; color: #888780; transition: all .15s; }
+  .view-toggle button.active { background: #378ADD; color: #fff; border-color: transparent; }
+  .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 1.25rem; }
+  .metric { background: #1e2124; border: 0.5px solid #2c2c2a; border-radius: 10px; padding: 1rem; }
+  .metric .label { font-size: 11px; color: #888780; margin-bottom: 5px; text-transform: uppercase; letter-spacing: .03em; }
+  .metric .value { font-size: 22px; font-weight: 500; line-height: 1; color: #e8e6e0; }
+  .metric .sub { font-size: 11px; color: #5f5e5a; margin-top: 4px; }
+  .metric.good .value { color: #1D9E75; }
+  .metric.warn .value { color: #EF9F27; }
+  .metric.info .value { color: #378ADD; }
+  .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .chart-card { background: #1e2124; border: 0.5px solid #2c2c2a; border-radius: 12px; padding: 1rem; }
+  .chart-card h3 { font-size: 11px; font-weight: 500; color: #888780; margin-bottom: .75rem; text-transform: uppercase; letter-spacing: .04em; }
+  .full-card { background: #1e2124; border: 0.5px solid #2c2c2a; border-radius: 12px; padding: 1rem; margin-bottom: 10px; }
+  .full-card h3 { font-size: 11px; font-weight: 500; color: #888780; margin-bottom: .75rem; text-transform: uppercase; letter-spacing: .04em; }
   .filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 1rem; }
-  .filters select, .filters input { padding: 6px 10px; border: 0.5px solid var(--color-border-secondary, rgba(0,0,0,.3)); border-radius: 8px; background: var(--color-background-primary, #fff); color: var(--color-text-primary, #1a1a1a); font-size: 13px; }
+  .filters select, .filters input { padding: 6px 10px; border: 0.5px solid #444441; border-radius: 8px; background: #1e2124; color: #e8e6e0; font-size: 13px; }
+  .filters select option { background: #1e2124; color: #e8e6e0; }
   .tbl-wrap { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  thead th { text-align: left; padding: 6px 10px; border-bottom: 0.5px solid var(--color-border-tertiary, rgba(0,0,0,.15)); color: var(--color-text-secondary, #666); font-weight: 500; white-space: nowrap; cursor: pointer; user-select: none; font-size: 11px; text-transform: uppercase; letter-spacing: .03em; }
-  thead th:hover { color: var(--color-text-primary, #1a1a1a); }
-  tbody tr { border-bottom: 0.5px solid var(--color-border-tertiary, rgba(0,0,0,.06)); }
-  tbody tr:hover { background: var(--color-background-secondary, #f5f5f3); }
-  tbody td { padding: 6px 10px; white-space: nowrap; }
+  thead th { text-align: left; padding: 6px 10px; border-bottom: 0.5px solid #2c2c2a; color: #888780; font-weight: 500; white-space: nowrap; cursor: pointer; user-select: none; font-size: 11px; text-transform: uppercase; letter-spacing: .03em; }
+  thead th:hover { color: #e8e6e0; }
+  tbody tr { border-bottom: 0.5px solid #2c2c2a; }
+  tbody tr:hover { background: #252829; }
+  tbody td { padding: 6px 10px; white-space: nowrap; color: #e8e6e0; }
   .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
-  .badge.complete { background: #eaf3de; color: #3b6d11; }
-  .badge.partial  { background: #faeeda; color: #854f0b; }
-  .badge.neg-dev  { background: #fcebeb; color: #a32d2d; }
-  .badge.pos-dev  { background: #eaf3de; color: #3b6d11; }
-  .loading { text-align: center; padding: 3rem; color: var(--color-text-secondary, #666); }
-  .pagination { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 12px; color: var(--color-text-secondary, #666); }
-  .pagination button { padding: 4px 10px; border: 0.5px solid var(--color-border-secondary, rgba(0,0,0,.3)); border-radius: 6px; background: transparent; cursor: pointer; font-size: 12px; color: var(--color-text-primary, #1a1a1a); }
-  .pagination button:disabled { opacity: .4; cursor: default; }
+  .badge.complete { background: #0F6E56; color: #9FE1CB; }
+  .badge.partial  { background: #633806; color: #FAC775; }
+  .badge.neg-dev  { background: #791F1F; color: #F09595; }
+  .badge.pos-dev  { background: #0F6E56; color: #9FE1CB; }
+  .loading { text-align: center; padding: 3rem; color: #888780; }
+  .pagination { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 12px; color: #888780; }
+  .pagination button { padding: 4px 10px; border: 0.5px solid #444441; border-radius: 6px; background: transparent; cursor: pointer; font-size: 12px; color: #e8e6e0; }
+  .pagination button:disabled { opacity: .3; cursor: default; }
   @media (max-width: 700px) { .charts-row { grid-template-columns: 1fr; } }
 </style>
 </head>
@@ -180,7 +181,7 @@ function render() {
   try {
     currentView === 'exec' ? renderExec() : renderOps();
   } catch(e) {
-    document.getElementById('content').innerHTML = '<div style="padding:2rem;color:#a32d2d;font-size:12px;font-family:monospace">Error: ' + e.message + '<br><br>' + (e.stack||'').split('\n').slice(0,5).join('<br>') + '</div>';
+    document.getElementById('content').innerHTML = '<div style="padding:2rem;color:#F09595;font-size:12px;font-family:monospace">Error: ' + e.message + '<br><br>' + (e.stack||'').split('\n').slice(0,5).join('<br>') + '</div>';
   }
 }
 
@@ -211,7 +212,6 @@ function renderExec() {
   const targetPct = Math.round((yearProjected / YEAR_TARGET) * 100);
   const onTrack = yearProjected >= YEAR_TARGET;
 
-  // monthly vs target
   const byMonth = {};
   allRows.forEach(r => {
     const d = new Date(r['Date']);
@@ -232,7 +232,6 @@ function renderExec() {
     return { label, units: mo.units, target, pctOfTarget, isCurrentMonth, daysInMonth, daysSoFar: now.getDate() };
   });
 
-  // production lines
   const byLine = {};
   lots.forEach(l => {
     const line = (l.line||'').trim();
@@ -245,8 +244,8 @@ function renderExec() {
   const lineEntries = Object.entries(byLine).sort((a,b) => parseInt(a[0].replace(/\D/g,'')) - parseInt(b[0].replace(/\D/g,'')));
   const maxLineUnits = lineEntries[0] ? lineEntries[0][1].units : 1;
   const lineTotal = lineEntries.reduce((s,e) => s + e[1].units, 0);
+  const lineColors = ['#1D9E75','#378ADD','#7F77DD','#EF9F27'];
 
-  // powder mix
   const byJar = {};
   lots.forEach(l => {
     const k = jarSizeKey(l.jarSize);
@@ -256,7 +255,6 @@ function renderExec() {
   const jarEntries = Object.entries(byJar).sort((a,b) => b[1]-a[1]).slice(0,10);
   const jarTotal = jarEntries.reduce((s,e) => s+e[1], 0);
 
-  // weekly
   const byWeek = {};
   allRows.forEach(r => {
     const w = (r['WEEK NUMBER']||'').trim();
@@ -272,7 +270,6 @@ function renderExec() {
     .sort((a,b) => { const an=parseFloat(a),bn=parseFloat(b); return (!isNaN(an)&&!isNaN(bn))?an-bn:a.localeCompare(b); })
     .filter(w => byWeek[w] > 0).slice(-6);
 
-  // product performance top 10
   const prodDetail = {};
   lots.forEach(l => {
     if (!prodDetail[l.product]) prodDetail[l.product] = { proj: 0, final: 0, lots: 0 };
@@ -282,11 +279,10 @@ function renderExec() {
   });
   const top10 = Object.entries(prodDetail).sort((a,b) => b[1].final - a[1].final).slice(0,10);
 
-  const devColor = avgDev < -2 ? '#a32d2d' : avgDev > 2 ? '#3b6d11' : 'inherit';
+  const devColor = avgDev < -2 ? '#EF9F27' : avgDev > 2 ? '#1D9E75' : '#e8e6e0';
   const devClass  = avgDev < -2 ? 'warn' : avgDev > 2 ? 'good' : '';
-  const JAR_COLORS = ['#185fa5','#1D9E75','#EF9F27','#D4537E','#7F77DD','#D85A30','#639922','#E24B4A','#378ADD','#5DCAA5'];
+  const JAR_COLORS = ['#378ADD','#1D9E75','#EF9F27','#D4537E','#7F77DD','#D85A30','#639922','#E24B4A','#85B7EB','#5DCAA5'];
 
-  // build HTML sections
   var metricsHTML =
     '<div class="metric info"><div class="label">Units produced</div><div class="value">' + totalUnits.toLocaleString() + '</div><div class="sub">vs ' + totalProj.toLocaleString() + ' projected</div></div>'
     + '<div class="metric"><div class="label">Avg units / day</div><div class="value">' + avgUnitsPerDay.toLocaleString() + '</div><div class="sub">' + uniqueProductionDays + ' production days</div></div>'
@@ -298,86 +294,81 @@ function renderExec() {
 
   var yearEndHTML =
     '<div style="display:flex;align-items:center;gap:3.5rem;flex-wrap:wrap;margin-bottom:1rem">'
-    + '<div><div style="font-size:11px;color:var(--color-text-secondary,#666);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Day of year</div><div style="font-size:20px;font-weight:500">' + dayOfYear + ' <span style="font-size:13px;color:var(--color-text-secondary,#666)">of 365</span></div></div>'
-    + '<div><div style="font-size:11px;color:var(--color-text-secondary,#666);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Units to date</div><div style="font-size:20px;font-weight:500">' + totalUnits.toLocaleString() + '</div></div>'
-    + '<div><div style="font-size:11px;color:var(--color-text-secondary,#666);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Year-end projection</div><div style="font-size:20px;font-weight:500;color:' + (onTrack?'#3b6d11':'#a32d2d') + '">' + yearProjected.toLocaleString() + '</div></div>'
-    + '<div><div style="font-size:11px;color:var(--color-text-secondary,#666);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Year-end target</div><div style="font-size:20px;font-weight:500">3,927,000</div></div>'
-    + '<div><div style="font-size:11px;color:var(--color-text-secondary,#666);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">vs target</div><div style="font-size:20px;font-weight:500;color:' + (onTrack?'#3b6d11':'#a32d2d') + '">' + (onTrack?'+':'') + toTarget.toLocaleString() + ' <span style="font-size:13px">(' + targetPct + '%)</span></div></div>'
+    + '<div><div style="font-size:11px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Day of year</div><div style="font-size:20px;font-weight:500">' + dayOfYear + ' <span style="font-size:13px;color:#888780">of 365</span></div></div>'
+    + '<div><div style="font-size:11px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Units to date</div><div style="font-size:20px;font-weight:500">' + totalUnits.toLocaleString() + '</div></div>'
+    + '<div><div style="font-size:11px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Year-end projection</div><div style="font-size:20px;font-weight:500;color:' + (onTrack?'#1D9E75':'#EF9F27') + '">' + yearProjected.toLocaleString() + '</div></div>'
+    + '<div><div style="font-size:11px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Year-end target</div><div style="font-size:20px;font-weight:500">3,927,000</div></div>'
+    + '<div><div style="font-size:11px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">vs target</div><div style="font-size:20px;font-weight:500;color:' + (onTrack?'#1D9E75':'#EF9F27') + '">' + (onTrack?'+':'') + toTarget.toLocaleString() + ' <span style="font-size:13px">(' + targetPct + '%)</span></div></div>'
     + '</div>'
-    + '<div style="background:var(--color-background-secondary,#ececea);border-radius:8px;height:12px;overflow:hidden"><div style="height:100%;width:' + Math.min(targetPct,100) + '%;background:' + (onTrack?'#639922':'#a32d2d') + ';border-radius:8px"></div></div>'
-    + '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--color-text-tertiary,#999);margin-top:4px"><span>0</span><span style="color:' + (onTrack?'#3b6d11':'#a32d2d') + ';font-weight:500">' + targetPct + '% of target</span><span>3,927,000</span></div>';
+    + '<div style="background:#2c2c2a;border-radius:8px;height:10px;overflow:hidden"><div style="height:100%;width:' + Math.min(targetPct,100) + '%;background:' + (onTrack?'#1D9E75':'#EF9F27') + ';border-radius:8px"></div></div>'
+    + '<div style="display:flex;justify-content:space-between;font-size:11px;color:#5f5e5a;margin-top:4px"><span>0</span><span style="color:' + (onTrack?'#1D9E75':'#EF9F27') + ';font-weight:500">' + targetPct + '% of target</span><span>3,927,000</span></div>';
 
   var monthTableHTML = monthRows.map(function(m) {
     var isGreen  = m.pctOfTarget >= 100;
     var isYellow = m.pctOfTarget >= 80 && m.pctOfTarget < 100;
-    var textColor = isGreen ? '#3b6d11' : isYellow ? '#854f0b' : '#a32d2d';
-    var barColor  = isGreen ? '#639922' : isYellow ? '#EF9F27' : '#a32d2d';
+    var textColor = isGreen ? '#1D9E75' : isYellow ? '#EF9F27' : '#E24B4A';
+    var pillBg    = isGreen ? '#0F6E56' : isYellow ? '#633806' : '#791F1F';
+    var pillText  = isGreen ? '#9FE1CB' : isYellow ? '#FAC775' : '#F09595';
+    var barColor  = isGreen ? '#1D9E75' : isYellow ? '#EF9F27' : '#E24B4A';
     var bw = Math.min(Math.round(m.pctOfTarget), 100);
     var targetLabel = m.isCurrentMonth
-      ? m.target.toLocaleString() + ' <span style="font-size:10px;color:var(--color-text-tertiary,#999)">(' + m.daysSoFar + '/' + m.daysInMonth + ' days)</span>'
+      ? m.target.toLocaleString() + ' <span style="font-size:10px;color:#5f5e5a">(' + m.daysSoFar + '/' + m.daysInMonth + ' days)</span>'
       : m.target.toLocaleString();
     return '<tr>'
-      + '<td style="font-weight:500">' + m.label + '</td>'
+      + '<td style="font-weight:500;color:#e8e6e0">' + m.label + '</td>'
       + '<td style="text-align:right">' + m.units.toLocaleString() + '</td>'
-      + '<td style="text-align:right;color:var(--color-text-secondary,#666)">' + targetLabel + '</td>'
-      + '<td style="text-align:right;font-weight:500;color:' + textColor + '">' + m.pctOfTarget.toFixed(2) + '%</td>'
-      + '<td style="min-width:100px;padding:6px 10px"><div style="background:var(--color-background-secondary,#ececea);border-radius:3px;height:6px;overflow:hidden"><div style="height:100%;width:' + bw + '%;background:' + barColor + ';border-radius:3px"></div></div></td>'
+      + '<td style="text-align:right;color:#888780">' + targetLabel + '</td>'
+      + '<td style="text-align:right"><span class="badge" style="background:' + pillBg + ';color:' + pillText + '">' + m.pctOfTarget.toFixed(2) + '%</span></td>'
+      + '<td style="min-width:100px;padding:6px 10px"><div style="background:#2c2c2a;border-radius:3px;height:6px;overflow:hidden"><div style="height:100%;width:' + bw + '%;background:' + barColor + ';border-radius:3px"></div></div></td>'
       + '</tr>';
   }).join('');
 
-  var linesTableHTML = lineEntries.map(function(entry) {
+  var linesTableHTML = lineEntries.map(function(entry, i) {
     var line = entry[0], d = entry[1];
     var sp = lineTotal ? ((d.units / lineTotal) * 100) : 0;
     var bw = Math.round((d.units / maxLineUnits) * 100);
-    return '<tr style="border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.06))">'
-      + '<td style="padding:5px 8px;font-weight:500">' + line + '</td>'
+    var col = lineColors[i % lineColors.length];
+    return '<tr style="border-bottom:0.5px solid #2c2c2a">'
+      + '<td style="padding:5px 8px;font-weight:500;color:#e8e6e0">' + line + '</td>'
       + '<td style="padding:5px 8px;text-align:right;white-space:nowrap">' + d.units.toLocaleString() + '</td>'
-      + '<td style="padding:5px 8px"><div style="background:var(--color-background-secondary,#ececea);border-radius:3px;height:6px;overflow:hidden"><div style="height:100%;width:' + bw + '%;background:#1D9E75;border-radius:3px"></div></div></td>'
-      + '<td style="padding:5px 8px;text-align:right;color:var(--color-text-secondary,#666)">' + sp.toFixed(1) + '%</td>'
-      + '<td style="padding:5px 8px;text-align:right;color:var(--color-text-secondary,#666)">' + d.lots.size.toLocaleString() + '</td>'
+      + '<td style="padding:5px 8px"><div style="background:#2c2c2a;border-radius:3px;height:6px;overflow:hidden"><div style="height:100%;width:' + bw + '%;background:' + col + ';border-radius:3px"></div></div></td>'
+      + '<td style="padding:5px 8px;text-align:right;color:#888780">' + sp.toFixed(1) + '%</td>'
+      + '<td style="padding:5px 8px;text-align:right;color:#888780">' + d.lots.size.toLocaleString() + '</td>'
       + '</tr>';
   }).join('');
 
   var jarLegendHTML = jarEntries.map(function(entry, i) {
     var j = entry[0], v = entry[1];
     var p = jarTotal ? ((v / jarTotal) * 100).toFixed(1) : 0;
-    return '<tr style="border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.06))">'
+    return '<tr style="border-bottom:0.5px solid #2c2c2a">'
       + '<td style="padding:3px 6px;width:16px"><div style="width:10px;height:10px;border-radius:2px;background:' + JAR_COLORS[i] + '"></div></td>'
-      + '<td style="padding:3px 6px;font-weight:500">' + j + '</td>'
+      + '<td style="padding:3px 6px;font-weight:500;color:#e8e6e0">' + j + '</td>'
       + '<td style="padding:3px 6px;text-align:right;white-space:nowrap">' + v.toLocaleString() + '</td>'
-      + '<td style="padding:3px 6px;text-align:right;color:var(--color-text-secondary,#666);width:40px">' + p + '%</td>'
+      + '<td style="padding:3px 6px;text-align:right;color:#888780;width:40px">' + p + '%</td>'
       + '</tr>';
   }).join('');
 
   var top10HTML = top10.map(function(entry) {
     var prod = entry[0], d = entry[1];
     var dev = d.proj ? ((d.final - d.proj) / d.proj * 100) : 0;
-    var dc  = dev < -5 ? 'color:#a32d2d' : dev > 5 ? 'color:#3b6d11' : '';
+    var dc  = dev < -5 ? 'color:#E24B4A' : dev > 5 ? 'color:#1D9E75' : 'color:#e8e6e0';
     return '<tr>'
       + '<td style="font-weight:500">' + prod + '</td>'
-      + '<td style="text-align:right">' + d.lots + '</td>'
-      + '<td style="text-align:right">' + d.proj.toLocaleString() + '</td>'
+      + '<td style="text-align:right;color:#888780">' + d.lots + '</td>'
+      + '<td style="text-align:right;color:#888780">' + d.proj.toLocaleString() + '</td>'
       + '<td style="text-align:right">' + d.final.toLocaleString() + '</td>'
       + '<td style="text-align:right;' + dc + '">' + (dev>0?'+':'') + dev.toFixed(1) + '%</td>'
       + '</tr>';
   }).join('');
 
-  // === SECTION ORDER ===
-  // 1. KPI metrics
-  // 2. Year-end projection
-  // 3. Monthly table
-  // 4. Lines + Powder mix (side by side)
-  // 5. Weekly chart
-  // 6. Top 10 product performance
-  document.getElementById('content').innerHTML =
+  var weekColors = weeks.map(w => parseInt(w) === currentWeekNum ? 'rgba(55,138,221,0.3)' : '#378ADD');
+  var weekLabels = weeks.map(w => parseInt(w) === currentWeekNum ? 'Week ' + w + ' (current)' : 'Week ' + w);
 
-    // 1. KPI metrics
+  document.getElementById('content').innerHTML =
     '<div class="metrics">' + metricsHTML + '</div>'
 
-    // 2. Year-end projection
     + '<div class="full-card"><h3>Year-end projection vs target</h3>' + yearEndHTML + '</div>'
 
-    // 3. Lines + Powder mix
     + '<div class="charts-row">'
     + '<div class="chart-card"><h3>Production lines breakdown</h3>'
     + '<div id="lines-chart-table"></div></div>'
@@ -388,35 +379,29 @@ function renderExec() {
     + '</div></div>'
     + '</div>'
 
-    // 4. Weekly chart
-    + '<div class="chart-card" style="margin-bottom:1rem"><h3>Weekly units produced \u2014 last 6 weeks</h3>'
+    + '<div class="chart-card" style="margin-bottom:10px"><h3>Weekly units produced \u2014 last 6 weeks</h3>'
     + '<div style="position:relative;height:200px"><canvas id="cWeekly"></canvas></div></div>'
 
-    // 5. Monthly table
     + '<div class="full-card"><h3>Units produced by month vs. target</h3><div class="tbl-wrap"><table>'
     + '<thead><tr><th>Month</th><th style="text-align:right">Actual</th><th style="text-align:right">Target</th><th style="text-align:right">% of target</th><th></th></tr></thead>'
     + '<tbody>' + monthTableHTML + '</tbody></table></div></div>'
 
-    // 6. Top 10
     + '<div class="full-card"><h3>Product performance \u2014 top 10 by volume</h3><div class="tbl-wrap"><table>'
     + '<thead><tr><th>Product</th><th style="text-align:right">Lots</th><th style="text-align:right">Projected</th><th style="text-align:right">Units produced</th><th style="text-align:right">Avg deviation</th></tr></thead>'
     + '<tbody>' + top10HTML + '</tbody></table></div></div>';
 
-  // Populate lines table
   document.getElementById('lines-chart-table').innerHTML =
     '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>'
-    + '<th style="text-align:left;padding:4px 8px;color:var(--color-text-secondary,#666);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.03em;border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.1))">Line</th>'
-    + '<th style="text-align:right;padding:4px 8px;color:var(--color-text-secondary,#666);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.03em;border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.1))">Units</th>'
-    + '<th style="border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.1))"></th>'
-    + '<th style="text-align:right;padding:4px 8px;color:var(--color-text-secondary,#666);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.03em;border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.1))">% of total</th>'
-    + '<th style="text-align:right;padding:4px 8px;color:var(--color-text-secondary,#666);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.03em;border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.1))">Lots run</th>'
+    + '<th style="text-align:left;padding:4px 8px;color:#888780;font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.03em;border-bottom:0.5px solid #2c2c2a">Line</th>'
+    + '<th style="text-align:right;padding:4px 8px;color:#888780;font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.03em;border-bottom:0.5px solid #2c2c2a">Units</th>'
+    + '<th style="border-bottom:0.5px solid #2c2c2a"></th>'
+    + '<th style="text-align:right;padding:4px 8px;color:#888780;font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.03em;border-bottom:0.5px solid #2c2c2a">% of total</th>'
+    + '<th style="text-align:right;padding:4px 8px;color:#888780;font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.03em;border-bottom:0.5px solid #2c2c2a">Lots run</th>'
     + '</tr></thead><tbody>' + linesTableHTML + '</tbody></table>';
 
-  // Populate jar legend
   document.getElementById('jar-legend').innerHTML =
     '<table style="width:100%;border-collapse:collapse;font-size:11px"><tbody>' + jarLegendHTML + '</tbody></table>';
 
-  // Charts
   charts.jar = new Chart(document.getElementById('cJar'), {
     type: 'doughnut',
     data: {
@@ -435,15 +420,16 @@ function renderExec() {
     }
   });
 
-  var weekColors = weeks.map(w => parseInt(w) === currentWeekNum ? 'rgba(55,138,221,0.35)' : '#378ADD');
-  var weekLabels = weeks.map(w => parseInt(w) === currentWeekNum ? 'Week ' + w + ' (current)' : 'Week ' + w);
   charts.weekly = new Chart(document.getElementById('cWeekly'), {
     type: 'bar',
     data: { labels: weekLabels, datasets: [{ label: 'Units produced', data: weeks.map(w => byWeek[w]), backgroundColor: weekColors, borderRadius: 4 }] },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false } },
-      scales: { x: { ticks: { font: { size: 11 } } }, y: { ticks: { callback: function(v) { return v.toLocaleString(); } } } }
+      scales: {
+        x: { ticks: { color: '#888780', font: { size: 11 } }, grid: { color: '#2c2c2a' } },
+        y: { ticks: { color: '#888780', callback: function(v) { return v.toLocaleString(); } }, grid: { color: '#2c2c2a' } }
+      }
     }
   });
 }
@@ -463,7 +449,7 @@ function renderOps() {
     + '<select id="fWeek" onchange="applyFilters()"><option value="">All weeks</option>' + weeks.map(w => '<option>' + w + '</option>').join('') + '</select>'
     + '<select id="fBottle" onchange="applyFilters()"><option value="">All bottle sizes</option>' + bottleSizes.map(s => '<option>' + s + '</option>').join('') + '</select>'
     + '<select id="fJar" onchange="applyFilters()"><option value="">All jar sizes</option>' + jarSizes.map(s => '<option>' + s + '</option>').join('') + '</select>'
-    + '<button onclick="clearFilters()" style="font-size:12px;padding:6px 12px;border:0.5px solid var(--color-border-secondary,rgba(0,0,0,.3));border-radius:8px;background:transparent;cursor:pointer;color:var(--color-text-secondary,#666)">Clear</button>'
+    + '<button onclick="clearFilters()" style="font-size:12px;padding:6px 12px;border:0.5px solid #444441;border-radius:8px;background:transparent;cursor:pointer;color:#888780">Clear</button>'
     + '</div>'
     + '<div id="ops-metrics" class="metrics" style="margin-bottom:1rem"></div>'
     + '<div class="full-card"><div class="tbl-wrap"><table style="min-width:600px"><thead><tr>'
@@ -530,7 +516,7 @@ function updateOpsTable() {
   var complete   = lots.filter(function(l) { return l.status.toLowerCase().includes('complete'); }).length;
   var devs       = lots.map(function(l) { return lotDev(l); }).filter(function(d) { return d !== null; });
   var avgDev     = devs.length ? devs.reduce(function(s,d) { return s+d; }, 0) / devs.length : 0;
-  var dc         = avgDev < -2 ? '#a32d2d' : avgDev > 2 ? '#3b6d11' : 'inherit';
+  var dc         = avgDev < -2 ? '#EF9F27' : avgDev > 2 ? '#1D9E75' : '#e8e6e0';
 
   var om = document.getElementById('ops-metrics');
   if (om) om.innerHTML =
