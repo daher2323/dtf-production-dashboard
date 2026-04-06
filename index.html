@@ -208,22 +208,21 @@ function renderExec() {
   const uniqueProductionDays = new Set(lots.map(l => l.date).filter(Boolean)).size;
   const avgUnitsPerDay = uniqueProductionDays ? Math.round(totalUnits / uniqueProductionDays) : 0;
   // product type split (Line #1 + #4 = powder, Line #2 = capsules)
-  const powderLines = ['Line #1', 'Line #4', 'Line 1', 'Line 4'];
-  const capsuleLines = ['Line #2', 'Line 2'];
   var powderUnits = 0, capsuleUnits = 0;
   lineEntries.forEach(function(entry) {
-    var line = entry[0], d = entry[1];
-    var ln = line.replace(/\s/g,'').toLowerCase();
-    if (ln === 'line#1' || ln === 'line1' || ln === 'line#4' || ln === 'line4') powderUnits += d.units;
-    else if (ln === 'line#2' || ln === 'line2') capsuleUnits += d.units;
+    var ln = entry[0].replace(/\s/g,'').toLowerCase();
+    if (ln === 'line#1' || ln === 'line1' || ln === 'line#4' || ln === 'line4') powderUnits += entry[1].units;
+    else if (ln === 'line#2' || ln === 'line2') capsuleUnits += entry[1].units;
   });
   var powderPct = totalUnits ? ((powderUnits / totalUnits) * 100).toFixed(1) : 0;
   var capsulePct = totalUnits ? ((capsuleUnits / totalUnits) * 100).toFixed(1) : 0;
-
-  // line breakdown per type for sub-labels
-  var l1units = byLine['Line #1'] ? byLine['Line #1'].units : (byLine['Line 1'] ? byLine['Line 1'].units : 0);
-  var l4units = byLine['Line #4'] ? byLine['Line #4'].units : (byLine['Line 4'] ? byLine['Line 4'].units : 0);
-  var l2units = byLine['Line #2'] ? byLine['Line #2'].units : (byLine['Line 2'] ? byLine['Line 2'].units : 0);
+  var l1units = 0, l4units = 0, l2units = 0;
+  lineEntries.forEach(function(entry) {
+    var ln = entry[0].replace(/\s/g,'').toLowerCase();
+    if (ln === 'line#1' || ln === 'line1') l1units = entry[1].units;
+    else if (ln === 'line#4' || ln === 'line4') l4units = entry[1].units;
+    else if (ln === 'line#2' || ln === 'line2') l2units = entry[1].units;
+  });
 
   const devColor = avgDev < -2 ? '#EF9F27' : avgDev > 2 ? '#1D9E75' : '#e8e6e0';
   const devClass  = avgDev < -2 ? 'warn' : avgDev > 2 ? 'good' : '';
