@@ -193,7 +193,7 @@ function render() {
 }
 
 function renderExec() {
-  const lots = Object.values(lotMap);
+  const lots = Object.values(lotMap).filter(l => l != null);
   const completeLots = lots.filter(l => l.status.toLowerCase().includes('complete'));
   const partialLots  = lots.filter(l => l.status.toLowerCase().includes('partial'));
   const totalUnits   = lots.reduce((s,l) => s + l.finalUnits, 0);
