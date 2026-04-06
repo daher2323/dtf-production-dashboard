@@ -145,21 +145,7 @@ function buildLotMap(rows) {
   return m;
 }
 
-function statusOrder(s) {
-  const v = (s||'').toLowerCase();
-  if (!v) return 0;
-  if (v.includes('partial')) return 1;
-  if (v.includes('complete')) return 2;
-  return 0;
-}
-
-function defaultSort(lots) {
-  return [...lots].sort((a,b) => {
-    const dateDiff = new Date(b.date) - new Date(a.date);
-    if (dateDiff !== 0) return dateDiff;
-    return statusOrder(a.status) - statusOrder(b.status);
-  });
-}
+function lotDev(l) {
   if (!l || !l.projected) return null;
   return ((l.finalUnits - l.projected) / l.projected) * 100;
 }
