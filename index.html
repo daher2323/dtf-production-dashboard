@@ -190,6 +190,8 @@ function renderExec() {
   const totalProj    = lots.reduce((s,l) => s + l.projected, 0);
   const uniqueProds  = new Set(lots.map(l => l.product)).size;
   const uniqueCustomers = new Set(lots.map(l => (l.product||'').split('-')[0].trim()).filter(Boolean)).size;
+  const uniqueProductionDays = new Set(lots.map(l => l.date).filter(Boolean)).size;
+  const avgUnitsPerDay = uniqueProductionDays ? Math.round(totalUnits / uniqueProductionDays) : 0;
   const totalLots    = lots.length;
   const devs         = lots.map(l => lotDev(l)).filter(d => d !== null);
   const avgDev       = devs.length ? devs.reduce((s,d)=>s+d,0)/devs.length : 0;
@@ -298,6 +300,7 @@ function renderExec() {
       <div class="metric ${devClass}"><div class="label">Avg deviation</div><div class="value" style="color:${devColor}">${avgDev>0?'+':''}${avgDev.toFixed(1)}%</div><div class="sub">${highDevCount} lots >5% under</div></div>
       <div class="metric"><div class="label">Unique products</div><div class="value">${uniqueProds}</div><div class="sub">across all lots</div></div>
       <div class="metric"><div class="label">Unique customers</div><div class="value">${uniqueCustomers}</div><div class="sub">across all lots</div></div>
+      <div class="metric"><div class="label">Avg units / day</div><div class="value">${avgUnitsPerDay.toLocaleString()}</div><div class="sub">${uniqueProductionDays} production days</div></div>
     </div>
 
     <div class="full-card">
