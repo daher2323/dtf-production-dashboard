@@ -300,6 +300,7 @@ function renderExec() {
   document.getElementById('content').innerHTML = `
     <div class="metrics">
       <div class="metric info"><div class="label">Units produced</div><div class="value">${totalUnits.toLocaleString()}</div><div class="sub">vs ${totalProj.toLocaleString()} projected</div></div>
+      <div class="metric"><div class="label">Avg units / day</div><div class="value">${avgUnitsPerDay.toLocaleString()}</div><div class="sub">${uniqueProductionDays} production days</div></div>
       <div class="metric"><div class="label">Total lots</div><div class="value">${totalLots.toLocaleString()}</div><div class="sub">${completeLots.length} complete · ${partialLots.length} partial</div></div>
       <div class="metric good"><div class="label">Completion rate</div><div class="value">${pct(completeLots.length,totalLots)}%</div><div class="sub">${completeLots.length} of ${totalLots} lots</div></div>
       <div class="metric ${devClass}"><div class="label">Avg deviation</div><div class="value" style="color:${devColor}">${avgDev>0?'+':''}${avgDev.toFixed(1)}%</div><div class="sub">${highDevCount} lots >5% under</div></div>
