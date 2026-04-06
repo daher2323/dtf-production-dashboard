@@ -320,7 +320,8 @@ function renderExec() {
       </div>
       <div class="chart-card">
         <h3>Powder product mix — units by jar size</h3>
-        <div style="position:relative;height:260px"><canvas id="cJar"></canvas></div>
+        <div style="position:relative;height:180px"><canvas id="cJar"></canvas></div>
+        <div id="jar-legend" style="margin-top:8px;overflow-y:auto;max-height:120px"></div>
       </div>
     </div>
 
@@ -435,57 +436,37 @@ function renderExec() {
       }).join('')}</tbody>
     </table>`;
 
+  const JAR_COLORS=['#185fa5','#1D9E75','#EF9F27','#D4537E','#7F77DD','#D85A30','#639922','#E24B4A','#378ADD','#5DCAA5'];
   const maxJarUnits = jarEntries[0]?.[1] || 1;
   charts.jar = new Chart(document.getElementById('cJar'), {
-    type: 'bar',
+    type: 'doughnut',
     data: {
       labels: jarEntries.map(([j]) => j),
-      datasets: [{
-        data: jarEntries.map(([,v]) => v),
-        backgroundColor: '#378ADD',
-        borderRadius: 4
-      }]
+      datasets: [{ data: jarEntries.map(([,v]) => v), backgroundColor: JAR_COLORS, borderWidth: 0 }]
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: ctx => {
-              const v = ctx.raw;
-              const p = jarTotal ? ((v/jarTotal)*100).toFixed(1) : 0;
-              return `${v.toLocaleString()} units (${p}%)`;
-            }
-          }
-        },
-        datalabels: { display: false }
-      },
-      scales: {
-        x: { ticks: { font: { size: 10 } } },
-        y: { ticks: { callback: v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v } }
-      },
-      animation: {
-        onComplete: function() {
-          const chart = this;
-          const ctx = chart.ctx;
-          ctx.font = '10px system-ui';
-          ctx.fillStyle = 'rgba(100,100,100,0.85)';
-          ctx.textAlign = 'center';
-          chart.data.datasets.forEach((dataset, i) => {
-            chart.getDatasetMeta(i).data.forEach((bar, idx) => {
-              const v = dataset.data[idx];
-              const p = jarTotal ? ((v/jarTotal)*100).toFixed(1) : 0;
-              ctx.fillText(`${p}%`, bar.x, bar.y - 4);
-            });
-          });
-        }
+        tooltip: { callbacks: { label: ctx => { const v=ctx.raw; const p=jarTotal?((v/jarTotal)*100).toFixed(1):0; return `${v.toLocaleString()} units (${p}%)`; } } }
       }
     }
   });
 
-  if (charts.jarTable) { try{charts.jarTable.destroy();}catch(e){} delete charts.jarTable; }
+  document.getElementById('jar-legend').innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:11px">
+      ${jarEntries.map(([j,v],i) => {
+        const p = jarTotal ? ((v/jarTotal)*100).toFixed(1) : 0;
+        return `<tr style="border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.06))">
+          <td style="padding:3px 6px;width:12px">
+            <div style="width:10px;height:10px;border-radius:2px;background:${JAR_COLORS[i]};flex-shrink:0"></div>
+          </td>
+          <td style="padding:3px 6px;font-weight:500">${j}</td>
+          <td style="padding:3px 6px;text-align:right;white-space:nowrap">${v.toLocaleString()}</td>
+          <td style="padding:3px 6px;text-align:right;color:var(--color-text-secondary,#666);width:40px">${p}%</td>
+        </tr>`;
+      }).join('')}
+    </table>`;
 
   charts.weekly = new Chart(document.getElementById('cWeekly'),{
     type:'bar',
