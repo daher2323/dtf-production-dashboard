@@ -249,7 +249,20 @@ function renderExec() {
     .filter(w => byWeek[w] > 0)
     .slice(-6);
 
-  // --- Monthly units vs target table ---
+  // --- Production lines breakdown ---
+  const byLine = {};
+  allRows.forEach(r => {
+    const line = (r['Line']||'').trim();
+    if (!line) return;
+    if (!byLine[line]) byLine[line] = { units: 0, lots: new Set(), complete: 0, partial: 0 };
+    byLine[line].units += num(r['Final Units']);
+    byLine[line].lots.add(r['Lot Number']);
+    const st = (r['Complete or Partial']||'').toLowerCase();
+    if (st.includes('complete')) byLine[line].complete++;
+    else if (st.includes('partial')) byLine[line].partial++;
+  });
+  const lineEntries = Object.entries(byLine).sort((a,b) => b[1].units - a[1].units);
+  const maxLineUnits = lineEntries[0]?.[1].units || 1;
   const YEAR_TARGET_2 = 3927000;
   const byMonth = {};
   allRows.forEach(r => {
@@ -306,6 +319,37 @@ function renderExec() {
         <div class="value">${uniqueProds}</div>
         <div class="sub">across all lots</div>
       </div>
+    </div>
+
+    <div class="full-card" style="margin-bottom:1rem">
+      <h3>Production lines breakdown</h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr>
+          <th style="text-align:left;padding:6px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--color-text-secondary,#666);border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.15));font-weight:500">Line</th>
+          <th style="text-align:right;padding:6px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--color-text-secondary,#666);border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.15));font-weight:500">Units produced</th>
+          <th style="text-align:right;padding:6px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--color-text-secondary,#666);border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.15));font-weight:500">% of total</th>
+          <th style="text-align:right;padding:6px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--color-text-secondary,#666);border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.15));font-weight:500">Lots run</th>
+          <th style="padding:6px 10px;border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.15))"></th>
+        </tr></thead>
+        <tbody>
+          ${lineEntries.map(([line, d]) => {
+            const sharePct = totalUnits ? ((d.units / totalUnits) * 100) : 0;
+            const barW = Math.round((d.units / maxLineUnits) * 100);
+            const lotCount = d.lots.size;
+            return `<tr style="border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.06))">
+              <td style="padding:6px 10px;font-weight:500">${line}</td>
+              <td style="padding:6px 10px;text-align:right">${d.units.toLocaleString()}</td>
+              <td style="padding:6px 10px;text-align:right;color:var(--color-text-secondary,#666)">${sharePct.toFixed(1)}%</td>
+              <td style="padding:6px 10px;text-align:right;color:var(--color-text-secondary,#666)">${lotCount.toLocaleString()}</td>
+              <td style="padding:6px 10px;min-width:120px">
+                <div style="background:var(--color-background-secondary,#ececea);border-radius:3px;height:6px;overflow:hidden">
+                  <div style="height:100%;width:${barW}%;background:#1D9E75;border-radius:3px"></div>
+                </div>
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table></div>
     </div>
 
     <div class="full-card" style="margin-bottom:1rem">
