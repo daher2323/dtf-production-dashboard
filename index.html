@@ -110,6 +110,7 @@ function num(v) {
   const n = parseFloat(String(v).replace(/,/g,'').replace(/[^0-9.\-]/g,''));
   return isNaN(n) ? 0 : n;
 }
+
 function pct(a,b) { return b ? Math.round((a/b)*100) : 0; }
 
 function buildLotMap(rows) {
@@ -145,21 +146,7 @@ function buildLotMap(rows) {
   return m;
 }
 
-function statusOrder(s) {
-  const v = (s||'').toLowerCase();
-  if (!v) return 0;
-  if (v.includes('partial')) return 1;
-  if (v.includes('complete')) return 2;
-  return 0;
-}
-
-function defaultSort(lots) {
-  return [...lots].sort((a,b) => {
-    const dateDiff = new Date(b.date) - new Date(a.date);
-    if (dateDiff !== 0) return dateDiff;
-    return statusOrder(a.status) - statusOrder(b.status);
-  });
-}
+function lotDev(l) {
   if (!l || !l.projected) return null;
   return ((l.finalUnits - l.projected) / l.projected) * 100;
 }
@@ -168,12 +155,12 @@ function jarSizeKey(j) {
   if (!j) return null;
   j = j.trim();
   const galMatch = j.match(/(\d+(?:\.\d+)?)\s*gallon/i);
-  if (galMatch) return `${galMatch[1]} Gallon`;
+  if (galMatch) return galMatch[1] + ' Gallon';
   const unitMatch = j.match(/^(\d+(?:\.\d+)?)\s*(oz|cc|ml|lb|gal|g)\b/i);
   if (unitMatch) {
     const n = unitMatch[1], u = unitMatch[2].toLowerCase();
-    if (u === 'g' || u === 'gal') return `${n} Gallon`;
-    return `${n}${u}`;
+    if (u === 'g' || u === 'gal') return n + ' Gallon';
+    return n + u;
   }
   return j;
 }
@@ -187,7 +174,9 @@ fetch(CSV_URL)
     document.getElementById('content').style.display = 'block';
     render();
   })
-  .catch(e => { document.getElementById('loading').textContent = 'Failed to load data: ' + e.message; });
+  .catch(e => {
+    document.getElementById('loading').textContent = 'Failed to load data: ' + e.message;
+  });
 
 function setView(v) {
   currentView = v;
@@ -196,12 +185,12 @@ function setView(v) {
 }
 
 function render() {
-  Object.values(charts).forEach(c => { try{c.destroy();}catch(e){} });
+  Object.values(charts).forEach(c => { try { c.destroy(); } catch(e) {} });
   charts = {};
   try {
     currentView === 'exec' ? renderExec() : renderOps();
   } catch(e) {
-    document.getElementById('content').innerHTML = `<div style="padding:2rem;color:#a32d2d;font-size:12px;font-family:monospace">Error: ${e.message}<br><br>${(e.stack||'').split('\n').slice(0,5).join('<br>')}</div>`;
+    document.getElementById('content').innerHTML = '<div style="padding:2rem;color:#a32d2d;font-size:12px;font-family:monospace">Error: ' + e.message + '<br><br>' + (e.stack||'').split('\n').slice(0,5).join('<br>') + '</div>';
   }
 }
 
@@ -215,20 +204,17 @@ function renderExec() {
   const uniqueCustomers = new Set(lots.map(l => (l.product||'').split('-')[0].trim()).filter(Boolean)).size;
   const totalLots    = lots.length;
   const devs         = lots.map(l => lotDev(l)).filter(d => d !== null);
-  const avgDev       = devs.length ? devs.reduce((s,d)=>s+d,0)/devs.length : 0;
+  const avgDev       = devs.length ? devs.reduce((s,d) => s+d, 0) / devs.length : 0;
   const highDevCount = devs.filter(d => d < -5).length;
 
-  // unique production days & avg units/day
   const uniqueProductionDays = new Set(lots.map(l => l.date).filter(Boolean)).size;
   const avgUnitsPerDay = uniqueProductionDays ? Math.round(totalUnits / uniqueProductionDays) : 0;
 
-  // date range
   const dates = allRows.map(r => new Date(r['Date'])).filter(d => !isNaN(d));
   const minDate = new Date(Math.min(...dates)), maxDate = new Date(Math.max(...dates));
-  const fmt = d => `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`;
-  if (dates.length) document.getElementById('data-range').textContent = `Data: ${fmt(minDate)} – ${fmt(maxDate)}`;
+  const fmt = d => (d.getMonth()+1) + '/' + d.getDate() + '/' + d.getFullYear();
+  if (dates.length) document.getElementById('data-range').textContent = 'Data: ' + fmt(minDate) + ' \u2013 ' + fmt(maxDate);
 
-  // year-end projection
   const now = new Date();
   const dayOfYear = Math.ceil((now - new Date(now.getFullYear(),0,1)) / 86400000);
   const yearProjected = Math.round((totalUnits / dayOfYear) * 365);
@@ -236,389 +222,371 @@ function renderExec() {
   const targetPct = Math.round((yearProjected / YEAR_TARGET) * 100);
   const onTrack = yearProjected >= YEAR_TARGET;
 
-  // top products
   const byProd = {};
   lots.forEach(l => { byProd[l.product] = (byProd[l.product]||0) + l.finalUnits; });
-  const topProds = Object.entries(byProd).sort((a,b)=>b[1]-a[1]).slice(0,8);
-  const maxProdUnits = topProds[0]?.[1] || 1;
+  const topProds = Object.entries(byProd).sort((a,b) => b[1]-a[1]).slice(0,8);
+  const maxProdUnits = topProds[0] ? topProds[0][1] : 1;
 
-  // powder mix by jar size
   const byJar = {};
   lots.forEach(l => {
     const k = jarSizeKey(l.jarSize);
     if (!k) return;
     byJar[k] = (byJar[k]||0) + l.finalUnits;
   });
-  const jarEntries = Object.entries(byJar).sort((a,b)=>b[1]-a[1]).slice(0,10);
-  const jarTotal = jarEntries.reduce((s,[,v])=>s+v,0);
+  const jarEntries = Object.entries(byJar).sort((a,b) => b[1]-a[1]).slice(0,10);
+  const jarTotal = jarEntries.reduce((s,e) => s+e[1], 0);
 
-  // weekly trend
   const byWeek = {};
   allRows.forEach(r => {
     const w = (r['WEEK NUMBER']||'').trim();
     if (!w) return;
     byWeek[w] = (byWeek[w]||0) + num(r['Final Units']);
   });
-  const currentWeekNum = (() => {
+  const currentWeekNum = (function() {
     const d = new Date(now); d.setHours(0,0,0,0);
     const jan1 = new Date(d.getFullYear(),0,1);
     return Math.ceil(((d-jan1)/86400000 + jan1.getDay()+1)/7);
   })();
   const weeks = Object.keys(byWeek)
-    .sort((a,b) => { const an=parseFloat(a),bn=parseFloat(b); return (!isNaN(an)&&!isNaN(bn))?an-bn:a.localeCompare(b); })
-    .filter(w => byWeek[w] > 0).slice(-6);
+    .sort((a,b) => { const an=parseFloat(a), bn=parseFloat(b); return (!isNaN(an)&&!isNaN(bn)) ? an-bn : a.localeCompare(b); })
+    .filter(w => byWeek[w] > 0)
+    .slice(-6);
 
-  // monthly vs target
   const byMonth = {};
   allRows.forEach(r => {
     const d = new Date(r['Date']);
     if (isNaN(d)) return;
-    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-    if (!byMonth[key]) byMonth[key] = { year:d.getFullYear(), month:d.getMonth()+1, units:0 };
+    const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+    if (!byMonth[key]) byMonth[key] = { year: d.getFullYear(), month: d.getMonth()+1, units: 0 };
     byMonth[key].units += num(r['Final Units']);
   });
-  const monthRows = Object.keys(byMonth).sort().map(k => {
-    const {year,month,units} = byMonth[k];
-    const daysInMonth = new Date(year,month,0).getDate();
-    const daysInYear  = (year%4===0&&(year%100!==0||year%400===0))?366:365;
-    const fullMonthTarget = Math.round((daysInMonth/daysInYear)*YEAR_TARGET);
-    const isCurrentMonth = (now.getFullYear()===year && now.getMonth()+1===month);
+  const monthRows = Object.keys(byMonth).sort().map(function(k) {
+    const mo = byMonth[k];
+    const daysInMonth = new Date(mo.year, mo.month, 0).getDate();
+    const daysInYear  = (mo.year%4===0 && (mo.year%100!==0 || mo.year%400===0)) ? 366 : 365;
+    const fullMonthTarget = Math.round((daysInMonth / daysInYear) * YEAR_TARGET);
+    const isCurrentMonth  = (now.getFullYear()===mo.year && now.getMonth()+1===mo.month);
     const target = isCurrentMonth ? Math.round(fullMonthTarget * now.getDate() / daysInMonth) : fullMonthTarget;
-    const pctOfTarget = target ? (units/target)*100 : 0;
-    const label = `${String(month).padStart(2,'0')}/${year}`;
-    return {label,units,target,pctOfTarget,isCurrentMonth,daysInMonth,daysSoFar:now.getDate()};
+    const pctOfTarget = target ? (mo.units / target) * 100 : 0;
+    const label = String(mo.month).padStart(2,'0') + '/' + mo.year;
+    return { label: label, units: mo.units, target: target, pctOfTarget: pctOfTarget, isCurrentMonth: isCurrentMonth, daysInMonth: daysInMonth, daysSoFar: now.getDate() };
   });
 
-  // production lines
   const byLine = {};
   lots.forEach(l => {
     const line = (l.line||'').trim();
     if (!line) return;
-    if (!byLine[line]) byLine[line] = { units:0, lots:new Set(), dates:new Set() };
+    if (!byLine[line]) byLine[line] = { units: 0, lots: new Set(), dates: new Set() };
     byLine[line].units += l.finalUnits;
     byLine[line].lots.add(l.lot);
     if (l.date) byLine[line].dates.add(l.date);
   });
   const lineEntries = Object.entries(byLine).sort((a,b) => {
-    const na=parseInt(a[0].replace(/\D/g,'')), nb=parseInt(b[0].replace(/\D/g,''));
-    return na-nb;
+    const na = parseInt(a[0].replace(/\D/g,'')), nb = parseInt(b[0].replace(/\D/g,''));
+    return na - nb;
   });
-  const maxLineUnits = lineEntries[0]?.[1]?.units || 1;
-  const lineTotal = lineEntries.reduce((s,[,d])=>s+d.units,0);
+  const maxLineUnits = lineEntries[0] ? lineEntries[0][1].units : 1;
+  const lineTotal = lineEntries.reduce((s,e) => s + e[1].units, 0);
 
-  // product performance
   const prodDetail = {};
   lots.forEach(l => {
-    if (!prodDetail[l.product]) prodDetail[l.product]={proj:0,final:0,lots:0};
-    prodDetail[l.product].proj+=l.projected;
-    prodDetail[l.product].final+=l.finalUnits;
+    if (!prodDetail[l.product]) prodDetail[l.product] = { proj: 0, final: 0, lots: 0 };
+    prodDetail[l.product].proj  += l.projected;
+    prodDetail[l.product].final += l.finalUnits;
     prodDetail[l.product].lots++;
   });
-  const top10=Object.entries(prodDetail).sort((a,b)=>b[1].final-a[1].final).slice(0,10);
+  const top10 = Object.entries(prodDetail).sort((a,b) => b[1].final - a[1].final).slice(0,10);
 
-  const devColor = avgDev<-2?'#a32d2d':avgDev>2?'#3b6d11':'inherit';
-  const devClass  = avgDev<-2?'warn':avgDev>2?'good':'';
+  const devColor = avgDev < -2 ? '#a32d2d' : avgDev > 2 ? '#3b6d11' : 'inherit';
+  const devClass  = avgDev < -2 ? 'warn'    : avgDev > 2 ? 'good'    : '';
 
-  document.getElementById('content').innerHTML = `
-    <div class="metrics">
-      <div class="metric info"><div class="label">Units produced</div><div class="value">${totalUnits.toLocaleString()}</div><div class="sub">vs ${totalProj.toLocaleString()} projected</div></div>
-      <div class="metric"><div class="label">Avg units / day</div><div class="value">${avgUnitsPerDay.toLocaleString()}</div><div class="sub">${uniqueProductionDays} production days</div></div>
-      <div class="metric"><div class="label">Total lots</div><div class="value">${totalLots.toLocaleString()}</div><div class="sub">${completeLots.length} complete · ${partialLots.length} partial</div></div>
-      <div class="metric good"><div class="label">Completion rate</div><div class="value">${pct(completeLots.length,totalLots)}%</div><div class="sub">${completeLots.length} of ${totalLots} lots</div></div>
-      <div class="metric ${devClass}"><div class="label">Avg deviation</div><div class="value" style="color:${devColor}">${avgDev>0?'+':''}${avgDev.toFixed(1)}%</div><div class="sub">${highDevCount} lots >5% under</div></div>
-      <div class="metric"><div class="label">Unique products</div><div class="value">${uniqueProds}</div><div class="sub">across all lots</div></div>
-      <div class="metric"><div class="label">Unique customers</div><div class="value">${uniqueCustomers}</div><div class="sub">across all lots</div></div>
-    </div>
+  var monthRowsHTML = monthRows.map(function(m) {
+    var isGreen  = m.pctOfTarget >= 100;
+    var isYellow = m.pctOfTarget >= 80 && m.pctOfTarget < 100;
+    var textColor = isGreen ? '#3b6d11' : isYellow ? '#854f0b' : '#a32d2d';
+    var barColor  = isGreen ? '#639922' : isYellow ? '#EF9F27' : '#a32d2d';
+    var bw = Math.min(Math.round(m.pctOfTarget), 100);
+    var targetLabel = m.isCurrentMonth
+      ? m.target.toLocaleString() + ' <span style="font-size:10px;color:var(--color-text-tertiary,#999)">(' + m.daysSoFar + '/' + m.daysInMonth + ' days)</span>'
+      : m.target.toLocaleString();
+    return '<tr>'
+      + '<td style="font-weight:500">' + m.label + '</td>'
+      + '<td style="text-align:right">' + m.units.toLocaleString() + '</td>'
+      + '<td style="text-align:right;color:var(--color-text-secondary,#666)">' + targetLabel + '</td>'
+      + '<td style="text-align:right;font-weight:500;color:' + textColor + '">' + m.pctOfTarget.toFixed(2) + '%</td>'
+      + '<td style="min-width:100px;padding:6px 10px"><div style="background:var(--color-background-secondary,#ececea);border-radius:3px;height:6px;overflow:hidden"><div style="height:100%;width:' + bw + '%;background:' + barColor + ';border-radius:3px"></div></div></td>'
+      + '</tr>';
+  }).join('');
 
-    <div class="full-card">
-      <h3>Year-end projection vs target</h3>
-      <div style="display:flex;align-items:center;gap:2rem;flex-wrap:wrap;margin-bottom:1rem">
-        <div><div style="font-size:11px;color:var(--color-text-secondary,#666);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Day of year</div><div style="font-size:20px;font-weight:500">${dayOfYear} <span style="font-size:13px;color:var(--color-text-secondary,#666)">of 365</span></div></div>
-        <div><div style="font-size:11px;color:var(--color-text-secondary,#666);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Units to date</div><div style="font-size:20px;font-weight:500">${totalUnits.toLocaleString()}</div></div>
-        <div><div style="font-size:11px;color:var(--color-text-secondary,#666);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Year-end projection</div><div style="font-size:20px;font-weight:500;color:${onTrack?'#3b6d11':'#a32d2d'}">${yearProjected.toLocaleString()}</div></div>
-        <div><div style="font-size:11px;color:var(--color-text-secondary,#666);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Year-end target</div><div style="font-size:20px;font-weight:500">3,927,000</div></div>
-        <div><div style="font-size:11px;color:var(--color-text-secondary,#666);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">vs target</div><div style="font-size:20px;font-weight:500;color:${onTrack?'#3b6d11':'#a32d2d'}">${onTrack?'+':''}${toTarget.toLocaleString()} <span style="font-size:13px">(${targetPct}%)</span></div></div>
-      </div>
-      <div style="background:var(--color-background-secondary,#ececea);border-radius:8px;height:12px;overflow:hidden">
-        <div style="height:100%;width:${Math.min(targetPct,100)}%;background:${onTrack?'#639922':'#a32d2d'};border-radius:8px"></div>
-      </div>
-      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--color-text-tertiary,#999);margin-top:4px">
-        <span>0</span><span style="color:${onTrack?'#3b6d11':'#a32d2d'};font-weight:500">${targetPct}% of target</span><span>3,927,000</span>
-      </div>
-    </div>
+  var lineRowsHTML = lineEntries.map(function(entry) {
+    var line = entry[0], d = entry[1];
+    var sp = lineTotal ? ((d.units / lineTotal) * 100) : 0;
+    var bw = Math.round((d.units / maxLineUnits) * 100);
+    return '<tr>'
+      + '<td style="font-weight:500">' + line + '</td>'
+      + '<td style="text-align:right;white-space:nowrap">' + d.units.toLocaleString() + '</td>'
+      + '<td style="padding:6px 10px"><div style="background:var(--color-background-secondary,#ececea);border-radius:3px;height:6px;overflow:hidden"><div style="height:100%;width:' + bw + '%;background:#1D9E75;border-radius:3px"></div></div></td>'
+      + '<td style="text-align:right;color:var(--color-text-secondary,#666)">' + sp.toFixed(1) + '%</td>'
+      + '<td style="text-align:right;color:var(--color-text-secondary,#666)">' + d.lots.size.toLocaleString() + '</td>'
+      + '</tr>';
+  }).join('');
 
-    <div class="charts-row">
-      <div class="chart-card">
-        <h3>Top products by units produced</h3>
-        <div id="top-prods-table" style="overflow-y:auto;max-height:260px"></div>
-      </div>
-      <div class="chart-card">
-        <h3>Powder product mix — units by jar size</h3>
-        <div style="position:relative;height:180px"><canvas id="cJar"></canvas></div>
-        <div id="jar-legend" style="margin-top:8px;overflow-y:auto;max-height:120px"></div>
-      </div>
-    </div>
+  var top10HTML = top10.map(function(entry) {
+    var prod = entry[0], d = entry[1];
+    var dev = d.proj ? ((d.final - d.proj) / d.proj * 100) : 0;
+    var dc  = dev < -5 ? 'color:#a32d2d' : dev > 5 ? 'color:#3b6d11' : '';
+    return '<tr>'
+      + '<td style="font-weight:500">' + prod + '</td>'
+      + '<td style="text-align:right">' + d.lots + '</td>'
+      + '<td style="text-align:right">' + d.proj.toLocaleString() + '</td>'
+      + '<td style="text-align:right">' + d.final.toLocaleString() + '</td>'
+      + '<td style="text-align:right;' + dc + '">' + (dev>0?'+':'') + dev.toFixed(1) + '%</td>'
+      + '</tr>';
+  }).join('');
 
-    <div class="chart-card" style="margin-bottom:1rem">
-      <h3>Weekly units produced — last 6 weeks</h3>
-      <div style="position:relative;height:200px"><canvas id="cWeekly"></canvas></div>
-    </div>
+  var topProdsHTML = topProds.map(function(entry, i) {
+    var p = entry[0], v = entry[1];
+    var bw = Math.round((v / maxProdUnits) * 100);
+    return '<tr style="border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.06))">'
+      + '<td style="padding:5px 8px;color:var(--color-text-tertiary,#999);font-size:11px">' + (i+1) + '</td>'
+      + '<td style="padding:5px 8px;font-weight:500">' + p + '</td>'
+      + '<td style="padding:5px 8px;text-align:right;white-space:nowrap">' + v.toLocaleString() + '</td>'
+      + '<td style="padding:5px 8px"><div style="background:var(--color-background-secondary,#ececea);border-radius:3px;height:6px;overflow:hidden"><div style="height:100%;width:' + bw + '%;background:#378ADD;border-radius:3px"></div></div></td>'
+      + '</tr>';
+  }).join('');
 
-    <div class="full-card">
-      <h3>Production lines breakdown</h3>
-      <div class="tbl-wrap"><table>
-        <thead><tr>
-          <th>Line</th>
-          <th style="text-align:right">Units produced</th>
-          <th style="min-width:140px"></th>
-          <th style="text-align:right">% of total</th>
-          <th style="text-align:right">Lots run</th>
-        </tr></thead>
-        <tbody>${lineEntries.map(([line,d]) => {
-          const sp = lineTotal ? ((d.units/lineTotal)*100) : 0;
-          const bw = Math.round((d.units/maxLineUnits)*100);
-          return `<tr>
-            <td style="font-weight:500">${line}</td>
-            <td style="text-align:right;white-space:nowrap">${d.units.toLocaleString()}</td>
-            <td style="padding:6px 10px">
-              <div style="background:var(--color-background-secondary,#ececea);border-radius:3px;height:6px;overflow:hidden">
-                <div style="height:100%;width:${bw}%;background:#1D9E75;border-radius:3px"></div>
-              </div>
-            </td>
-            <td style="text-align:right;color:var(--color-text-secondary,#666)">${sp.toFixed(1)}%</td>
-            <td style="text-align:right;color:var(--color-text-secondary,#666)">${d.lots.size.toLocaleString()}</td>
-          </tr>`;
-        }).join('')}</tbody>
-      </table></div>
-    </div>
+  var jarLegendHTML = jarEntries.map(function(entry, i) {
+    var j = entry[0], v = entry[1];
+    var p = jarTotal ? ((v / jarTotal) * 100).toFixed(1) : 0;
+    var colors = ['#185fa5','#1D9E75','#EF9F27','#D4537E','#7F77DD','#D85A30','#639922','#E24B4A','#378ADD','#5DCAA5'];
+    return '<tr style="border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.06))">'
+      + '<td style="padding:3px 6px;width:16px"><div style="width:10px;height:10px;border-radius:2px;background:' + colors[i] + '"></div></td>'
+      + '<td style="padding:3px 6px;font-weight:500">' + j + '</td>'
+      + '<td style="padding:3px 6px;text-align:right;white-space:nowrap">' + v.toLocaleString() + '</td>'
+      + '<td style="padding:3px 6px;text-align:right;color:var(--color-text-secondary,#666);width:40px">' + p + '%</td>'
+      + '</tr>';
+  }).join('');
 
-    <div class="full-card">
-      <h3>Units produced by month vs. target</h3>
-      <div class="tbl-wrap"><table>
-        <thead><tr>
-          <th>Month</th>
-          <th style="text-align:right">Actual</th>
-          <th style="text-align:right">Target</th>
-          <th style="text-align:right">% of target</th>
-          <th></th>
-        </tr></thead>
-        <tbody>${monthRows.map(m => {
-          const over = m.pctOfTarget >= 100;
-          const warn = m.pctOfTarget >= 80;
-          const pc = over ? '#3b6d11' : warn ? '#854f0b' : '#a32d2d';
-          const barColor = over ? '#639922' : warn ? '#EF9F27' : '#a32d2d';
-          const bw = Math.min(Math.round(m.pctOfTarget),100);
-          const targetLabel = m.isCurrentMonth
-            ? `${m.target.toLocaleString()} <span style="font-size:10px;color:var(--color-text-tertiary,#999)">(${m.daysSoFar}/${m.daysInMonth} days)</span>`
-            : m.target.toLocaleString();
-          return `<tr>
-            <td style="font-weight:500">${m.label}</td>
-            <td style="text-align:right">${m.units.toLocaleString()}</td>
-            <td style="text-align:right;color:var(--color-text-secondary,#666)">${targetLabel}</td>
-            <td style="text-align:right;font-weight:500;color:${pc}">${m.pctOfTarget.toFixed(2)}%</td>
-            <td style="min-width:100px;padding:6px 10px">
-              <div style="background:var(--color-background-secondary,#ececea);border-radius:3px;height:6px;overflow:hidden">
-                <div style="height:100%;width:${Math.min(Math.round(m.pctOfTarget),100)}%;background:${barColor};border-radius:3px"></div>
-              </div>
-            </td>
-          </tr>`;
-        }).join('')}</tbody>
-      </table></div>
-    </div>
+  var weekColors = weeks.map(w => parseInt(w) === currentWeekNum ? 'rgba(55,138,221,0.35)' : '#378ADD');
+  var weekLabels = weeks.map(w => parseInt(w) === currentWeekNum ? 'Week ' + w + ' (current)' : 'Week ' + w);
 
-    <div class="full-card">
-      <h3>Product performance — top 10 by volume</h3>
-      <div class="tbl-wrap"><table>
-        <thead><tr>
-          <th>Product</th><th style="text-align:right">Lots</th>
-          <th style="text-align:right">Projected</th>
-          <th style="text-align:right">Units produced</th>
-          <th style="text-align:right">Avg deviation</th>
-        </tr></thead>
-        <tbody>${top10.map(([prod,d])=>{
-          const dev=d.proj?((d.final-d.proj)/d.proj*100):0;
-          const dc=dev<-5?'color:#a32d2d':dev>5?'color:#3b6d11':'';
-          return `<tr>
-            <td style="font-weight:500">${prod}</td>
-            <td style="text-align:right">${d.lots}</td>
-            <td style="text-align:right">${d.proj.toLocaleString()}</td>
-            <td style="text-align:right">${d.final.toLocaleString()}</td>
-            <td style="text-align:right;${dc}">${dev>0?'+':''}${dev.toFixed(1)}%</td>
-          </tr>`;
-        }).join('')}</tbody>
-      </table></div>
-    </div>
-  `;
+  document.getElementById('content').innerHTML =
+    '<div class="metrics">'
+    + '<div class="metric info"><div class="label">Units produced</div><div class="value">' + totalUnits.toLocaleString() + '</div><div class="sub">vs ' + totalProj.toLocaleString() + ' projected</div></div>'
+    + '<div class="metric"><div class="label">Avg units / day</div><div class="value">' + avgUnitsPerDay.toLocaleString() + '</div><div class="sub">' + uniqueProductionDays + ' production days</div></div>'
+    + '<div class="metric"><div class="label">Total lots</div><div class="value">' + totalLots.toLocaleString() + '</div><div class="sub">' + completeLots.length + ' complete \u00b7 ' + partialLots.length + ' partial</div></div>'
+    + '<div class="metric good"><div class="label">Completion rate</div><div class="value">' + pct(completeLots.length,totalLots) + '%</div><div class="sub">' + completeLots.length + ' of ' + totalLots + ' lots</div></div>'
+    + '<div class="metric ' + devClass + '"><div class="label">Avg deviation</div><div class="value" style="color:' + devColor + '">' + (avgDev>0?'+':'') + avgDev.toFixed(1) + '%</div><div class="sub">' + highDevCount + ' lots >5% under</div></div>'
+    + '<div class="metric"><div class="label">Unique products</div><div class="value">' + uniqueProds + '</div><div class="sub">across all lots</div></div>'
+    + '<div class="metric"><div class="label">Unique customers</div><div class="value">' + uniqueCustomers + '</div><div class="sub">across all lots</div></div>'
+    + '</div>'
 
-  // top products table
-  document.getElementById('top-prods-table').innerHTML = `
-    <table style="width:100%;border-collapse:collapse;font-size:12px">
-      <thead><tr>
-        <th style="text-align:left;padding:4px 8px;color:var(--color-text-secondary,#666);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.03em;border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.1))">#</th>
-        <th style="text-align:left;padding:4px 8px;color:var(--color-text-secondary,#666);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.03em;border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.1))">Product</th>
-        <th style="text-align:right;padding:4px 8px;color:var(--color-text-secondary,#666);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.03em;border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.1))">Units</th>
-        <th style="border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.1));width:80px"></th>
-      </tr></thead>
-      <tbody>${topProds.map(([p,v],i)=>{
-        const bw=Math.round((v/maxProdUnits)*100);
-        return `<tr style="border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.06))">
-          <td style="padding:5px 8px;color:var(--color-text-tertiary,#999);font-size:11px">${i+1}</td>
-          <td style="padding:5px 8px;font-weight:500">${p}</td>
-          <td style="padding:5px 8px;text-align:right;white-space:nowrap">${v.toLocaleString()}</td>
-          <td style="padding:5px 8px">
-            <div style="background:var(--color-background-secondary,#ececea);border-radius:3px;height:6px;overflow:hidden">
-              <div style="height:100%;width:${bw}%;background:#378ADD;border-radius:3px"></div>
-            </div>
-          </td>
-        </tr>`;
-      }).join('')}</tbody>
-    </table>`;
+    + '<div class="full-card">'
+    + '<h3>Year-end projection vs target</h3>'
+    + '<div style="display:flex;align-items:center;gap:2rem;flex-wrap:wrap;margin-bottom:1rem">'
+    + '<div><div style="font-size:11px;color:var(--color-text-secondary,#666);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Day of year</div><div style="font-size:20px;font-weight:500">' + dayOfYear + ' <span style="font-size:13px;color:var(--color-text-secondary,#666)">of 365</span></div></div>'
+    + '<div><div style="font-size:11px;color:var(--color-text-secondary,#666);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Units to date</div><div style="font-size:20px;font-weight:500">' + totalUnits.toLocaleString() + '</div></div>'
+    + '<div><div style="font-size:11px;color:var(--color-text-secondary,#666);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Year-end projection</div><div style="font-size:20px;font-weight:500;color:' + (onTrack?'#3b6d11':'#a32d2d') + '">' + yearProjected.toLocaleString() + '</div></div>'
+    + '<div><div style="font-size:11px;color:var(--color-text-secondary,#666);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Year-end target</div><div style="font-size:20px;font-weight:500">3,927,000</div></div>'
+    + '<div><div style="font-size:11px;color:var(--color-text-secondary,#666);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">vs target</div><div style="font-size:20px;font-weight:500;color:' + (onTrack?'#3b6d11':'#a32d2d') + '">' + (onTrack?'+':'') + toTarget.toLocaleString() + ' <span style="font-size:13px">(' + targetPct + '%)</span></div></div>'
+    + '</div>'
+    + '<div style="background:var(--color-background-secondary,#ececea);border-radius:8px;height:12px;overflow:hidden"><div style="height:100%;width:' + Math.min(targetPct,100) + '%;background:' + (onTrack?'#639922':'#a32d2d') + ';border-radius:8px"></div></div>'
+    + '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--color-text-tertiary,#999);margin-top:4px"><span>0</span><span style="color:' + (onTrack?'#3b6d11':'#a32d2d') + ';font-weight:500">' + targetPct + '% of target</span><span>3,927,000</span></div>'
+    + '</div>'
 
-  const JAR_COLORS=['#185fa5','#1D9E75','#EF9F27','#D4537E','#7F77DD','#D85A30','#639922','#E24B4A','#378ADD','#5DCAA5'];
-  charts.jar = new Chart(document.getElementById('cJar'),{
-    type:'doughnut',
-    data:{ labels:jarEntries.map(([j])=>j), datasets:[{data:jarEntries.map(([,v])=>v),backgroundColor:JAR_COLORS,borderWidth:0}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>{const v=ctx.raw;const p=jarTotal?((v/jarTotal)*100).toFixed(1):0;return `${v.toLocaleString()} units (${p}%)`;
-    }}}}}
+    + '<div class="charts-row">'
+    + '<div class="chart-card"><h3>Top products by units produced</h3><div id="top-prods-table" style="overflow-y:auto;max-height:260px"></div></div>'
+    + '<div class="chart-card"><h3>Powder product mix \u2014 units by jar size</h3><div style="position:relative;height:180px"><canvas id="cJar"></canvas></div><div id="jar-legend" style="margin-top:8px;overflow-y:auto;max-height:120px"></div></div>'
+    + '</div>'
+
+    + '<div class="chart-card" style="margin-bottom:1rem"><h3>Weekly units produced \u2014 last 6 weeks</h3><div style="position:relative;height:200px"><canvas id="cWeekly"></canvas></div></div>'
+
+    + '<div class="full-card"><h3>Production lines breakdown</h3><div class="tbl-wrap"><table><thead><tr>'
+    + '<th>Line</th><th style="text-align:right">Units produced</th><th style="min-width:140px"></th><th style="text-align:right">% of total</th><th style="text-align:right">Lots run</th>'
+    + '</tr></thead><tbody>' + lineRowsHTML + '</tbody></table></div></div>'
+
+    + '<div class="full-card"><h3>Units produced by month vs. target</h3><div class="tbl-wrap"><table><thead><tr>'
+    + '<th>Month</th><th style="text-align:right">Actual</th><th style="text-align:right">Target</th><th style="text-align:right">% of target</th><th></th>'
+    + '</tr></thead><tbody>' + monthRowsHTML + '</tbody></table></div></div>'
+
+    + '<div class="full-card"><h3>Product performance \u2014 top 10 by volume</h3><div class="tbl-wrap"><table><thead><tr>'
+    + '<th>Product</th><th style="text-align:right">Lots</th><th style="text-align:right">Projected</th><th style="text-align:right">Units produced</th><th style="text-align:right">Avg deviation</th>'
+    + '</tr></thead><tbody>' + top10HTML + '</tbody></table></div></div>';
+
+  document.getElementById('top-prods-table').innerHTML =
+    '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>'
+    + '<th style="text-align:left;padding:4px 8px;color:var(--color-text-secondary,#666);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.03em;border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.1))">#</th>'
+    + '<th style="text-align:left;padding:4px 8px;color:var(--color-text-secondary,#666);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.03em;border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.1))">Product</th>'
+    + '<th style="text-align:right;padding:4px 8px;color:var(--color-text-secondary,#666);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.03em;border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.1))">Units</th>'
+    + '<th style="border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.1));width:80px"></th>'
+    + '</tr></thead><tbody>' + topProdsHTML + '</tbody></table>';
+
+  document.getElementById('jar-legend').innerHTML =
+    '<table style="width:100%;border-collapse:collapse;font-size:11px"><tbody>' + jarLegendHTML + '</tbody></table>';
+
+  var JAR_COLORS = ['#185fa5','#1D9E75','#EF9F27','#D4537E','#7F77DD','#D85A30','#639922','#E24B4A','#378ADD','#5DCAA5'];
+  charts.jar = new Chart(document.getElementById('cJar'), {
+    type: 'doughnut',
+    data: {
+      labels: jarEntries.map(e => e[0]),
+      datasets: [{ data: jarEntries.map(e => e[1]), backgroundColor: JAR_COLORS, borderWidth: 0 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: function(ctx) {
+          var v = ctx.raw;
+          var p = jarTotal ? ((v/jarTotal)*100).toFixed(1) : 0;
+          return v.toLocaleString() + ' units (' + p + '%)';
+        }}}
+      }
+    }
   });
 
-  document.getElementById('jar-legend').innerHTML = `
-    <table style="width:100%;border-collapse:collapse;font-size:11px">
-      ${jarEntries.map(([j,v],i) => {
-        const p = jarTotal ? ((v/jarTotal)*100).toFixed(1) : 0;
-        return `<tr style="border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.06))">
-          <td style="padding:3px 6px;width:16px"><div style="width:10px;height:10px;border-radius:2px;background:${JAR_COLORS[i]}"></div></td>
-          <td style="padding:3px 6px;font-weight:500">${j}</td>
-          <td style="padding:3px 6px;text-align:right;white-space:nowrap">${v.toLocaleString()}</td>
-          <td style="padding:3px 6px;text-align:right;color:var(--color-text-secondary,#666);width:40px">${p}%</td>
-        </tr>`;
-      }).join('')}
-    </table>`;
-
-  const weekColors = weeks.map(w => parseInt(w)===currentWeekNum ? 'rgba(55,138,221,0.35)' : '#378ADD');
-  const weekLabels = weeks.map(w => parseInt(w)===currentWeekNum ? `Week ${w} (current)` : `Week ${w}`);
-  charts.weekly = new Chart(document.getElementById('cWeekly'),{
-    type:'bar',
-    data:{ labels:weekLabels, datasets:[{label:'Units produced',data:weeks.map(w=>byWeek[w]),backgroundColor:weekColors,borderRadius:4}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:11}}},y:{ticks:{callback:v=>v.toLocaleString()}}}}
+  charts.weekly = new Chart(document.getElementById('cWeekly'), {
+    type: 'bar',
+    data: {
+      labels: weekLabels,
+      datasets: [{ label: 'Units produced', data: weeks.map(w => byWeek[w]), backgroundColor: weekColors, borderRadius: 4 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { x: { ticks: { font: { size: 11 } } }, y: { ticks: { callback: function(v) { return v.toLocaleString(); } } } }
+    }
   });
 }
 
 function renderOps() {
   const lots = Object.values(lotMap).filter(Boolean);
-  const products    = [...new Set(lots.map(l=>l.product).filter(Boolean))].sort();
-  const weeks       = [...new Set(lots.map(l=>l.week).filter(Boolean))].sort();
-  const bottleSizes = [...new Set(allRows.map(r=>r['Bottle Size']).filter(Boolean))].sort();
-  const jarSizes    = [...new Set(allRows.map(r=>r['Jar Size']).filter(Boolean))].sort();
+  const products    = [...new Set(lots.map(l => l.product).filter(Boolean))].sort();
+  const weeks       = [...new Set(lots.map(l => l.week).filter(Boolean))].sort();
+  const bottleSizes = [...new Set(allRows.map(r => r['Bottle Size']).filter(Boolean))].sort();
+  const jarSizes    = [...new Set(allRows.map(r => r['Jar Size']).filter(Boolean))].sort();
 
-  document.getElementById('content').innerHTML = `
-    <div class="filters">
-      <input type="text" id="fSearch" placeholder="Search lot # or product…" style="min-width:180px" oninput="applyFilters()">
-      <select id="fProduct" onchange="applyFilters()"><option value="">All products</option>${products.map(p=>`<option>${p}</option>`).join('')}</select>
-      <select id="fStatus" onchange="applyFilters()"><option value="">All statuses</option><option>Complete</option><option>Partial</option></select>
-      <select id="fWeek" onchange="applyFilters()"><option value="">All weeks</option>${weeks.map(w=>`<option>${w}</option>`).join('')}</select>
-      <select id="fBottle" onchange="applyFilters()"><option value="">All bottle sizes</option>${bottleSizes.map(s=>`<option>${s}</option>`).join('')}</select>
-      <select id="fJar" onchange="applyFilters()"><option value="">All jar sizes</option>${jarSizes.map(s=>`<option>${s}</option>`).join('')}</select>
-      <button onclick="clearFilters()" style="font-size:12px;padding:6px 12px;border:0.5px solid var(--color-border-secondary,rgba(0,0,0,.3));border-radius:8px;background:transparent;cursor:pointer;color:var(--color-text-secondary,#666)">Clear</button>
-    </div>
-    <div id="ops-metrics" class="metrics" style="margin-bottom:1rem"></div>
-    <div class="full-card">
-      <div class="tbl-wrap"><table style="min-width:600px">
-        <thead><tr>
-          <th onclick="sortBy('date')">Date ↕</th>
-          <th onclick="sortBy('lot')">Lot # ↕</th>
-          <th onclick="sortBy('product')">Product ↕</th>
-          <th onclick="sortBy('line')">Line ↕</th>
-          <th onclick="sortBy('bottleSize')">Bottle ↕</th>
-          <th onclick="sortBy('jarSize')">Jar ↕</th>
-          <th onclick="sortBy('projected')">Projected ↕</th>
-          <th onclick="sortBy('finalUnits')">Final units ↕</th>
-          <th onclick="sortBy('dev')">Dev % ↕</th>
-          <th onclick="sortBy('status')">Status ↕</th>
-        </tr></thead>
-        <tbody id="ops-body"></tbody>
-      </table></div>
-      <div class="pagination">
-        <button id="prevBtn" onclick="changePage(-1)">← Prev</button>
-        <span id="pageInfo"></span>
-        <button id="nextBtn" onclick="changePage(1)">Next →</button>
-        <span id="rowCount" style="margin-left:auto"></span>
-      </div>
-    </div>`;
+  document.getElementById('content').innerHTML =
+    '<div class="filters">'
+    + '<input type="text" id="fSearch" placeholder="Search lot # or product\u2026" style="min-width:180px" oninput="applyFilters()">'
+    + '<select id="fProduct" onchange="applyFilters()"><option value="">All products</option>' + products.map(p => '<option>' + p + '</option>').join('') + '</select>'
+    + '<select id="fStatus" onchange="applyFilters()"><option value="">All statuses</option><option>Complete</option><option>Partial</option></select>'
+    + '<select id="fWeek" onchange="applyFilters()"><option value="">All weeks</option>' + weeks.map(w => '<option>' + w + '</option>').join('') + '</select>'
+    + '<select id="fBottle" onchange="applyFilters()"><option value="">All bottle sizes</option>' + bottleSizes.map(s => '<option>' + s + '</option>').join('') + '</select>'
+    + '<select id="fJar" onchange="applyFilters()"><option value="">All jar sizes</option>' + jarSizes.map(s => '<option>' + s + '</option>').join('') + '</select>'
+    + '<button onclick="clearFilters()" style="font-size:12px;padding:6px 12px;border:0.5px solid var(--color-border-secondary,rgba(0,0,0,.3));border-radius:8px;background:transparent;cursor:pointer;color:var(--color-text-secondary,#666)">Clear</button>'
+    + '</div>'
+    + '<div id="ops-metrics" class="metrics" style="margin-bottom:1rem"></div>'
+    + '<div class="full-card"><div class="tbl-wrap"><table style="min-width:600px"><thead><tr>'
+    + '<th onclick="sortBy(\'date\')">Date \u21d5</th>'
+    + '<th onclick="sortBy(\'lot\')">Lot # \u21d5</th>'
+    + '<th onclick="sortBy(\'product\')">Product \u21d5</th>'
+    + '<th onclick="sortBy(\'line\')">Line \u21d5</th>'
+    + '<th onclick="sortBy(\'bottleSize\')">Bottle \u21d5</th>'
+    + '<th onclick="sortBy(\'jarSize\')">Jar \u21d5</th>'
+    + '<th onclick="sortBy(\'projected\')">Projected \u21d5</th>'
+    + '<th onclick="sortBy(\'finalUnits\')">Final units \u21d5</th>'
+    + '<th onclick="sortBy(\'dev\')">Dev % \u21d5</th>'
+    + '<th onclick="sortBy(\'status\')">Status \u21d5</th>'
+    + '</tr></thead><tbody id="ops-body"></tbody></table></div>'
+    + '<div class="pagination"><button id="prevBtn" onclick="changePage(-1)">\u2190 Prev</button><span id="pageInfo"></span><button id="nextBtn" onclick="changePage(1)">Next \u2192</button><span id="rowCount" style="margin-left:auto"></span></div>'
+    + '</div>';
+
   applyFilters();
 }
 
 function getFilteredLots() {
-  const search=(document.getElementById('fSearch')||{}).value?.toLowerCase()||'';
-  const prod  =(document.getElementById('fProduct')||{}).value||'';
-  const status=(document.getElementById('fStatus')||{}).value||'';
-  const week  =(document.getElementById('fWeek')||{}).value||'';
-  const bottle=(document.getElementById('fBottle')||{}).value||'';
-  const jar   =(document.getElementById('fJar')||{}).value||'';
-  return Object.values(lotMap).filter(Boolean).filter(l=>{
-    if(search&&!(l.lot.toLowerCase().includes(search)||l.product.toLowerCase().includes(search)))return false;
-    if(prod&&l.product!==prod)return false;
-    if(status&&!l.status.toLowerCase().includes(status.toLowerCase()))return false;
-    if(week&&l.week!==week)return false;
-    if(bottle&&l.bottleSize!==bottle)return false;
-    if(jar&&l.jarSize!==jar)return false;
+  const search = (document.getElementById('fSearch')||{}).value ? document.getElementById('fSearch').value.toLowerCase() : '';
+  const prod   = document.getElementById('fProduct') ? document.getElementById('fProduct').value : '';
+  const status = document.getElementById('fStatus')  ? document.getElementById('fStatus').value  : '';
+  const week   = document.getElementById('fWeek')    ? document.getElementById('fWeek').value    : '';
+  const bottle = document.getElementById('fBottle')  ? document.getElementById('fBottle').value  : '';
+  const jar    = document.getElementById('fJar')     ? document.getElementById('fJar').value     : '';
+  return Object.values(lotMap).filter(Boolean).filter(l => {
+    if (search && !(l.lot.toLowerCase().includes(search) || l.product.toLowerCase().includes(search))) return false;
+    if (prod   && l.product   !== prod)   return false;
+    if (status && !l.status.toLowerCase().includes(status.toLowerCase())) return false;
+    if (week   && l.week      !== week)   return false;
+    if (bottle && l.bottleSize !== bottle) return false;
+    if (jar    && l.jarSize   !== jar)    return false;
     return true;
   });
 }
 
-function applyFilters(){page=1;updateOpsTable();}
-function clearFilters(){['fSearch','fProduct','fStatus','fWeek','fBottle','fJar'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});applyFilters();}
-function sortBy(col){if(sortCol===col)sortDir*=-1;else{sortCol=col;sortDir=1;}updateOpsTable();}
-function changePage(dir){page+=dir;updateOpsTable();}
+function applyFilters() { page = 1; updateOpsTable(); }
 
-function updateOpsTable(){
-  let lots=getFilteredLots();
-  if(sortCol){
-    lots=[...lots].sort((a,b)=>{
-      let av=a[sortCol]??'',bv=b[sortCol]??'';
-      if(sortCol==='dev'){av=lotDev(a)??-999;bv=lotDev(b)??-999;}
-      if(sortCol==='date'){return(new Date(av)-new Date(bv))*sortDir;}
-      if(typeof av==='number'||!isNaN(parseFloat(av)))return(parseFloat(av)-parseFloat(bv))*sortDir;
-      return String(av).localeCompare(String(bv))*sortDir;
+function clearFilters() {
+  ['fSearch','fProduct','fStatus','fWeek','fBottle','fJar'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  applyFilters();
+}
+
+function sortBy(col) {
+  if (sortCol === col) sortDir *= -1;
+  else { sortCol = col; sortDir = 1; }
+  updateOpsTable();
+}
+
+function changePage(dir) { page += dir; updateOpsTable(); }
+
+function updateOpsTable() {
+  var lots = getFilteredLots();
+  if (sortCol) {
+    lots = lots.slice().sort(function(a,b) {
+      var av = a[sortCol] != null ? a[sortCol] : '';
+      var bv = b[sortCol] != null ? b[sortCol] : '';
+      if (sortCol === 'dev') { av = lotDev(a) != null ? lotDev(a) : -999; bv = lotDev(b) != null ? lotDev(b) : -999; }
+      if (sortCol === 'date') { return (new Date(av) - new Date(bv)) * sortDir; }
+      if (typeof av === 'number' || !isNaN(parseFloat(av))) return (parseFloat(av) - parseFloat(bv)) * sortDir;
+      return String(av).localeCompare(String(bv)) * sortDir;
     });
   }
-  const total=lots.length,totalPages=Math.ceil(total/PAGE_SIZE)||1;
-  page=Math.min(Math.max(1,page),totalPages);
-  const slice=lots.slice((page-1)*PAGE_SIZE,page*PAGE_SIZE);
-  const totalProj=lots.reduce((s,l)=>s+l.projected,0);
-  const totalFinal=lots.reduce((s,l)=>s+l.finalUnits,0);
-  const complete=lots.filter(l=>l.status.toLowerCase().includes('complete')).length;
-  const devs=lots.map(l=>lotDev(l)).filter(d=>d!==null);
-  const avgDev=devs.length?devs.reduce((s,d)=>s+d,0)/devs.length:0;
-  const dc=avgDev<-2?'#a32d2d':avgDev>2?'#3b6d11':'inherit';
-  const om=document.getElementById('ops-metrics');
-  if(om)om.innerHTML=`
-    <div class="metric info"><div class="label">Lots shown</div><div class="value">${total.toLocaleString()}</div></div>
-    <div class="metric"><div class="label">Units produced</div><div class="value">${totalFinal.toLocaleString()}</div><div class="sub">vs ${totalProj.toLocaleString()} projected</div></div>
-    <div class="metric"><div class="label">Avg deviation</div><div class="value" style="color:${dc}">${avgDev>0?'+':''}${avgDev.toFixed(1)}%</div><div class="sub">lot by lot</div></div>
-    <div class="metric good"><div class="label">Complete lots</div><div class="value">${complete}</div><div class="sub">of ${total} shown</div></div>`;
-  const body=document.getElementById('ops-body');
-  if(!body)return;
-  body.innerHTML=slice.map(l=>{
-    const dev=lotDev(l);
-    const devStr=dev!==null?`${dev>0?'+':''}${dev.toFixed(1)}%`:'—';
-    const devCls=dev!==null&&Math.abs(dev)>=5?(dev<0?'neg-dev':'pos-dev'):'';
-    const st=l.status.toLowerCase();
-    const badgeCls=st.includes('complete')?'complete':st.includes('partial')?'partial':'';
-    return `<tr>
-      <td>${l.date}</td><td style="font-weight:500">${l.lot}</td><td>${l.product}</td>
-      <td>${l.line||'—'}</td><td>${l.bottleSize||'—'}</td><td>${l.jarSize||'—'}</td>
-      <td style="text-align:right">${l.projected?l.projected.toLocaleString():'—'}</td>
-      <td style="text-align:right">${l.finalUnits?l.finalUnits.toLocaleString():'—'}</td>
-      <td>${dev!==null?`<span class="badge ${devCls}">${devStr}</span>`:'—'}</td>
-      <td><span class="badge ${badgeCls}">${l.status||'—'}</span></td>
-    </tr>`;
+  var total = lots.length, totalPages = Math.ceil(total / PAGE_SIZE) || 1;
+  page = Math.min(Math.max(1, page), totalPages);
+  var slice = lots.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
+
+  var totalProj  = lots.reduce(function(s,l) { return s + l.projected; }, 0);
+  var totalFinal = lots.reduce(function(s,l) { return s + l.finalUnits; }, 0);
+  var complete   = lots.filter(function(l) { return l.status.toLowerCase().includes('complete'); }).length;
+  var devs       = lots.map(function(l) { return lotDev(l); }).filter(function(d) { return d !== null; });
+  var avgDev     = devs.length ? devs.reduce(function(s,d) { return s+d; }, 0) / devs.length : 0;
+  var dc         = avgDev < -2 ? '#a32d2d' : avgDev > 2 ? '#3b6d11' : 'inherit';
+
+  var om = document.getElementById('ops-metrics');
+  if (om) om.innerHTML =
+    '<div class="metric info"><div class="label">Lots shown</div><div class="value">' + total.toLocaleString() + '</div></div>'
+    + '<div class="metric"><div class="label">Units produced</div><div class="value">' + totalFinal.toLocaleString() + '</div><div class="sub">vs ' + totalProj.toLocaleString() + ' projected</div></div>'
+    + '<div class="metric"><div class="label">Avg deviation</div><div class="value" style="color:' + dc + '">' + (avgDev>0?'+':'') + avgDev.toFixed(1) + '%</div><div class="sub">lot by lot</div></div>'
+    + '<div class="metric good"><div class="label">Complete lots</div><div class="value">' + complete + '</div><div class="sub">of ' + total + ' shown</div></div>';
+
+  var body = document.getElementById('ops-body');
+  if (!body) return;
+  body.innerHTML = slice.map(function(l) {
+    var dev = lotDev(l);
+    var devStr = dev !== null ? (dev>0?'+':'') + dev.toFixed(1) + '%' : '\u2014';
+    var devCls = dev !== null && Math.abs(dev) >= 5 ? (dev < 0 ? 'neg-dev' : 'pos-dev') : '';
+    var st = l.status.toLowerCase();
+    var badgeCls = st.includes('complete') ? 'complete' : st.includes('partial') ? 'partial' : '';
+    return '<tr>'
+      + '<td>' + l.date + '</td>'
+      + '<td style="font-weight:500">' + l.lot + '</td>'
+      + '<td>' + l.product + '</td>'
+      + '<td>' + (l.line||'\u2014') + '</td>'
+      + '<td>' + (l.bottleSize||'\u2014') + '</td>'
+      + '<td>' + (l.jarSize||'\u2014') + '</td>'
+      + '<td style="text-align:right">' + (l.projected ? l.projected.toLocaleString() : '\u2014') + '</td>'
+      + '<td style="text-align:right">' + (l.finalUnits ? l.finalUnits.toLocaleString() : '\u2014') + '</td>'
+      + '<td>' + (dev !== null ? '<span class="badge ' + devCls + '">' + devStr + '</span>' : '\u2014') + '</td>'
+      + '<td><span class="badge ' + badgeCls + '">' + (l.status||'\u2014') + '</span></td>'
+      + '</tr>';
   }).join('');
-  const pi=document.getElementById('pageInfo'),pb=document.getElementById('prevBtn'),nb=document.getElementById('nextBtn'),rc=document.getElementById('rowCount');
-  if(pi)pi.textContent=`Page ${page} of ${totalPages}`;
-  if(pb)pb.disabled=page<=1;
-  if(nb)nb.disabled=page>=totalPages;
-  if(rc)rc.textContent=`${total.toLocaleString()} lots`;
+
+  var pi = document.getElementById('pageInfo'), pb = document.getElementById('prevBtn'), nb = document.getElementById('nextBtn'), rc = document.getElementById('rowCount');
+  if (pi) pi.textContent = 'Page ' + page + ' of ' + totalPages;
+  if (pb) pb.disabled = page <= 1;
+  if (nb) nb.disabled = page >= totalPages;
+  if (rc) rc.textContent = total.toLocaleString() + ' lots';
 }
 </script>
 </body>
