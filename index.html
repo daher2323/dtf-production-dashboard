@@ -395,7 +395,7 @@ function renderExec() {
     + '<div style="font-size:10px;color:#5f5e5a">L2: ' + l2units.toLocaleString() + '</div>'
     + '</div></div>'
     + '<div style="border-top:0.5px solid #2c2c2a;margin-bottom:.75rem"></div>'
-    + '<div style="font-size:11px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.6rem">Line breakdown</div>';
+    + '<div style="font-size:11px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.6rem">Units by line breakdown</div>';
 
   var monthTableHTML = monthRows.map(function(m) {
     var isGreen  = m.pctOfTarget >= 100;
@@ -454,7 +454,7 @@ function renderExec() {
     + '<div class="full-card"><h3>Year-end projection vs target</h3>' + yearEndHTML + '</div>'
 
     + '<div class="charts-row">'
-    + '<div class="chart-card"><h3>Production lines &amp; product type split</h3>'
+    + '<div class="chart-card">'
     + typeSplitHTML
     + '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>'
     + '<th style="text-align:left;padding:4px 8px;color:#888780;font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.03em;border-bottom:0.5px solid #2c2c2a">Line</th>'
