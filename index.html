@@ -339,10 +339,13 @@ function renderExec() {
           <th style="min-width:140px"></th>
           <th style="text-align:right">% of total</th>
           <th style="text-align:right">Lots run</th>
+          <th style="text-align:right">Avg units/day</th>
         </tr></thead>
         <tbody>${lineEntries.map(([line,d]) => {
           const sp = lineTotal ? ((d.units/lineTotal)*100) : 0;
           const bw = Math.round((d.units/maxLineUnits)*100);
+          const daysWithData = d.dates.size;
+          const avgPerDay = daysWithData ? Math.round(d.units / daysWithData) : 0;
           return `<tr>
             <td style="font-weight:500">${line}</td>
             <td style="text-align:right;white-space:nowrap">${d.units.toLocaleString()}</td>
@@ -353,6 +356,7 @@ function renderExec() {
             </td>
             <td style="text-align:right;color:var(--color-text-secondary,#666)">${sp.toFixed(1)}%</td>
             <td style="text-align:right;color:var(--color-text-secondary,#666)">${d.lots.size.toLocaleString()}</td>
+            <td style="text-align:right;color:var(--color-text-secondary,#666)">${avgPerDay.toLocaleString()}</td>
           </tr>`;
         }).join('')}</tbody>
       </table></div>
