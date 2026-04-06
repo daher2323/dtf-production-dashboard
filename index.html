@@ -278,9 +278,12 @@ function renderExec() {
     const jan1 = new Date(d.getFullYear(),0,1);
     return Math.ceil(((d-jan1)/86400000 + jan1.getDay()+1)/7);
   })();
+  const WEEKLY_TARGET = Math.round(YEAR_TARGET / 52);
   const weeks = Object.keys(byWeek)
     .sort((a,b) => { const an=parseFloat(a),bn=parseFloat(b); return (!isNaN(an)&&!isNaN(bn))?an-bn:a.localeCompare(b); })
-    .filter(w => byWeek[w] > 0).slice(-6);
+    .filter(w => byWeek[w] > 0).slice(-8);
+  const completedWeekData = weeks.filter(w => parseInt(w) !== currentWeekNum).map(w => byWeek[w]);
+  const weekAvg = completedWeekData.length ? Math.round(completedWeekData.reduce((s,v)=>s+v,0)/completedWeekData.length) : 0;
 
   const prodDetail = {};
   lots.forEach(l => {
@@ -415,8 +418,14 @@ function renderExec() {
     + '</div></div>'
     + '</div>'
 
-    + '<div class="chart-card" style="margin-bottom:10px"><h3>Weekly units produced \u2014 last 6 weeks</h3>'
-    + '<div style="position:relative;height:200px"><canvas id="cWeekly"></canvas></div></div>'
+    + '<div class="chart-card" style="margin-bottom:10px">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;flex-wrap:wrap;gap:8px">'
+    + '<h3 style="margin:0">Weekly units produced \u2014 last 8 weeks</h3>'
+    + '<div style="display:flex;gap:16px;align-items:center;font-size:11px;color:#888780">'
+    + '<span style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:20px;border-top:2px dashed #EF9F27"></span>8-wk avg: ' + weekAvg.toLocaleString() + '</span>'
+    + '<span style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:20px;border-top:2px dashed #1D9E75"></span>Weekly target: ' + WEEKLY_TARGET.toLocaleString() + '</span>'
+    + '</div></div>'
+    + '<div style="position:relative;height:240px"><canvas id="cWeekly"></canvas></div></div>'
 
     + '<div class="full-card"><h3>Units produced by month vs. target</h3><div class="tbl-wrap"><table>'
     + '<thead><tr><th>Month</th><th style="text-align:right">Actual</th><th style="text-align:right">Target</th><th style="text-align:right">% of target</th><th></th></tr></thead>'
