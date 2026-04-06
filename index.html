@@ -189,6 +189,7 @@ function renderExec() {
   const totalUnits   = lots.reduce((s,l) => s + l.finalUnits, 0);
   const totalProj    = lots.reduce((s,l) => s + l.projected, 0);
   const uniqueProds  = new Set(lots.map(l => l.product)).size;
+  const uniqueCustomers = new Set(lots.map(l => (l.product||'').split('-')[0].trim()).filter(Boolean)).size;
   const totalLots    = lots.length;
   const devs         = lots.map(l => lotDev(l)).filter(d => d !== null);
   const avgDev       = devs.length ? devs.reduce((s,d)=>s+d,0)/devs.length : 0;
@@ -296,6 +297,7 @@ function renderExec() {
       <div class="metric good"><div class="label">Completion rate</div><div class="value">${pct(completeLots.length,totalLots)}%</div><div class="sub">${completeLots.length} of ${totalLots} lots</div></div>
       <div class="metric ${devClass}"><div class="label">Avg deviation</div><div class="value" style="color:${devColor}">${avgDev>0?'+':''}${avgDev.toFixed(1)}%</div><div class="sub">${highDevCount} lots >5% under</div></div>
       <div class="metric"><div class="label">Unique products</div><div class="value">${uniqueProds}</div><div class="sub">across all lots</div></div>
+      <div class="metric"><div class="label">Unique customers</div><div class="value">${uniqueCustomers}</div><div class="sub">across all lots</div></div>
     </div>
 
     <div class="full-card">
