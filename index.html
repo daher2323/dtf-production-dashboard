@@ -207,10 +207,26 @@ function renderExec() {
   const highDevCount = devs.filter(d => d < -5).length;
   const uniqueProductionDays = new Set(lots.map(l => l.date).filter(Boolean)).size;
   const avgUnitsPerDay = uniqueProductionDays ? Math.round(totalUnits / uniqueProductionDays) : 0;
+  // product type split (Line #1 + #4 = powder, Line #2 = capsules)
+  const powderLines = ['Line #1', 'Line #4', 'Line 1', 'Line 4'];
+  const capsuleLines = ['Line #2', 'Line 2'];
+  var powderUnits = 0, capsuleUnits = 0;
+  lineEntries.forEach(function(entry) {
+    var line = entry[0], d = entry[1];
+    var ln = line.replace(/\s/g,'').toLowerCase();
+    if (ln === 'line#1' || ln === 'line1' || ln === 'line#4' || ln === 'line4') powderUnits += d.units;
+    else if (ln === 'line#2' || ln === 'line2') capsuleUnits += d.units;
+  });
+  var powderPct = totalUnits ? ((powderUnits / totalUnits) * 100).toFixed(1) : 0;
+  var capsulePct = totalUnits ? ((capsuleUnits / totalUnits) * 100).toFixed(1) : 0;
+
+  // line breakdown per type for sub-labels
+  var l1units = byLine['Line #1'] ? byLine['Line #1'].units : (byLine['Line 1'] ? byLine['Line 1'].units : 0);
+  var l4units = byLine['Line #4'] ? byLine['Line #4'].units : (byLine['Line 4'] ? byLine['Line 4'].units : 0);
+  var l2units = byLine['Line #2'] ? byLine['Line #2'].units : (byLine['Line 2'] ? byLine['Line 2'].units : 0);
+
   const devColor = avgDev < -2 ? '#EF9F27' : avgDev > 2 ? '#1D9E75' : '#e8e6e0';
   const devClass  = avgDev < -2 ? 'warn' : avgDev > 2 ? 'good' : '';
-
-  // date range
   const dates = allRows.map(r => new Date(r['Date'])).filter(d => !isNaN(d));
   const minDate = new Date(Math.min(...dates)), maxDate = new Date(Math.max(...dates));
   const fmt = d => (d.getMonth()+1) + '/' + d.getDate() + '/' + d.getFullYear();
@@ -418,7 +434,26 @@ function renderExec() {
     + '<th style="border-bottom:0.5px solid #2c2c2a"></th>'
     + '<th style="text-align:right;padding:4px 8px;color:#888780;font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.03em;border-bottom:0.5px solid #2c2c2a">% of total</th>'
     + '<th style="text-align:right;padding:4px 8px;color:#888780;font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.03em;border-bottom:0.5px solid #2c2c2a">Lots run</th>'
-    + '</tr></thead><tbody>' + linesHTML + '</tbody></table></div>'
+    + '</tr></thead><tbody>' + linesHTML + '</tbody></table>'
+    + '<div style="border-top:0.5px solid #2c2c2a;margin:1rem 0 .75rem"></div>'
+    + '<div style="font-size:11px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.6rem">Product type split</div>'
+    + '<div style="display:flex;gap:10px">'
+    + '<div style="flex:1;background:#141618;border:0.5px solid #2c2c2a;border-radius:8px;padding:.75rem 1rem">'
+    + '<div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px">Powder (Lines 1 &amp; 4)</div>'
+    + '<div style="font-size:18px;font-weight:500;color:#1D9E75;margin-bottom:3px">' + powderUnits.toLocaleString() + '</div>'
+    + '<div style="font-size:10px;color:#5f5e5a;margin-bottom:8px">' + powderPct + '% of total production</div>'
+    + '<div style="height:5px;background:#2c2c2a;border-radius:3px;overflow:hidden;margin-bottom:4px"><div style="height:100%;width:' + powderPct + '%;background:#1D9E75;border-radius:3px"></div></div>'
+    + '<div style="display:flex;justify-content:space-between;font-size:10px;color:#5f5e5a"><span>L1: ' + l1units.toLocaleString() + '</span><span>L4: ' + l4units.toLocaleString() + '</span></div>'
+    + '</div>'
+    + '<div style="flex:1;background:#141618;border:0.5px solid #2c2c2a;border-radius:8px;padding:.75rem 1rem">'
+    + '<div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px">Capsules (Line 2)</div>'
+    + '<div style="font-size:18px;font-weight:500;color:#378ADD;margin-bottom:3px">' + capsuleUnits.toLocaleString() + '</div>'
+    + '<div style="font-size:10px;color:#5f5e5a;margin-bottom:8px">' + capsulePct + '% of total production</div>'
+    + '<div style="height:5px;background:#2c2c2a;border-radius:3px;overflow:hidden;margin-bottom:4px"><div style="height:100%;width:' + capsulePct + '%;background:#378ADD;border-radius:3px"></div></div>'
+    + '<div style="font-size:10px;color:#5f5e5a">L2: ' + l2units.toLocaleString() + '</div>'
+    + '</div>'
+    + '</div>'
+    + '</div>'
     + '<div class="chart-card"><h3>Powder product mix \u2014 units by jar size</h3>'
     + '<div style="display:flex;align-items:center;gap:12px">'
     + '<div style="position:relative;height:200px;min-width:200px;flex-shrink:0"><canvas id="cJar"></canvas></div>'
