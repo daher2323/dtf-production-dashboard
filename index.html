@@ -320,7 +320,7 @@ function renderExec() {
     <div class="charts-row">
       <div class="chart-card">
         <h3>Top products by units produced</h3>
-        <div style="position:relative;height:240px"><canvas id="cProds"></canvas></div>
+        <div id="top-prods-table" style="overflow-y:auto;max-height:240px"></div>
       </div>
       <div class="chart-card">
         <h3>Powder product mix — units by jar size</h3>
@@ -367,13 +367,35 @@ function renderExec() {
     </tr>`;
   }).join('');
 
-  // Chart: top products
-  const BLUES = ['#185fa5','#378ADD','#85B7EB','#B5D4F4','#1D9E75','#5DCAA5','#9FE1CB','#E1F5EE'];
-  charts.prods = new Chart(document.getElementById('cProds'), {
-    type:'bar',
-    data:{ labels: topProds.map(([p])=>p.length>22?p.slice(0,20)+'…':p), datasets:[{ data:topProds.map(([,v])=>v), backgroundColor:BLUES, borderRadius:4 }]},
-    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ticks:{callback:v=>v.toLocaleString()}}, y:{ticks:{font:{size:10}}} } }
-  });
+  // Top products ranked table
+  const maxUnits = topProds[0]?.[1] || 1;
+  document.getElementById('top-prods-table').innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr>
+        <th style="text-align:left;padding:4px 8px;color:var(--color-text-secondary,#666);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.03em;border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.1));white-space:nowrap">#</th>
+        <th style="text-align:left;padding:4px 8px;color:var(--color-text-secondary,#666);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.03em;border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.1))">Product</th>
+        <th style="text-align:right;padding:4px 8px;color:var(--color-text-secondary,#666);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.03em;border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.1));white-space:nowrap">Units</th>
+        <th style="padding:4px 8px;border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.1));width:80px"></th>
+      </tr></thead>
+      <tbody>
+        ${topProds.map(([p,v],i) => {
+          const barW = Math.round((v/maxUnits)*100);
+          return `<tr style="border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.06))">
+            <td style="padding:5px 8px;color:var(--color-text-tertiary,#999);font-size:11px">${i+1}</td>
+            <td style="padding:5px 8px;font-weight:500">${p}</td>
+            <td style="padding:5px 8px;text-align:right;white-space:nowrap">${v.toLocaleString()}</td>
+            <td style="padding:5px 8px">
+              <div style="background:var(--color-background-secondary,#ececea);border-radius:3px;height:6px;overflow:hidden">
+                <div style="height:100%;width:${barW}%;background:#378ADD;border-radius:3px"></div>
+              </div>
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+
+  // remove old chart reference
+  if (charts.prods) { try{charts.prods.destroy();}catch(e){} delete charts.prods; }
 
   // Chart: jar size powder mix (doughnut)
   const JAR_COLORS = ['#185fa5','#1D9E75','#EF9F27','#D4537E','#7F77DD','#D85A30','#639922','#E24B4A'];
