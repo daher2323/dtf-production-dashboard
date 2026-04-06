@@ -77,7 +77,7 @@
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ0Vqunj5euX6ZRNwnYeF22UChTxiCd6gP_GVEiuFBeUo6o9c2Mc6Idt1pQkckhuyukmNJesy8_nZqX/pub?gid=943770391&single=true&output=csv";
 const YEAR_TARGET = 3927000;
 
-let allRows = [], lotMap = {}, currentView = 'exec', sortCol = null, sortDir = 1, page = 1;
+let allRows = [], lotMap = {}, currentView = 'exec', sortCol = 'date', sortDir = -1, page = 1;
 const PAGE_SIZE = 50;
 let charts = {};
 
@@ -393,8 +393,7 @@ function renderExec() {
       <h3>Product performance — top 10 by volume</h3>
       <div class="tbl-wrap"><table>
         <thead><tr>
-          <th>Product</th><th style="text-align:right">Lots</th><th style="text-align:right">Complete</th>
-          <th style="text-align:right">Partial</th><th style="text-align:right">Projected</th>
+          <th>Product</th><th style="text-align:right">Lots</th><th style="text-align:right">Projected</th>
           <th style="text-align:right">Units produced</th><th style="text-align:right">Avg deviation</th>
         </tr></thead>
         <tbody>${top10.map(([prod,d])=>{
@@ -402,8 +401,7 @@ function renderExec() {
           const dc=dev<-5?'color:#a32d2d':dev>5?'color:#3b6d11':'';
           return `<tr>
             <td style="font-weight:500">${prod}</td>
-            <td style="text-align:right">${d.lots}</td><td style="text-align:right">${d.complete}</td>
-            <td style="text-align:right">${d.partial}</td>
+            <td style="text-align:right">${d.lots}</td>
             <td style="text-align:right">${d.proj.toLocaleString()}</td>
             <td style="text-align:right">${d.final.toLocaleString()}</td>
             <td style="text-align:right;${dc}">${dev>0?'+':''}${dev.toFixed(1)}%</td>
