@@ -194,9 +194,12 @@ function renderExec() {
   const avgDev = devs.length ? (devs.reduce((s,d)=>s+d,0)/devs.length) : 0;
   const highDevCount = devs.filter(d => d < -5).length;
 
-  // Dates
-  const dates = lots.map(l=>l.date).filter(Boolean).sort();
-  if (dates.length) document.getElementById('data-range').textContent = `Data: ${dates[0]} – ${dates[dates.length-1]}`;
+  // Date range from raw rows for accuracy
+  const dates = allRows.map(r => new Date(r['Date'])).filter(d => !isNaN(d));
+  const minDate = new Date(Math.min(...dates));
+  const maxDate = new Date(Math.max(...dates));
+  const fmt = d => `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`;
+  if (dates.length) document.getElementById('data-range').textContent = `Data: ${fmt(minDate)} – ${fmt(maxDate)}`;
 
   // --- Top products by final units ---
   const byProd = {};
