@@ -256,14 +256,14 @@ function renderExec() {
     return { label: label, units: mo.units, target: target, fullMonthTarget: fullMonthTarget, pctOfTarget: pctOfTarget, isCurrentMonth: isCurrentMonth, daysInMonth: daysInMonth, daysSoFar: now.getDate() };
   });
 
-  // production lines
+  // production lines — sum directly from allRows to match Google Sheets pivot
   var byLine = {};
-  lots.forEach(function(l) {
-    var line = (l.line||'').trim();
+  allRows.forEach(function(r) {
+    var line = (r['Line']||'').trim();
     if (!line) return;
     if (!byLine[line]) byLine[line] = { units: 0, lots: new Set() };
-    byLine[line].units += l.finalUnits;
-    byLine[line].lots.add(l.lot);
+    byLine[line].units += num(r['Final Units']);
+    byLine[line].lots.add(r['Lot Number']);
   });
   var lineEntries = Object.entries(byLine).sort(function(a,b) {
     return parseInt(a[0].replace(/\D/g,'')) - parseInt(b[0].replace(/\D/g,''));
