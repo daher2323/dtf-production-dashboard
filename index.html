@@ -163,7 +163,9 @@ fetch(CSV_URL)
   .then(r => r.text())
   .then(text => {
     allRows = parseCSV(text).filter(isValid);
-    lotMap = buildLotMap(allRows);
+    const built = buildLotMap(allRows);
+    lotMap = built.lotMap;
+    window._lineDateSets = built.lineDateSets;
     document.getElementById('loading').style.display = 'none';
     document.getElementById('content').style.display = 'block';
     render();
