@@ -116,25 +116,26 @@ function buildLotMap(rows) {
   const m = {};
   rows.forEach(r => {
     const lot = r['Lot Number'];
+    const vals = Object.values(r);
+    const rowDate = vals[0] || ''; // Date is always column 1
+    const rowLine = vals[1] || ''; // Line is always column 2
     if (!m[lot]) {
       m[lot] = {
-        lot, date: r['Date'], product: r['Product'],
+        lot, date: rowDate, product: r['Product'],
         bottleSize: r['Bottle Size'], jarSize: r['Jar Size'],
         projected: num(r['Projected Units']),
         finalUnits: 0,
         status: r['Complete or Partial'] || '',
         week: r['WEEK NUMBER'] || '', monYr: r['MON-YR'] || '',
-        line: r['Line'] || '',
+        line: rowLine,
         induction: r['Induction Setting'] || '', beltSpeed: r['Belt Speed'] || '',
         lidSize: r['Lid Size'] || '', desiccant: r['Desiccant'] || ''
       };
     }
     m[lot].finalUnits += num(r['Final Units']);
     if (r['Complete or Partial']) m[lot].status = r['Complete or Partial'];
-    // update line if not yet set — some lots' first row may be missing it
-    if (!m[lot].line && r['Line']) m[lot].line = r['Line'];
-    // update date if not yet set
-    if (!m[lot].date && r['Date']) m[lot].date = r['Date'];
+    if (!m[lot].line && rowLine) m[lot].line = rowLine;
+    if (!m[lot].date && rowDate) m[lot].date = rowDate;
   });
   return m;
 }
