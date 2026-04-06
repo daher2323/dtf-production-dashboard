@@ -292,10 +292,34 @@ function renderExec() {
     prodDetail[l.product].final += l.finalUnits;
     prodDetail[l.product].lots++;
   });
-  const top10 = Object.entries(prodDetail).sort((a,b) => b[1].final - a[1].final).slice(0,10);
+  // top 10 customers
+  const byCust = {};
+  lots.forEach(l => {
+    const cust = (l.product||'').split('-')[0].trim();
+    if (!cust) return;
+    if (!byCust[cust]) byCust[cust] = { units: 0, lots: 0 };
+    byCust[cust].units += l.finalUnits;
+    byCust[cust].lots++;
+  });
+  const top10Cust = Object.entries(byCust).sort((a,b) => b[1].units - a[1].units).slice(0,10);
+  const maxCustUnits = top10Cust[0] ? top10Cust[0][1].units : 1;
+  const custTotalUnits = top10Cust.reduce((s,e) => s + e[1].units, 0);
 
-  const devColor = avgDev < -2 ? '#EF9F27' : avgDev > 2 ? '#1D9E75' : '#e8e6e0';
-  const devClass  = avgDev < -2 ? 'warn' : avgDev > 2 ? 'good' : '';
+  var top10HTML = top10Cust.map(function(entry, i) {
+    var cust = entry[0], d = entry[1];
+    var avgRun = d.lots ? Math.round(d.units / d.lots) : 0;
+    var bw = Math.round((d.units / maxCustUnits) * 100);
+    var sharePct = custTotalUnits ? ((d.units / totalUnits) * 100).toFixed(1) : 0;
+    return '<tr>'
+      + '<td style="color:#5f5e5a;font-size:11px;width:24px">' + (i+1) + '</td>'
+      + '<td style="font-weight:500">' + cust + '</td>'
+      + '<td style="text-align:right;color:#888780">' + d.lots + '</td>'
+      + '<td style="text-align:right">' + d.units.toLocaleString() + '</td>'
+      + '<td style="padding:6px 10px;width:90px"><div style="background:#2c2c2a;border-radius:2px;height:4px;overflow:hidden"><div style="height:100%;width:' + bw + '%;background:#378ADD;border-radius:2px"></div></div></td>'
+      + '<td style="text-align:right;color:#888780">' + avgRun.toLocaleString() + '</td>'
+      + '<td style="text-align:right;color:#888780">' + sharePct + '%</td>'
+      + '</tr>';
+  }).join('');
   const JAR_COLORS = ['#378ADD','#1D9E75','#EF9F27','#D4537E','#7F77DD','#D85A30','#639922','#E24B4A','#85B7EB','#5DCAA5'];
 
   var metricsHTML =
@@ -431,8 +455,8 @@ function renderExec() {
     + '<thead><tr><th>Month</th><th style="text-align:right">Actual</th><th style="text-align:right">Target</th><th style="text-align:right">% of target</th><th></th></tr></thead>'
     + '<tbody>' + monthTableHTML + '</tbody></table>' + asteriskNote + '</div></div>'
 
-    + '<div class="full-card"><h3>Product performance \u2014 top 10 by volume</h3><div class="tbl-wrap"><table>'
-    + '<thead><tr><th>Product</th><th style="text-align:right">Lots</th><th style="text-align:right">Projected</th><th style="text-align:right">Units produced</th><th style="text-align:right">Avg deviation</th></tr></thead>'
+    + '<div class="full-card"><h3>Top 10 customers by units produced</h3><div class="tbl-wrap"><table>'
+    + '<thead><tr><th style="width:24px">#</th><th>Customer</th><th style="text-align:right">Lots</th><th style="text-align:right">Units produced</th><th style="width:90px"></th><th style="text-align:right">Avg run size</th><th style="text-align:right">% of total</th></tr></thead>'
     + '<tbody>' + top10HTML + '</tbody></table></div></div>';
 
   document.getElementById('lines-chart-table').innerHTML =
