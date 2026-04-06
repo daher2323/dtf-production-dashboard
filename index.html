@@ -570,17 +570,15 @@ function sortBy(col){if(sortCol===col)sortDir*=-1;else{sortCol=col;sortDir=1;}up
 function changePage(dir){page+=dir;updateOpsTable();}
 
 function updateOpsTable(){
-  let lots = getFilteredLots();
-  if (sortCol && sortCol !== 'date') {
-    lots = [...lots].sort((a,b) => {
-      let av=a[sortCol]??'', bv=b[sortCol]??'';
+  let lots=getFilteredLots();
+  if(sortCol){
+    lots=[...lots].sort((a,b)=>{
+      let av=a[sortCol]??'',bv=b[sortCol]??'';
       if(sortCol==='dev'){av=lotDev(a)??-999;bv=lotDev(b)??-999;}
+      if(sortCol==='date'){return(new Date(av)-new Date(bv))*sortDir;}
       if(typeof av==='number'||!isNaN(parseFloat(av)))return(parseFloat(av)-parseFloat(bv))*sortDir;
       return String(av).localeCompare(String(bv))*sortDir;
     });
-  } else {
-    lots = defaultSort(lots);
-    if (sortCol === 'date' && sortDir === 1) lots.reverse();
   }
   const total=lots.length,totalPages=Math.ceil(total/PAGE_SIZE)||1;
   page=Math.min(Math.max(1,page),totalPages);
