@@ -566,7 +566,7 @@ function renderToday() {
   var total25banner = rows25banner.reduce(function(s,r){return s+num(r['Final Units']);},0);
 
   var viewDayOfYear = Math.ceil((viewDateObj - new Date(viewDateObj.getFullYear(),0,1))/86400000);
-  var yearProjBanner = ytdDays ? Math.round((ytdUnits/ytdDays)*365) : 0;
+  var yearProjBanner = viewDayOfYear ? Math.round((ytdUnits / viewDayOfYear) * 365) : 0;
   var targetPctBanner = Math.round((yearProjBanner/YEAR_TARGET)*100);
   var onTrackBanner = yearProjBanner >= YEAR_TARGET;
   var actualPctBanner = yearProjBanner ? ((ytdUnits/yearProjBanner)*100) : 0;
