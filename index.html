@@ -563,16 +563,16 @@ function renderToday() {
     return parseInt((a.line||'').replace(/\D/g,''))-parseInt((b.line||'').replace(/\D/g,''));
   });
 
+  var todayTotal = Object.values(todayByLine).reduce(function(s,v){return s+v;},0);
+
   var dayTargetRow = (dailyTargets && dailyTargets[viewStr]) || {};
   function lineGoal(line) {
     var t = dayTargetRow[line] || 0;
     return t ? {value: t, isTarget: true} : {value: lineAvg[line]||0, isTarget: false};
   }
 
-  // total goal for banner — sum targets where set, avg where not
   var totalGoal = ALL_LINES.reduce(function(s, line){
-    var goal = lineGoal(line);
-    return s + goal.value;
+    return s + lineGoal(line).value;
   }, 0);
   var allLinesHaveTarget = ALL_LINES.every(function(line){ return !!(dayTargetRow[line]); });
   var bannerGoalLabel = allLinesHaveTarget ? '% of target' : '% of avg';
