@@ -440,7 +440,7 @@ function renderExec() {
     var yoyDelta='<td style="text-align:right">';
     if(m.yoyDiff!==null){var yPos=m.yoyDiff>=0,yBg=yPos?'#085041':'#791F1F',yTxt=yPos?'#9FE1CB':'#F09595';yoyDelta+='<span style="display:inline-block;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:500;background:'+yBg+';color:'+yTxt+'">'+(yPos?'+':'')+m.yoyDiff.toFixed(1)+'%</span>';}else yoyDelta+='\u2014';
     yoyDelta+='</td>';
-    var units25Str=u25?'<span style="color:#5f5e5a;font-weight:400"> ('+u25.toLocaleString()+(m.isCurrentMonth?' MTD':'')+')':'</span>':'';
+    var units25Str=u25?'<span style="color:#5f5e5a;font-weight:400"> ('+u25.toLocaleString()+(m.isCurrentMonth?' MTD':'')+')'+' </span>':'';
     return '<tr><td style="font-weight:500">'+m.label+'</td><td style="text-align:right">'+m.units.toLocaleString()+units25Str+'</td><td style="text-align:right;color:#888780">'+tgtHTML+'</td><td style="text-align:right"><span class="badge" style="background:'+pBg+';color:'+pTxt+'">'+m.pctOfTarget.toFixed(2)+'%</span></td><td style="min-width:100px;padding:6px 10px"><div style="background:#2c2c2a;border-radius:3px;height:6px;overflow:hidden"><div style="height:100%;width:'+bw+'%;background:'+bCol+';border-radius:3px"></div></div></td>'+yoyDelta+'</tr>';
   }).join('');
 
