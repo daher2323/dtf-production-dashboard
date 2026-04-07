@@ -186,7 +186,7 @@ function jarSizeKey(j) {
   return j;
 }
 
-function deltaTag(v26, v25, isHigherBetter, fmt) {
+function deltaTag(v26, v25, isHigherBetter, fmt, v25Label) {
   if (!v25 && v25 !== 0) return '';
   var diff = v26 - v25;
   var pctDiff = v25 ? ((diff / Math.abs(v25)) * 100) : 0;
@@ -195,9 +195,10 @@ function deltaTag(v26, v25, isHigherBetter, fmt) {
   var txt = positive ? '#9FE1CB' : '#F09595';
   var sign = diff > 0 ? '+' : '';
   var label = fmt === 'pct'
-    ? sign + pctDiff.toFixed(1) + '% vs \'25'
-    : sign + Math.round(diff).toLocaleString() + ' vs \'25';
-  return '<span style="display:inline-block;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:500;background:'+bg+';color:'+txt+'">'+label+'</span>';
+    ? sign + pctDiff.toFixed(1) + '% vs 2025'
+    : sign + Math.round(diff).toLocaleString() + ' vs 2025';
+  return '<div style="font-size:10px;color:#5f5e5a;margin-bottom:3px">2025: '+(v25Label||v25.toLocaleString())+'</div>'
+       + '<span style="display:inline-block;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:500;background:'+bg+';color:'+txt+'">'+label+'</span>';
 }
 
 function loadDashboard() {
@@ -373,13 +374,13 @@ function renderExec() {
 
   // ---- METRICS with YoY deltas ----
   var metricsHTML=
-    '<div class="metric info"><div class="label">Units produced</div><div class="value">'+totalUnits.toLocaleString()+'</div><div class="sub">vs '+totalProj.toLocaleString()+' projected</div><div class="yoy">'+deltaTag(totalUnits,total25,true,'pct')+'</div></div>'
-    +'<div class="metric"><div class="label">Avg units / day</div><div class="value">'+avgPerDay.toLocaleString()+'</div><div class="sub">'+uniqDays+' production days</div><div class="yoy">'+deltaTag(avgPerDay,avg25perDay,true,'pct')+'</div></div>'
-    +'<div class="metric"><div class="label">Total lots</div><div class="value">'+totalLots.toLocaleString()+'</div><div class="sub">'+completeLots.length+' complete \u00b7 '+partialLots.length+' partial</div><div class="yoy">'+deltaTag(totalLots,total25lots,true,'pct')+'</div></div>'
-    +'<div class="metric good"><div class="label">Completion rate</div><div class="value">'+compPct+'%</div><div class="sub">'+completeLots.length+' of '+totalLots+' lots</div><div class="yoy">'+deltaTag(compPct,comp25pct,true,'num')+'</div></div>'
-    +'<div class="metric '+devClass+'"><div class="label">Avg deviation</div><div class="value" style="color:'+devColor+'">'+(avgDev>0?'+':'')+avgDev.toFixed(1)+'%</div><div class="sub">'+highDevCount+' lots >5% under</div><div class="yoy">'+deltaTag(avgDev,avgDev25,false,'num')+'</div></div>'
+    '<div class="metric info"><div class="label">Units produced</div><div class="value">'+totalUnits.toLocaleString()+'</div><div class="sub">vs '+totalProj.toLocaleString()+' projected</div><div class="yoy">'+deltaTag(totalUnits,total25,true,'pct',total25.toLocaleString())+'</div></div>'
+    +'<div class="metric"><div class="label">Avg units / day</div><div class="value">'+avgPerDay.toLocaleString()+'</div><div class="sub">'+uniqDays+' production days</div><div class="yoy">'+deltaTag(avgPerDay,avg25perDay,true,'pct',avg25perDay.toLocaleString())+'</div></div>'
+    +'<div class="metric"><div class="label">Total lots</div><div class="value">'+totalLots.toLocaleString()+'</div><div class="sub">'+completeLots.length+' complete \u00b7 '+partialLots.length+' partial</div><div class="yoy">'+deltaTag(totalLots,total25lots,true,'pct',total25lots.toLocaleString())+'</div></div>'
+    +'<div class="metric good"><div class="label">Completion rate</div><div class="value">'+compPct+'%</div><div class="sub">'+completeLots.length+' of '+totalLots+' lots</div><div class="yoy">'+deltaTag(compPct,comp25pct,true,'num',comp25pct+'%')+'</div></div>'
+    +'<div class="metric '+devClass+'"><div class="label">Avg deviation</div><div class="value" style="color:'+devColor+'">'+(avgDev>0?'+':'')+avgDev.toFixed(1)+'%</div><div class="sub">'+highDevCount+' lots >5% under</div><div class="yoy">'+deltaTag(avgDev,avgDev25,false,'num',(avgDev25>0?'+':'')+avgDev25.toFixed(1)+'%')+'</div></div>'
     +'<div class="metric"><div class="label">Unique products</div><div class="value">'+uniqueProds+'</div><div class="sub">across all lots</div></div>'
-    +'<div class="metric"><div class="label">Unique customers</div><div class="value">'+uniqueCusts+'</div><div class="sub">across all lots</div><div class="yoy">'+deltaTag(uniqueCusts,custs25,true,'pct')+'</div></div>';
+    +'<div class="metric"><div class="label">Unique customers</div><div class="value">'+uniqueCusts+'</div><div class="sub">across all lots</div><div class="yoy">'+deltaTag(uniqueCusts,custs25,true,'pct',custs25.toLocaleString())+'</div></div>';
 
   // today outlook
   var todayOutlookHTML=
