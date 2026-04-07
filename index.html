@@ -316,7 +316,6 @@ function openPicker() {
   var todayStr = (now.getMonth()+1)+'/'+now.getDate()+'/'+now.getFullYear();
   var selected = productionDays[selectedDayIdx];
 
-  // group days by month
   var byMonth = {};
   productionDays.forEach(function(d){
     var dt = new Date(d); if(isNaN(dt)) return;
@@ -327,7 +326,6 @@ function openPicker() {
 
   var monthsHTML = Object.keys(byMonth).sort().reverse().map(function(k){
     var mo = byMonth[k];
-    // build a calendar grid
     var firstDay = new Date(mo.days[0].dt.getFullYear(), mo.days[0].dt.getMonth(), 1);
     var daysInMonth = new Date(firstDay.getFullYear(), firstDay.getMonth()+1, 0).getDate();
     var startDow = firstDay.getDay();
@@ -358,7 +356,7 @@ function openPicker() {
 
   var picker = document.createElement('div');
   picker.id = 'day-picker';
-  picker.style.cssText = 'position:absolute;z-index:1000;background:#1e2124;border:0.5px solid #444441;border-radius:12px;padding:1rem;max-height:400px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.4);min-width:240px;';
+  picker.style.cssText = 'position:absolute;z-index:1000;background:#1e2124;border:0.5px solid #444441;border-radius:12px;padding:1rem;max-height:400px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.4);min-width:240px;right:0;top:44px;';
   picker.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem"><span style="font-size:11px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.04em">Select date</span><button onclick="closePicker()" style="background:transparent;border:none;color:#888780;cursor:pointer;font-size:16px;line-height:1;padding:0">&#x2715;</button></div>'+monthsHTML;
   picker.addEventListener('click', function(e){ e.stopPropagation(); });
 
@@ -430,9 +428,7 @@ function prepData() {
   var lineAvg={};
   lineEntries.forEach(function(e){lineAvg[e[0]]=uniqDays?Math.round(e[1].units/uniqDays):0;});
 
-  var dates=allRows.map(function(r){return new Date(r['Date']);}).filter(function(d){return !isNaN(d);});
-
-  return {now,lots,completeLots,partialLots,totalUnits,totalProj,uniqueProds,uniqueCusts,totalLots,devs,avgDev,highDevCount,uniqDays,avgPerDay,total25,total25lots,comp25pct,avg25perDay,avgDev25,custs25,lineEntries,lineAvg,comp25,dates};
+  return {now,lots,completeLots,partialLots,totalUnits,totalProj,uniqueProds,uniqueCusts,totalLots,devs,avgDev,highDevCount,uniqDays,avgPerDay,total25,total25lots,comp25pct,avg25perDay,avgDev25,custs25,lineEntries,lineAvg,comp25};
 }
 
 function animateGauges(gaugeData) {
@@ -482,30 +478,26 @@ function renderToday() {
   var d = prepData();
   var now=d.now, lineAvg=d.lineAvg, totalUnits=d.totalUnits, uniqDays=d.uniqDays;
 
-  var nowStr=now.toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'});
+  var nowStr=(now.getMonth()+1)+'/'+now.getDate()+'/'+now.getFullYear();
   var isLive = selectedDayIdx === productionDays.length-1;
-  var viewStr = isLive ? nowStr : productionDays[selectedDayIdx];
+  var viewStr = productionDays[selectedDayIdx] || nowStr;
   var viewDate = new Date(viewStr);
   var viewFmt = isNaN(viewDate)?viewStr:viewDate.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
 
-  // day label
-  var dayLabel='';
-  if(isLive){ dayLabel=''; }
-  else {
-    var diffDays=Math.round((now-viewDate)/86400000);
-    if(diffDays===1) dayLabel='Yesterday';
-    else if(diffDays===2) dayLabel='2 days ago';
-    else if(diffDays===3) dayLabel='3 days ago';
-    else dayLabel=diffDays+' days ago';
-  }
+  var dayLabel = isLive ? '(Today)' : (function(){
+    var diffDays = Math.round((now - viewDate) / 86400000);
+    if (diffDays === 1) return '(Yesterday)';
+    if (diffDays === 2) return '(2 days ago)';
+    if (diffDays === 3) return '(3 days ago)';
+    return '('+diffDays+' days ago)';
+  })();
 
   var etHour=parseInt(new Date().toLocaleString('en-US',{hour:'numeric',hour12:false,timeZone:'America/New_York'}));
   var dayComplete=!isLive||(etHour>=16);
 
   function matchesViewDate(rowDate) {
     if (!rowDate) return false;
-    var dt = new Date(rowDate);
-    if (isNaN(dt)) return false;
+    var dt = new Date(rowDate); if (isNaN(dt)) return false;
     var formatted = (dt.getMonth()+1)+'/'+dt.getDate()+'/'+dt.getFullYear();
     var viewD = new Date(viewStr);
     var viewFormatted = (viewD.getMonth()+1)+'/'+viewD.getDate()+'/'+viewD.getFullYear();
@@ -550,12 +542,12 @@ function renderToday() {
   var allLinesAvg=d.avgPerDay;
   var todayPct=allLinesAvg?Math.round((todayTotal/allLinesAvg)*100):0;
   var barW=Math.min(todayPct,100);
-  var statusLabel=dayComplete?(todayPct>=100?'Day complete':'Day complete'):( isLive?'Day in progress':'Day complete');
+  var statusLabel=(!isLive||dayComplete)?(todayPct>=100?'Day complete':'Day complete'):'Day in progress';
   if(isLive&&!dayComplete) statusLabel='Day in progress';
   var statusColor=(!isLive||dayComplete)?(todayPct>=100?'#1D9E75':'#EF9F27'):'#888780';
   var barColor=(!isLive||dayComplete)?(todayPct>=100?'#1D9E75':'#EF9F27'):'#5f5e5a';
 
-  // YTD as of selected date (not necessarily today)
+  // YTD as of selected date
   var viewDateObj = new Date(viewStr);
   var ytdRows = allRows.filter(function(r){
     var dt = new Date(r['Date']); if(isNaN(dt)) return false;
@@ -566,7 +558,6 @@ function renderToday() {
   var ytdUnits = ytdLots.reduce(function(s,l){return s+l.finalUnits;},0);
   var ytdDays = new Set(ytdLots.map(function(l){return l.date;}).filter(Boolean)).size;
 
-  // 2025 same-period for context banner
   var viewMo = viewDateObj.getMonth(), viewDy = viewDateObj.getDate();
   var rows25banner = allRows25.filter(function(r){
     var dt = new Date(r['Date']); if(isNaN(dt)) return false;
@@ -582,6 +573,9 @@ function renderToday() {
   var tOnBarBanner = yearProjBanner ? ((YEAR_TARGET/yearProjBanner)*100) : 100;
   var yoyPctBanner = total25banner ? ((ytdUnits-total25banner)/total25banner*100) : 0;
   var yoySignBanner = yoyPctBanner >= 0 ? '+' : '';
+
+  var prevDisabled = selectedDayIdx<=0;
+  var nextDisabled = isLive;
 
   var contextBanner=
     '<div style="background:#1e2124;border:0.5px solid #2c2c2a;border-radius:12px;padding:.875rem 1.25rem;margin-bottom:10px">'
@@ -608,15 +602,12 @@ function renderToday() {
     +'<div style="display:flex;justify-content:space-between;font-size:10px;color:#5f5e5a;margin-top:4px"><span style="color:#378ADD">'+ytdUnits.toLocaleString()+' to date</span><span>target: 3,927,000</span></div>'
     +'</div></div></div>';
 
-  // date nav
-  var prevDisabled = selectedDayIdx<=0;
-  var nextDisabled = isLive;
   var dateNavHTML=
     '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;" id="date-nav-anchor">'
     +'<button onclick="navDay(-1)" '+(prevDisabled?'disabled':'')+' style="width:28px;height:28px;flex-shrink:0;border-radius:8px;border:0.5px solid #444441;background:transparent;cursor:'+(prevDisabled?'default':'pointer')+';color:'+(prevDisabled?'#444441':'#e8e6e0')+';font-size:16px;display:flex;align-items:center;justify-content:center;font-family:system-ui">&#8249;</button>'
     +'<div onclick="openPicker()" style="text-align:center;width:180px;flex-shrink:0;cursor:pointer;padding:4px 8px;border-radius:8px;border:0.5px solid #444441;background:transparent;transition:background .15s;" onmouseover="this.style.background=\'#252829\'" onmouseout="this.style.background=\'transparent\'">'
     +'<div style="font-size:13px;font-weight:500;color:#e8e6e0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+viewFmt+' &#x25BE;</div>'
-    +'<div style="font-size:10px;color:#5f5e5a;margin-top:2px;height:14px;">'+(dayLabel||'')+'</div>'
+    +'<div style="font-size:10px;color:#5f5e5a;margin-top:2px;height:14px;">'+dayLabel+'</div>'
     +'</div>'
     +'<button onclick="navDay(1)" '+(nextDisabled?'disabled':'')+' style="width:28px;height:28px;flex-shrink:0;border-radius:8px;border:0.5px solid #444441;background:transparent;cursor:'+(nextDisabled?'default':'pointer')+';color:'+(nextDisabled?'#444441':'#e8e6e0')+';font-size:16px;display:flex;align-items:center;justify-content:center;font-family:system-ui">&#8250;</button>'
     +'<div style="width:70px;flex-shrink:0;display:flex;justify-content:flex-start;">'
@@ -625,7 +616,6 @@ function renderToday() {
     +'</div>'
     +'</div>';
 
-  // gauges HTML
   var gaugesHTML = ALL_LINES.map(function(line,i){
     var k2=lk(line),color=LINE_COLOR[k2]||'#888780',bg=LINE_BG[k2]||'#2c2c2a',txt=LINE_TXT[k2]||'#e8e6e0',type=LINE_TYPE[k2]||'';
     var avg=lineAvg[line]||0;
@@ -644,12 +634,9 @@ function renderToday() {
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px">'
     +'<div style="display:flex;align-items:center;gap:8px"><div style="width:8px;height:8px;border-radius:50%;background:'+(isLive?'#1D9E75':'#888780')+'"></div>'
     +'<h3 style="margin:0;font-size:11px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.05em">Daily outlook</h3>'
-    +(isLive?'<span style="font-size:10px;color:#1D9E75;font-weight:500;padding:2px 8px;border-radius:10px;background:#085041;margin-left:6px">&#8635; Live &mdash; 60s</span>'
-            :'<span style="font-size:10px;color:#888780;font-weight:500;padding:2px 8px;border-radius:10px;background:#2c2c2a;margin-left:6px">Viewing past day</span>')
     +'</div>'
     +dateNavHTML
     +'</div>'
-    // currently running — always shown, collapsed with notice on past days
     +'<div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem">Currently running</div>'
     +(isLive
       ? ALL_LINES.map(function(line){
@@ -663,10 +650,8 @@ function renderToday() {
       : '<div style="padding:8px 0;border-bottom:0.5px solid #2c2c2a;font-size:12px;color:#5f5e5a;font-style:italic">Live data not available for past days</div>'
     )
     +'<div style="border-top:0.5px solid #2c2c2a;margin-top:.75rem;padding-top:.75rem">'
-    // gauges
     +'<div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem">Production by line</div>'
     +'<div style="display:flex;gap:12px;margin-bottom:10px">'+gaugesHTML+'</div>'
-    // total banner
     +'<div style="background:#141618;border:0.5px solid #2c2c2a;border-radius:10px;padding:.875rem 1.25rem;margin-bottom:1rem">'
     +'<div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:8px">'
     +'<div style="flex:1;text-align:center"><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">'+(isLive?'Total units today':'Total units')+'</div><div style="font-size:26px;font-weight:500;color:#e8e6e0;line-height:1">'+todayTotal.toLocaleString()+'</div></div>'
@@ -679,7 +664,6 @@ function renderToday() {
     +'</div>'
     +'<div style="background:#2c2c2a;border-radius:6px;height:8px;overflow:hidden"><div style="height:100%;width:'+barW+'%;background:'+barColor+';border-radius:6px;transition:width .4s"></div></div>'
     +'</div>'
-    // completed
     +'<div style="border-top:0.5px solid #2c2c2a;padding-top:.75rem">'
     +'<div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem">'+(isLive?'Completed today':'Completed')+'</div>'
     +(completedToday.length===0
@@ -699,23 +683,17 @@ function renderToday() {
             +'<div style="'+cs+';justify-content:center;"><span style="font-size:10px;font-weight:500;padding:2px 0;border-radius:10px;background:'+stBg+';color:'+stTxt+';text-align:center;width:64px;display:inline-block">'+l.status+'</span></div>'
             +'<div style="'+cs+';justify-content:flex-end;white-space:nowrap;">'+l.finalUnits.toLocaleString()+' <span style="color:#5f5e5a;font-size:11px;margin-left:3px">/ '+(l.projected?l.projected.toLocaleString():'—')+' proj</span></div>'
             +'<div style="'+cs+';justify-content:flex-end;"><span style="font-size:11px;font-weight:500;padding:2px 6px;border-radius:8px;white-space:nowrap;background:'+devBg+';color:'+devTxt+'">'+devS+'</span></div>';
-        }).join('')
-        +'</div>'
+        }).join('')+'</div>'
     )
     +'</div>'
-    +(isLive?'</div>':'')
+    +'</div>'
     +'</div>';
 
   document.getElementById('content').innerHTML = html;
 
-  // animate gauges
   var gaugeData = ALL_LINES.map(function(line,i){
     var k2=lk(line);
-    return {
-      canvasId:'dial_'+i, valId:'gval_'+i, badgeId:'gbadge_'+i,
-      color:LINE_COLOR[k2]||'#888780', track:LINE_TRACK[k2]||'#2c2c2a',
-      units:todayByLine[line]||0, avg:lineAvg[line]||0
-    };
+    return { canvasId:'dial_'+i, valId:'gval_'+i, badgeId:'gbadge_'+i, color:LINE_COLOR[k2]||'#888780', track:LINE_TRACK[k2]||'#2c2c2a', units:todayByLine[line]||0, avg:lineAvg[line]||0 };
   });
   animateGauges(gaugeData);
 }
@@ -770,8 +748,6 @@ function renderPerformance() {
   var powU=0,capU=0,l1u=0,l2u=0,l4u=0;
   lineEntries.forEach(function(e){var k2=lk(e[0]),u=e[1].units;if(k2==='line#1'){powU+=u;l1u=u;}else if(k2==='line#4'){powU+=u;l4u=u;}else if(k2==='line#2'){capU+=u;l2u=u;}});
   var powPct=totalUnits?((powU/totalUnits)*100).toFixed(1):0, capPct=totalUnits?((capU/totalUnits)*100).toFixed(1):0;
-  var lineAvg2={};
-  lineEntries.forEach(function(e){lineAvg2[e[0]]=uniqDays?Math.round(e[1].units/uniqDays):0;});
 
   var byJar={};
   lots.forEach(function(l){var k2=jarSizeKey(l.jarSize);if(!k2)return;byJar[k2]=(byJar[k2]||0)+l.finalUnits;});
@@ -874,7 +850,6 @@ function renderPerformance() {
   document.getElementById('jar-legend').innerHTML='<table style="width:100%;border-collapse:collapse;font-size:11px"><tbody>'+jarLegHTML+'</tbody></table>';
 
   charts.jar=new Chart(document.getElementById('cJar'),{type:'doughnut',data:{labels:jarEntries.map(function(e){return e[0];}),datasets:[{data:jarEntries.map(function(e){return e[1];}),backgroundColor:JAR_COLORS,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){var v=ctx.raw,p=jarTotal?((v/jarTotal)*100).toFixed(1):0;return v.toLocaleString()+' units ('+p+'%)';}}}}}});
-
   charts.weekly=new Chart(document.getElementById('cWeekly'),{type:'bar',data:{labels:weekLabels,datasets:[{type:'bar',label:'Units produced',data:weekData26,backgroundColor:weekColors,borderRadius:4,order:2},{type:'line',label:'8-week avg',data:weeks.map(function(){return weekAvg;}),borderColor:'#EF9F27',borderWidth:2,borderDash:[6,4],pointRadius:0,pointHoverRadius:0,fill:false,tension:0,order:1},{type:'line',label:'Weekly target',data:weeks.map(function(){return WEEKLY_TARGET;}),borderColor:'#1D9E75',borderWidth:2,borderDash:[6,4],pointRadius:0,pointHoverRadius:0,fill:false,tension:0,order:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){if(ctx.dataset.label==='8-week avg')return '8-wk avg: '+weekAvg.toLocaleString();if(ctx.dataset.label==='Weekly target')return 'Weekly target: '+WEEKLY_TARGET.toLocaleString();return 'Units: '+ctx.raw.toLocaleString();}}}},scales:{x:{ticks:{color:'#888780',font:{size:10},maxRotation:20},grid:{color:'#2c2c2a'}},y:{ticks:{color:'#888780',callback:function(v){return(v/1000).toFixed(0)+'k';}},grid:{color:'#2c2c2a'}}}},plugins:[{id:'barLabels',afterDatasetsDraw:function(chart){var ctx2=chart.ctx,meta=chart.getDatasetMeta(0);ctx2.save();ctx2.font='500 10px system-ui,sans-serif';ctx2.textAlign='center';ctx2.textBaseline='bottom';meta.data.forEach(function(bar,i){ctx2.fillStyle=parseInt(weeks[i])===cwn?'rgba(133,183,235,0.7)':'#85B7EB';ctx2.fillText(weekData26[i].toLocaleString(),bar.x,bar.y-4);});ctx2.restore();}}]});
 }
 
