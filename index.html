@@ -101,6 +101,7 @@
 var CORRECT_PW = 'DTF2026!';
 var CSV_2026 = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ0Vqunj5euX6ZRNwnYeF22UChTxiCd6gP_GVEiuFBeUo6o9c2Mc6Idt1pQkckhuyukmNJesy8_nZqX/pub?gid=943770391&single=true&output=csv';
 var CSV_2025 = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ0Vqunj5euX6ZRNwnYeF22UChTxiCd6gP_GVEiuFBeUo6o9c2Mc6Idt1pQkckhuyukmNJesy8_nZqX/pub?gid=2024063496&single=true&output=csv';
+var CSV_TARGETS = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ0Vqunj5euX6ZRNwnYeF22UChTxiCd6gP_GVEiuFBeUo6o9c2Mc6Idt1pQkckhuyukmNJesy8_nZqX/pub?gid=1686526578&single=true&output=csv';
 var YEAR_TARGET = 3927000;
 var WEEKLY_TARGET = Math.round(YEAR_TARGET / 52);
 var ALL_LINES = ['Line #1', 'Line #2', 'Line #4'];
@@ -110,7 +111,7 @@ var LINE_BG    = {'line#1':'#085041','line#2':'#0C447C','line#4':'#3C3489'};
 var LINE_TXT   = {'line#1':'#9FE1CB','line#2':'#85B7EB','line#4':'#AFA9EC'};
 var LINE_TYPE  = {'line#1':'Powder','line#2':'Capsules','line#4':'Powder'};
 
-var allRows = [], allRows25 = [], lotMap = {};
+var allRows = [], allRows25 = [], lotMap = {}, dailyTargets = {};
 var topView = 'summary', subView = 'today';
 var sortCol = 'date', sortDir = -1, page = 1, PAGE_SIZE = 50;
 var charts = {}, todayTimer = null, refreshTimer = null;
@@ -210,7 +211,28 @@ function deltaTag(v26, v25, isHigherBetter, fmt, v25Label) {
 }
 
 function fetchData() {
-  return Promise.all([fetch(CSV_2026).then(function(r){return r.text();}), fetch(CSV_2025).then(function(r){return r.text();})]);
+  return Promise.all([
+    fetch(CSV_2026).then(function(r){return r.text();}),
+    fetch(CSV_2025).then(function(r){return r.text();}),
+    fetch(CSV_TARGETS).then(function(r){return r.text();}).catch(function(){return '';})
+  ]);
+}
+
+function parseTargets(text) {
+  if (!text) return {};
+  var rows = parseCSV(text);
+  var m = {};
+  rows.forEach(function(r){
+    var d = (r['Date']||'').trim(); if (!d) return;
+    var dt = new Date(d); if (isNaN(dt)) return;
+    var key = (dt.getMonth()+1)+'/'+dt.getDate()+'/'+dt.getFullYear();
+    m[key] = {
+      'Line #1': num(r['Line #1']||r['Line 1']||r['LINE #1']||''),
+      'Line #2': num(r['Line #2']||r['Line 2']||r['LINE #2']||''),
+      'Line #4': num(r['Line #4']||r['Line 4']||r['LINE #4']||'')
+    };
+  });
+  return m;
 }
 
 function buildProductionDays() {
@@ -234,6 +256,7 @@ function loadDashboard() {
   fetchData().then(function(results) {
     allRows   = parseCSV(results[0]).filter(isValid);
     allRows25 = parseCSV(results[1]).filter(isValid);
+    dailyTargets = parseTargets(results[2]);
     lotMap = buildLotMap(allRows);
     buildProductionDays();
     document.getElementById('loading').style.display = 'none';
@@ -250,6 +273,7 @@ function startRefreshTimers() {
     fetchData().then(function(res){
       allRows=parseCSV(res[0]).filter(isValid);
       allRows25=parseCSV(res[1]).filter(isValid);
+      dailyTargets=parseTargets(res[2]);
       lotMap=buildLotMap(allRows);
       buildProductionDays();
       if(topView==='summary'&&subView==='performance') render();
@@ -261,6 +285,7 @@ function startRefreshTimers() {
       fetchData().then(function(res){
         allRows=parseCSV(res[0]).filter(isValid);
         allRows25=parseCSV(res[1]).filter(isValid);
+        dailyTargets=parseTargets(res[2]);
         lotMap=buildLotMap(allRows);
         buildProductionDays();
         render();
@@ -451,7 +476,7 @@ function animateGauges(gaugeData) {
       ctx.fillStyle='#888780'; ctx.font='500 12px system-ui,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
       ctx.fillText(pct+'%',cx,cy-r*0.38);
       var valEl=document.getElementById(g.valId); if(valEl) valEl.textContent=Math.round(g.units*e).toLocaleString();
-      var badgeEl=document.getElementById(g.badgeId); if(badgeEl) badgeEl.textContent=pct+'% of avg';
+      var badgeEl=document.getElementById(g.badgeId); if(badgeEl) badgeEl.textContent=pct+(g.badgeSuffix||'% of avg');
     });
     if(t<1) requestAnimationFrame(draw);
     else {
@@ -467,7 +492,7 @@ function animateGauges(gaugeData) {
         ctx.fillStyle='#888780';ctx.font='500 12px system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
         ctx.fillText(finalPct+'%',cx,cy-r*0.38);
         var valEl=document.getElementById(g.valId); if(valEl) valEl.textContent=g.units.toLocaleString();
-        var badgeEl=document.getElementById(g.badgeId); if(badgeEl) badgeEl.textContent=finalPct+'% of avg';
+        var badgeEl=document.getElementById(g.badgeId); if(badgeEl) badgeEl.textContent=finalPct+(g.badgeSuffix||'% of avg');
       });
     }
   }
@@ -616,15 +641,23 @@ function renderToday() {
     +'</div>'
     +'</div>';
 
+  // resolve per-line targets or fall back to avg
+  var dayTargetRow = dailyTargets[viewStr] || {};
+  function lineGoal(line) {
+    var t = dayTargetRow[line];
+    return t ? {value: t, isTarget: true} : {value: lineAvg[line]||0, isTarget: false};
+  }
+
   var gaugesHTML = ALL_LINES.map(function(line,i){
     var k2=lk(line),color=LINE_COLOR[k2]||'#888780',bg=LINE_BG[k2]||'#2c2c2a',txt=LINE_TXT[k2]||'#e8e6e0',type=LINE_TYPE[k2]||'';
-    var avg=lineAvg[line]||0;
+    var goal = lineGoal(line);
+    var goalLabel = goal.isTarget ? 'target: '+goal.value.toLocaleString()+' / day' : 'avg: '+(lineAvg[line]||0).toLocaleString()+' / day';
     return '<div style="flex:1;background:#141618;border:0.5px solid #2c2c2a;border-radius:10px;padding:1rem;text-align:center">'
       +'<div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem">'+line+(type?' \u2014 '+type:'')+'</div>'
       +'<canvas id="dial_'+i+'" width="140" height="82" style="display:block;margin:0 auto .25rem"></canvas>'
       +'<div style="font-size:20px;font-weight:500;color:'+color+';margin-bottom:2px" id="gval_'+i+'">0</div>'
-      +'<div style="font-size:10px;color:#5f5e5a">avg: '+avg.toLocaleString()+' / day</div>'
-      +'<div style="display:inline-block;margin-top:6px;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500;background:'+bg+';color:'+txt+'" id="gbadge_'+i+'">0% of avg</div>'
+      +'<div style="font-size:10px;color:'+(goal.isTarget?'#EF9F27':'#5f5e5a')+'">'+goalLabel+'</div>'
+      +'<div style="display:inline-block;margin-top:6px;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500;background:'+bg+';color:'+txt+'" id="gbadge_'+i+'">0% of '+(goal.isTarget?'target':'avg')+'</div>'
       +'</div>';
   }).join('');
 
@@ -693,7 +726,13 @@ function renderToday() {
 
   var gaugeData = ALL_LINES.map(function(line,i){
     var k2=lk(line);
-    return { canvasId:'dial_'+i, valId:'gval_'+i, badgeId:'gbadge_'+i, color:LINE_COLOR[k2]||'#888780', track:LINE_TRACK[k2]||'#2c2c2a', units:todayByLine[line]||0, avg:lineAvg[line]||0 };
+    var goal = lineGoal(line);
+    return {
+      canvasId:'dial_'+i, valId:'gval_'+i, badgeId:'gbadge_'+i,
+      color:LINE_COLOR[k2]||'#888780', track:LINE_TRACK[k2]||'#2c2c2a',
+      units:todayByLine[line]||0, avg:goal.value,
+      badgeSuffix: goal.isTarget ? '% of target' : '% of avg'
+    };
   });
   animateGauges(gaugeData);
 }
