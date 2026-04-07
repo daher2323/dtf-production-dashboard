@@ -420,10 +420,19 @@ function renderToday() {
   var etHour=parseInt(new Date().toLocaleString('en-US',{hour:'numeric',hour12:false,timeZone:'America/New_York'}));
   var dayComplete=!isLive||(etHour>=16);
 
+  function matchesViewDate(rowDate) {
+    if (!rowDate) return false;
+    var dt = new Date(rowDate);
+    if (isNaN(dt)) return false;
+    var formatted = (dt.getMonth()+1)+'/'+dt.getDate()+'/'+dt.getFullYear();
+    var viewD = new Date(viewStr);
+    var viewFormatted = (viewD.getMonth()+1)+'/'+viewD.getDate()+'/'+viewD.getFullYear();
+    return formatted === viewFormatted;
+  }
+
   var todayByLine={};
   allRows.forEach(function(r){
-    var dt=new Date(r['Date']); if(isNaN(dt)) return;
-    if(dt.toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'})!==viewStr) return;
+    if(!matchesViewDate(r['Date'])) return;
     var line=(r['Line']||'').trim(); if(!line) return;
     if(!todayByLine[line]) todayByLine[line]=0;
     todayByLine[line]+=num(r['Final Units']);
@@ -433,8 +442,7 @@ function renderToday() {
   var completedToday=[];
   var seenLots=new Set();
   allRows.forEach(function(r){
-    var dt=new Date(r['Date']); if(isNaN(dt)) return;
-    if(dt.toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'})!==viewStr) return;
+    if(!matchesViewDate(r['Date'])) return;
     var lot=(r['Lot Number']||'').trim(); if(!lot||seenLots.has(lot)) return; seenLots.add(lot);
     var lotData=lotMap[lot];
     var product=lotData?lotData.product:(r['Product']||'');
@@ -551,7 +559,7 @@ function renderToday() {
     +'<div class="full-card">'
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px">'
     +'<div style="display:flex;align-items:center;gap:8px"><div style="width:8px;height:8px;border-radius:50%;background:'+(isLive?'#1D9E75':'#888780')+'"></div>'
-    +'<h3 style="margin:0;font-size:11px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.05em">Today\'s outlook</h3>'
+    +'<h3 style="margin:0;font-size:11px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.05em">Daily outlook</h3>'
     +(isLive?'<span style="font-size:10px;color:#1D9E75;font-weight:500;padding:2px 8px;border-radius:10px;background:#085041;margin-left:6px">&#8635; Live &mdash; 60s</span>'
             :'<span style="font-size:10px;color:#888780;font-weight:500;padding:2px 8px;border-radius:10px;background:#2c2c2a;margin-left:6px">Viewing past day</span>')
     +'</div>'
