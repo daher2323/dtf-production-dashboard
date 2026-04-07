@@ -355,12 +355,13 @@ function renderExec() {
     var finalUnits=lotData?lotData.finalUnits:num(r['Final Units']);
     var status=lotData?lotData.status:(r['Complete or Partial']||'');
     var line=(r['Line']||'').trim();
+    var startTime=(r['Start Time']||'').trim();
     var st=status.toLowerCase();
     if(st.includes('complete')||st.includes('partial')){
       completedToday.push({product:product,projected:projected,finalUnits:finalUnits,status:status,line:line});
     } else {
       if(!runningByLine[line]) runningByLine[line]=[];
-      runningByLine[line].push({product:product,projected:projected});
+      runningByLine[line].push({product:product,projected:projected,startTime:startTime});
     }
   });
 
@@ -421,7 +422,10 @@ function renderExec() {
     +ALL_LINES.map(function(line){
       var k2=lk(line),bg=LINE_BG[k2]||'#2c2c2a',txt=LINE_TXT[k2]||'#e8e6e0',items=runningByLine[line]||[];
       if(items.length===0) return '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:0.5px solid #2c2c2a;font-size:12px"><span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:6px;white-space:nowrap;background:'+bg+';color:'+txt+'">'+line+'</span><span style="color:#5f5e5a;font-style:italic">No active lots at this time</span></div>';
-      return items.map(function(r){return '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:0.5px solid #2c2c2a;font-size:12px"><span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:6px;white-space:nowrap;background:'+bg+';color:'+txt+'">'+line+'</span><span style="font-weight:500">'+r.product+'</span><span style="color:#888780;margin-left:auto;white-space:nowrap">'+(r.projected?r.projected.toLocaleString()+' units projected':'')+'</span></div>';}).join('');
+      return items.map(function(r){
+        var timePart=r.startTime?'Start: '+r.startTime+' \u00a0|\u00a0 ':'';
+        return '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:0.5px solid #2c2c2a;font-size:12px"><span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:6px;white-space:nowrap;background:'+bg+';color:'+txt+'">'+line+'</span><span style="font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+r.product+'</span><span style="color:#888780;white-space:nowrap;font-size:11px">'+timePart+(r.projected?r.projected.toLocaleString()+' units projected':'')+'</span></div>';
+      }).join('');
     }).join('')
     // 2. gauges
     +'<div style="border-top:0.5px solid #2c2c2a;margin-top:.75rem;padding-top:.75rem;font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem">Production by line</div>'
@@ -437,15 +441,14 @@ function renderExec() {
     }).join('')+'</div>'
     // 3. total banner
     +'<div style="background:#141618;border:0.5px solid #2c2c2a;border-radius:10px;padding:.875rem 1.25rem;margin-bottom:1rem">'
-    +'<div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">'
-    +'<div style="display:flex;gap:32px;align-items:flex-end">'
-    +'<div><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Total units today</div><div style="font-size:26px;font-weight:500;color:#e8e6e0;line-height:1">'+todayTotal.toLocaleString()+'</div></div>'
-    +'<div style="width:0.5px;background:#2c2c2a;height:32px;flex-shrink:0"></div>'
-    +'<div><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Daily avg (all lines)</div><div style="font-size:16px;font-weight:500;color:#e8e6e0">'+allLinesAvg.toLocaleString()+'</div></div>'
-    +'<div style="width:0.5px;background:#2c2c2a;height:32px;flex-shrink:0"></div>'
-    +'<div><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">% of avg</div><div style="font-size:16px;font-weight:500;color:#e8e6e0">'+todayPct+'%</div></div>'
-    +'</div>'
-    +'<div style="font-size:10px;color:'+statusColor+';font-weight:500">'+statusLabel+'</div>'
+    +'<div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:8px">'
+    +'<div style="flex:1;text-align:center"><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Total units today</div><div style="font-size:26px;font-weight:500;color:#e8e6e0;line-height:1">'+todayTotal.toLocaleString()+'</div></div>'
+    +'<div style="width:0.5px;background:#2c2c2a;height:36px;flex-shrink:0;align-self:center"></div>'
+    +'<div style="flex:1;text-align:center"><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Daily avg (all lines)</div><div style="font-size:18px;font-weight:500;color:#e8e6e0;line-height:1.2">'+allLinesAvg.toLocaleString()+'</div></div>'
+    +'<div style="width:0.5px;background:#2c2c2a;height:36px;flex-shrink:0;align-self:center"></div>'
+    +'<div style="flex:1;text-align:center"><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">% of avg</div><div style="font-size:18px;font-weight:500;color:#e8e6e0;line-height:1.2">'+todayPct+'%</div></div>'
+    +'<div style="width:0.5px;background:#2c2c2a;height:36px;flex-shrink:0;align-self:center"></div>'
+    +'<div style="flex:1;text-align:center"><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Status</div><div style="font-size:13px;font-weight:500;color:'+statusColor+';line-height:1.4">'+statusLabel+'</div></div>'
     +'</div>'
     +'<div style="background:#2c2c2a;border-radius:6px;height:8px;overflow:hidden"><div style="height:100%;width:'+barW+'%;background:#5f5e5a;border-radius:6px;transition:width .4s"></div></div>'
     +'</div>'
@@ -466,8 +469,8 @@ function renderExec() {
           return '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:0.5px solid #2c2c2a;font-size:12px">'
             +'<span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:6px;white-space:nowrap;background:'+bg+';color:'+txt+'">'+l.line+'</span>'
             +'<span style="font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+l.product+'</span>'
-            +'<span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:10px;background:'+stBg+';color:'+stTxt+';flex-shrink:0">'+l.status+'</span>'
-            +'<span style="white-space:nowrap;color:#e8e6e0">'+l.finalUnits.toLocaleString()+' <span style="color:#5f5e5a;font-size:11px">/ '+(l.projected?l.projected.toLocaleString():'—')+' proj</span></span>'
+            +'<span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:10px;background:'+stBg+';color:'+stTxt+';flex-shrink:0;width:64px;text-align:center;display:inline-block">'+l.status+'</span>'
+            +'<span style="white-space:nowrap;color:#e8e6e0;width:160px;text-align:right;flex-shrink:0">'+l.finalUnits.toLocaleString()+' <span style="color:#5f5e5a;font-size:11px">/ '+(l.projected?l.projected.toLocaleString():'—')+' proj</span></span>'
             +'<span style="font-size:11px;font-weight:500;padding:2px 7px;border-radius:8px;white-space:nowrap;background:'+devBg+';color:'+devTxt+'">'+devS+'</span>'
             +'</div>';
         }).join('')
