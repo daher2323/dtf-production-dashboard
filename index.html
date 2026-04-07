@@ -579,7 +579,7 @@ function renderToday() {
 
   var contextBanner=
     '<div style="background:#1e2124;border:0.5px solid #2c2c2a;border-radius:12px;padding:.875rem 1.25rem;margin-bottom:10px">'
-    +'<div style="font-size:10px;color:#5f5e5a;margin-bottom:.6rem;text-align:right;height:16px;">YTD as of '+viewFmt+(isLive?' (today)':'')+'</div>'
+    +'<div style="font-size:10px;color:#5f5e5a;margin-bottom:.6rem;text-align:right;height:16px;">YTD as of '+viewFmt+' '+dayLabel+'</div>'
     +'<div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">'
     +'<div style="flex:1;min-width:120px"><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Units produced YTD</div>'
     +'<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:22px;font-weight:500;color:#e8e6e0">'+ytdUnits.toLocaleString()+'</span>'
