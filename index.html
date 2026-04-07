@@ -751,7 +751,16 @@ function renderToday() {
     +'<div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:8px">'
     +'<div style="flex:1;text-align:center"><div id="banner-lbl-total" style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;transition:color .4s">'+(isLive?'Total units today':'Total units')+'</div>'
     +'<div style="display:flex;align-items:center;justify-content:center;gap:6px"><span id="banner-total" style="font-size:26px;font-weight:500;color:#e8e6e0;line-height:1;transition:color .4s">0</span>'
-    +'<span id="banner-bullseye" style="opacity:0;transform:scale(0) rotate(-20deg);display:inline-flex;align-items:center;"><svg width="22" height="22" viewBox="0 0 22 22" fill="none"><circle cx="11" cy="11" r="10" stroke="#1D9E75" stroke-width="1.5"/><circle cx="11" cy="11" r="6.5" stroke="#1D9E75" stroke-width="1.5"/><circle cx="11" cy="11" r="3" fill="#1D9E75"/></svg></span>'
+    +'<span id="banner-bullseye" style="display:none;margin-left:8px;vertical-align:middle;">'
+    +'<svg width="24" height="24" viewBox="0 0 24 24" fill="none">'
+    +'<circle cx="12" cy="12" r="11" fill="#fff" stroke="#e8e6e0" stroke-width="0.5"/>'
+    +'<circle cx="12" cy="12" r="11" fill="#D4372A"/>'
+    +'<circle cx="12" cy="12" r="8" fill="#fff"/>'
+    +'<circle cx="12" cy="12" r="5.5" fill="#D4372A"/>'
+    +'<circle cx="12" cy="12" r="3" fill="#fff"/>'
+    +'<circle cx="12" cy="12" r="1.5" fill="#D4372A"/>'
+    +'</svg>'
+    +'</span>'
     +'</div></div>'
     +'<div id="banner-div1" style="width:0.5px;background:#2c2c2a;height:36px;flex-shrink:0;align-self:center;transition:background .4s"></div>'
     +'<div style="flex:1;text-align:center"><div id="banner-lbl-goal" style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;transition:color .4s">'+(allLinesHaveTarget?'Daily target (all lines)':'Daily avg (all lines)')+'</div><div style="font-size:18px;font-weight:500;color:#e8e6e0;line-height:1.2;transition:color .4s">'+totalGoal.toLocaleString()+'</div></div>'
@@ -788,38 +797,6 @@ function renderToday() {
     +'</div>';
 
   document.getElementById('content').innerHTML = html;
-
-  // Apply immediate visual state for lines already at/over target
-  requestAnimationFrame(function(){
-    ALL_LINES.forEach(function(line, i){
-      var units = todayByLine[line]||0;
-      var goal = lineGoal(line);
-      var frac = goal.value ? units/goal.value : 0;
-      var card = document.getElementById('gcard_'+i);
-      var check = document.getElementById('gcheck_'+i);
-      if(frac >= 1){
-        if(card){ card.style.background='#04342C'; card.style.border='1.5px solid #1D9E75'; }
-        if(check){ check.style.opacity='1'; check.style.transform='scale(1)'; check.style.transition='opacity .4s, transform .4s cubic-bezier(.34,1.56,.64,1)'; }
-      } else {
-        if(card){ card.style.background='#141618'; card.style.border='0.5px solid #2c2c2a'; }
-        if(check){ check.style.opacity='0'; check.style.transform='scale(0)'; }
-      }
-    });
-
-    if(todayTotal >= totalGoal){
-      var banner = document.getElementById('today-banner');
-      if(banner){ banner.style.background='#085041'; banner.style.border='1.5px solid #1D9E75'; }
-      ['banner-lbl-total','banner-lbl-goal','banner-lbl-pct','banner-lbl-status'].forEach(function(id){
-        var el=document.getElementById(id); if(el) el.style.color='#5DCAA5';
-      });
-      ['banner-div1','banner-div2','banner-div3'].forEach(function(id){
-        var el=document.getElementById(id); if(el) el.style.background='#0F6E56';
-      });
-      var bt=document.getElementById('banner-track'); if(bt) bt.style.background='#0F6E56';
-      var bs=document.getElementById('banner-bullseye');
-      if(bs){ bs.style.opacity='1'; bs.style.transform='scale(1) rotate(0deg)'; bs.style.transition='opacity .5s, transform .5s cubic-bezier(.34,1.56,.64,1)'; }
-    }
-  });
 
   var gaugeData = ALL_LINES.map(function(line,i){
     var k2=lk(line);
