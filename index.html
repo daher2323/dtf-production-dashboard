@@ -287,26 +287,26 @@ function setSub(v) {
 }
 
 function navDay(dir) {
-  selectedDayIdx = Math.max(0, Math.min(productionDays.length-1, selectedDayIdx+dir));
   var scrollY = window.scrollY;
+  selectedDayIdx = Math.max(0, Math.min(productionDays.length-1, selectedDayIdx+dir));
   render();
-  window.scrollTo(0, scrollY);
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){ window.scrollTo(0, scrollY); }); });
 }
 
 function goLive() {
-  selectedDayIdx = productionDays.length - 1;
   var scrollY = window.scrollY;
+  selectedDayIdx = productionDays.length - 1;
   render();
-  window.scrollTo(0, scrollY);
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){ window.scrollTo(0, scrollY); }); });
 }
 
 function pickDay(str) {
+  var scrollY = window.scrollY;
   var idx = productionDays.indexOf(str);
   if (idx !== -1) selectedDayIdx = idx;
   closePicker();
-  var scrollY = window.scrollY;
   render();
-  window.scrollTo(0, scrollY);
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){ window.scrollTo(0, scrollY); }); });
 }
 
 function openPicker() {
@@ -612,15 +612,17 @@ function renderToday() {
   var prevDisabled = selectedDayIdx<=0;
   var nextDisabled = isLive;
   var dateNavHTML=
-    '<div style="display:flex;align-items:center;gap:6px" id="date-nav-anchor">'
-    +'<button onclick="navDay(-1)" '+(prevDisabled?'disabled':'')+' style="width:28px;height:28px;border-radius:8px;border:0.5px solid #444441;background:transparent;cursor:'+(prevDisabled?'default':'pointer')+';color:'+(prevDisabled?'#444441':'#e8e6e0')+';font-size:16px;display:flex;align-items:center;justify-content:center;font-family:system-ui">&#8249;</button>'
-    +'<div onclick="openPicker()" style="text-align:center;min-width:150px;cursor:pointer;padding:4px 8px;border-radius:8px;border:0.5px solid #444441;background:transparent;transition:background .15s;" onmouseover="this.style.background=\'#252829\'" onmouseout="this.style.background=\'transparent\'">'
-    +'<div style="font-size:13px;font-weight:500;color:#e8e6e0">'+viewFmt+' &#x25BE;</div>'
-    +(dayLabel?'<div style="font-size:10px;color:#5f5e5a;margin-top:2px">'+dayLabel+'</div>':'')
+    '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;" id="date-nav-anchor">'
+    +'<button onclick="navDay(-1)" '+(prevDisabled?'disabled':'')+' style="width:28px;height:28px;flex-shrink:0;border-radius:8px;border:0.5px solid #444441;background:transparent;cursor:'+(prevDisabled?'default':'pointer')+';color:'+(prevDisabled?'#444441':'#e8e6e0')+';font-size:16px;display:flex;align-items:center;justify-content:center;font-family:system-ui">&#8249;</button>'
+    +'<div onclick="openPicker()" style="text-align:center;width:180px;flex-shrink:0;cursor:pointer;padding:4px 8px;border-radius:8px;border:0.5px solid #444441;background:transparent;transition:background .15s;" onmouseover="this.style.background=\'#252829\'" onmouseout="this.style.background=\'transparent\'">'
+    +'<div style="font-size:13px;font-weight:500;color:#e8e6e0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+viewFmt+' &#x25BE;</div>'
+    +'<div style="font-size:10px;color:#5f5e5a;margin-top:2px;height:14px;">'+(dayLabel||'')+'</div>'
     +'</div>'
-    +'<button onclick="navDay(1)" '+(nextDisabled?'disabled':'')+' style="width:28px;height:28px;border-radius:8px;border:0.5px solid #444441;background:transparent;cursor:'+(nextDisabled?'default':'pointer')+';color:'+(nextDisabled?'#444441':'#e8e6e0')+';font-size:16px;display:flex;align-items:center;justify-content:center;font-family:system-ui">&#8250;</button>'
-    +(isLive?''
-      :'<button onclick="goLive()" style="padding:4px 12px;border-radius:8px;border:0.5px solid #1D9E75;background:transparent;cursor:pointer;color:#1D9E75;font-size:11px;font-weight:500;font-family:system-ui;margin-left:2px">Live</button>')
+    +'<button onclick="navDay(1)" '+(nextDisabled?'disabled':'')+' style="width:28px;height:28px;flex-shrink:0;border-radius:8px;border:0.5px solid #444441;background:transparent;cursor:'+(nextDisabled?'default':'pointer')+';color:'+(nextDisabled?'#444441':'#e8e6e0')+';font-size:16px;display:flex;align-items:center;justify-content:center;font-family:system-ui">&#8250;</button>'
+    +'<div style="width:70px;flex-shrink:0;display:flex;justify-content:flex-start;">'
+    +(isLive?'<span style="font-size:10px;color:#1D9E75;font-weight:500;padding:2px 8px;border-radius:10px;background:#085041;white-space:nowrap;">&#8635; Live</span>'
+            :'<button onclick="goLive()" style="padding:4px 12px;border-radius:8px;border:0.5px solid #1D9E75;background:transparent;cursor:pointer;color:#1D9E75;font-size:11px;font-weight:500;font-family:system-ui;white-space:nowrap;">Live</button>')
+    +'</div>'
     +'</div>';
 
   // gauges HTML
@@ -647,19 +649,20 @@ function renderToday() {
     +'</div>'
     +dateNavHTML
     +'</div>'
-    // currently running (only on live)
-    +(isLive?
-      '<div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem">Currently running</div>'
-      +ALL_LINES.map(function(line){
-        var k2=lk(line),bg=LINE_BG[k2]||'#2c2c2a',txt=LINE_TXT[k2]||'#e8e6e0',items=runningByLine[line]||[];
-        if(!items.length) return '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:0.5px solid #2c2c2a;font-size:12px"><span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:6px;white-space:nowrap;background:'+bg+';color:'+txt+'">'+line+'</span><span style="color:#5f5e5a;font-style:italic">No active lots at this time</span></div>';
-        return items.map(function(r){
-          var tp=r.startTime?'Start: '+r.startTime+' \u00a0|\u00a0 ':'';
-          return '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:0.5px solid #2c2c2a;font-size:12px"><span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:6px;white-space:nowrap;background:'+bg+';color:'+txt+'">'+line+'</span><span style="font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+r.product+'</span><span style="color:#888780;white-space:nowrap;font-size:11px">'+tp+(r.projected?r.projected.toLocaleString()+' units projected':'')+'</span></div>';
-        }).join('');
-      }).join('')
-      +'<div style="border-top:0.5px solid #2c2c2a;margin-top:.75rem;padding-top:.75rem">'
-      : '<div>')
+    // currently running — always shown, collapsed with notice on past days
+    +'<div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem">Currently running</div>'
+    +(isLive
+      ? ALL_LINES.map(function(line){
+          var k2=lk(line),bg=LINE_BG[k2]||'#2c2c2a',txt=LINE_TXT[k2]||'#e8e6e0',items=runningByLine[line]||[];
+          if(!items.length) return '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:0.5px solid #2c2c2a;font-size:12px"><span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:6px;white-space:nowrap;background:'+bg+';color:'+txt+'">'+line+'</span><span style="color:#5f5e5a;font-style:italic">No active lots at this time</span></div>';
+          return items.map(function(r){
+            var tp=r.startTime?'Start: '+r.startTime+' \u00a0|\u00a0 ':'';
+            return '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:0.5px solid #2c2c2a;font-size:12px"><span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:6px;white-space:nowrap;background:'+bg+';color:'+txt+'">'+line+'</span><span style="font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+r.product+'</span><span style="color:#888780;white-space:nowrap;font-size:11px">'+tp+(r.projected?r.projected.toLocaleString()+' units projected':'')+'</span></div>';
+          }).join('');
+        }).join('')
+      : '<div style="padding:8px 0;border-bottom:0.5px solid #2c2c2a;font-size:12px;color:#5f5e5a;font-style:italic">Live data not available for past days</div>'
+    )
+    +'<div style="border-top:0.5px solid #2c2c2a;margin-top:.75rem;padding-top:.75rem">'
     // gauges
     +'<div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem">Production by line</div>'
     +'<div style="display:flex;gap:12px;margin-bottom:10px">'+gaugesHTML+'</div>'
