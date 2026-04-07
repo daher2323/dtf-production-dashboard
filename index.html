@@ -19,9 +19,10 @@
   .nav-top { display: flex; gap: 6px; }
   .nav-top button { padding: 6px 18px; border-radius: 20px; border: 0.5px solid #444441; background: transparent; cursor: pointer; font-size: 13px; color: #888780; font-family: system-ui, sans-serif; transition: all .15s; }
   .nav-top button.active { background: #378ADD; color: #fff; border-color: transparent; }
-  .nav-sub { display: flex; gap: 4px; }
-  .nav-sub button { padding: 4px 14px; border-radius: 14px; border: 0.5px solid #444441; background: transparent; cursor: pointer; font-size: 12px; color: #888780; font-family: system-ui, sans-serif; transition: all .15s; }
-  .nav-sub button.active { background: #1e2124; color: #e8e6e0; border-color: #5f5e5a; font-weight: 500; }
+  .nav-sub { display: flex; border: 0.5px solid #444441; border-radius: 20px; overflow: hidden; }
+  .nav-sub button { padding: 5px 18px; border: none; background: transparent; cursor: pointer; font-size: 12px; color: #888780; font-family: system-ui, sans-serif; transition: all .15s; }
+  .nav-sub button:not(:first-child) { border-left: 0.5px solid #444441; }
+  .nav-sub button.active { background: #1D9E75; color: #fff; font-weight: 500; }
   .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 1.25rem; }
   .metric { background: #1e2124; border: 0.5px solid #2c2c2a; border-radius: 10px; padding: 1rem; }
   .metric .label { font-size: 11px; color: #888780; margin-bottom: 5px; text-transform: uppercase; letter-spacing: .03em; }
@@ -78,8 +79,7 @@
       <img src="DTF_Logo.png" alt="DTF Logo" onerror="this.style.display='none'">
       <div>
         <div class="brand-name">Dynamic Technical Formulations</div>
-        <div class="brand-sub">Production Dashboard</div>
-        <div class="data-range" id="data-range"></div>
+        <div class="brand-sub">Operations View</div>
       </div>
     </div>
     <div class="nav-area">
@@ -322,11 +322,6 @@ function prepData() {
   lineEntries.forEach(function(e){ lineAvg[e[0]]=uniqDays?Math.round(e[1].units/uniqDays):0; });
 
   var dates=allRows.map(function(r){return new Date(r['Date']);}).filter(function(d){return !isNaN(d);});
-  if(dates.length){
-    var minD=new Date(Math.min.apply(null,dates)),maxD=new Date(Math.max.apply(null,dates));
-    var fmtD=function(d){return (d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear();};
-    document.getElementById('data-range').textContent='Data: '+fmtD(minD)+' \u2013 '+fmtD(maxD);
-  }
 
   return {now,lots,completeLots,partialLots,totalUnits,totalProj,uniqueProds,uniqueCusts,totalLots,devs,avgDev,highDevCount,uniqDays,avgPerDay,total25,total25lots,comp25pct,avg25perDay,avgDev25,custs25,lineEntries,lineAvg,comp25};
 }
