@@ -789,6 +789,30 @@ function renderToday() {
 
   document.getElementById('content').innerHTML = html;
 
+  // Apply immediate visual state for lines already at/over target (past days or pre-loaded)
+  ALL_LINES.forEach(function(line, i){
+    var units = todayByLine[line]||0;
+    var goal = lineGoal(line);
+    var frac = goal.value ? units/goal.value : 0;
+    if(frac >= 1){
+      var card = document.getElementById('gcard_'+i);
+      if(card){ card.style.background='#04342C'; card.style.border='1.5px solid #1D9E75'; }
+    }
+  });
+
+  // Apply banner state if already hit
+  if(todayTotal >= totalGoal){
+    var banner = document.getElementById('today-banner');
+    if(banner){ banner.style.background='#085041'; banner.style.border='1.5px solid #1D9E75'; }
+    ['banner-lbl-total','banner-lbl-goal','banner-lbl-pct','banner-lbl-status'].forEach(function(id){
+      var el=document.getElementById(id); if(el) el.style.color='#5DCAA5';
+    });
+    ['banner-div1','banner-div2','banner-div3'].forEach(function(id){
+      var el=document.getElementById(id); if(el) el.style.background='#0F6E56';
+    });
+    var bt=document.getElementById('banner-track'); if(bt) bt.style.background='#0F6E56';
+  }
+
   var gaugeData = ALL_LINES.map(function(line,i){
     var k2=lk(line);
     var goal=lineGoal(line);
