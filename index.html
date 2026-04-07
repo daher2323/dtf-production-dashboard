@@ -563,6 +563,12 @@ function renderToday() {
     return parseInt((a.line||'').replace(/\D/g,''))-parseInt((b.line||'').replace(/\D/g,''));
   });
 
+  var dayTargetRow = (dailyTargets && dailyTargets[viewStr]) || {};
+  function lineGoal(line) {
+    var t = dayTargetRow[line] || 0;
+    return t ? {value: t, isTarget: true} : {value: lineAvg[line]||0, isTarget: false};
+  }
+
   // total goal for banner — sum targets where set, avg where not
   var totalGoal = ALL_LINES.reduce(function(s, line){
     var goal = lineGoal(line);
@@ -570,7 +576,6 @@ function renderToday() {
   }, 0);
   var allLinesHaveTarget = ALL_LINES.every(function(line){ return !!(dayTargetRow[line]); });
   var bannerGoalLabel = allLinesHaveTarget ? '% of target' : '% of avg';
-
   var todayPct = totalGoal ? Math.round((todayTotal/totalGoal)*100) : 0;
   var barW=Math.min(todayPct,100);
   var statusLabel=(!isLive||dayComplete)?(todayPct>=100?'Day complete':'Day complete'):'Day in progress';
