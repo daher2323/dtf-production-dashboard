@@ -374,7 +374,7 @@ function renderToday() {
   });
 
   var todayTotal=Object.values(todayByLine).reduce(function(s,v){return s+v;},0);
-  var allLinesAvg=Object.values(lineAvg).reduce(function(s,v){return s+v;},0);
+  var allLinesAvg=d.avgPerDay;
   var todayPct=allLinesAvg?Math.round((todayTotal/allLinesAvg)*100):0;
   var barW=Math.min(todayPct,100);
   var statusLabel=dayComplete?'Day complete':'Day in progress';
