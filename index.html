@@ -751,16 +751,7 @@ function renderToday() {
     +'<div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:8px">'
     +'<div style="flex:1;text-align:center"><div id="banner-lbl-total" style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;transition:color .4s">'+(isLive?'Total units today':'Total units')+'</div>'
     +'<div style="display:flex;align-items:center;justify-content:center;gap:6px"><span id="banner-total" style="font-size:26px;font-weight:500;color:#e8e6e0;line-height:1;transition:color .4s">0</span>'
-    +'<span id="banner-bullseye" style="display:none;margin-left:8px;vertical-align:middle;">'
-    +'<svg width="24" height="24" viewBox="0 0 24 24" fill="none">'
-    +'<circle cx="12" cy="12" r="11" fill="#fff" stroke="#e8e6e0" stroke-width="0.5"/>'
-    +'<circle cx="12" cy="12" r="11" fill="#D4372A"/>'
-    +'<circle cx="12" cy="12" r="8" fill="#fff"/>'
-    +'<circle cx="12" cy="12" r="5.5" fill="#D4372A"/>'
-    +'<circle cx="12" cy="12" r="3" fill="#fff"/>'
-    +'<circle cx="12" cy="12" r="1.5" fill="#D4372A"/>'
-    +'</svg>'
-    +'</span>'
+    +'<span id="banner-bullseye" style="display:none;margin-left:8px;vertical-align:middle;font-size:22px;line-height:1">&#127919;</span>'
     +'</div></div>'
     +'<div id="banner-div1" style="width:0.5px;background:#2c2c2a;height:36px;flex-shrink:0;align-self:center;transition:background .4s"></div>'
     +'<div style="flex:1;text-align:center"><div id="banner-lbl-goal" style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;transition:color .4s">'+(allLinesHaveTarget?'Daily target (all lines)':'Daily avg (all lines)')+'</div><div style="font-size:18px;font-weight:500;color:#e8e6e0;line-height:1.2;transition:color .4s">'+totalGoal.toLocaleString()+'</div></div>'
@@ -798,19 +789,37 @@ function renderToday() {
 
   document.getElementById('content').innerHTML = html;
 
-  var gaugeData = ALL_LINES.map(function(line,i){
+  var _gaugeData = ALL_LINES.map(function(line,i){
     var k2=lk(line);
     var goal=lineGoal(line);
-    return {
-      canvasId:'dial_'+i, valId:'gval_'+i, badgeId:'gbadge_'+i,
-      cardId:'gcard_'+i, checkId:'gcheck_'+i, idx:i,
+    return { idx:i, canvasId:'dial_'+i, valId:'gval_'+i, badgeId:'gbadge_'+i,
       color:LINE_COLOR[k2]||'#888780', track:LINE_TRACK[k2]||'#2c2c2a',
       origBg:LINE_BG[k2]||'#2c2c2a', origTxt:LINE_TXT[k2]||'#e8e6e0',
       units:todayByLine[line]||0, avg:goal.value,
       badgeSuffix: goal.isTarget ? '% of target' : '% of avg'
     };
   });
-  animateGauges(gaugeData, todayTotal, totalGoal, allLinesHaveTarget, barColor, statusLabel, statusColor);
+
+  setTimeout(function(){
+    _gaugeData.forEach(function(g){
+      var frac = g.avg ? (g.units/g.avg) : 0;
+      var hit = frac >= 1;
+      var card = document.getElementById('gcard_'+g.idx);
+      var check = document.getElementById('gcheck_'+g.idx);
+      if(card) card.style.border = hit ? '2.5px solid #1D9E75' : '0.5px solid #2c2c2a';
+      if(check) check.style.display = hit ? 'flex' : 'none';
+    });
+    var allHit = todayTotal >= totalGoal;
+    var banner = document.getElementById('today-banner');
+    if(banner){ banner.style.background=allHit?'#085041':'#141618'; banner.style.border=allHit?'1.5px solid #1D9E75':'0.5px solid #2c2c2a'; }
+    ['banner-lbl-total','banner-lbl-goal','banner-lbl-pct','banner-lbl-status'].forEach(function(id){ var el=document.getElementById(id); if(el) el.style.color=allHit?'#5DCAA5':'#888780'; });
+    ['banner-div1','banner-div2','banner-div3'].forEach(function(id){ var el=document.getElementById(id); if(el) el.style.background=allHit?'#0F6E56':'#2c2c2a'; });
+    var bt=document.getElementById('banner-track'); if(bt) bt.style.background=allHit?'#0F6E56':'#2c2c2a';
+    var bs=document.getElementById('banner-bullseye'); if(bs) bs.style.display=allHit?'inline':'none';
+    var bvStatus=document.getElementById('banner-status'); if(bvStatus){bvStatus.textContent=statusLabel;bvStatus.style.color=statusColor;}
+    animateGauges(_gaugeData, todayTotal, totalGoal, barColor);
+  }, 0);
+}
 }
 
 function renderPerformance() {
