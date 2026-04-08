@@ -124,6 +124,7 @@ var topView = 'summary', subView = 'today';
 var sortCol = 'date', sortDir = -1, page = 1, PAGE_SIZE = 50;
 var charts = {}, todayTimer = null, refreshTimer = null;
 var productionDays = [], selectedDayIdx = -1;
+var selectedWeekMon = null;
 
 function lk(s) { return (s||'').replace(/\s/g,'').toLowerCase(); }
 
@@ -439,6 +440,92 @@ function openPicker() {
 function closePicker() {
   var p = document.getElementById('day-picker');
   if (p) p.remove();
+}
+
+function getCurrentWeekMon() {
+  var now = new Date(); now.setHours(0,0,0,0);
+  var day = now.getDay();
+  var mon = new Date(now); mon.setDate(now.getDate()-(day===0?6:day-1));
+  return mon;
+}
+
+function navWeek(dir) {
+  if(!selectedWeekMon) selectedWeekMon = getCurrentWeekMon();
+  var d = new Date(selectedWeekMon); d.setDate(d.getDate() + dir*7);
+  selectedWeekMon = d;
+  render();
+}
+
+function goWeekLive() {
+  selectedWeekMon = getCurrentWeekMon();
+  render();
+}
+
+function pickWeek(monStr) {
+  selectedWeekMon = new Date(monStr);
+  closeWeekPicker();
+  render();
+}
+
+function openWeekPicker() {
+  var existing = document.getElementById('week-picker');
+  if (existing) { closeWeekPicker(); return; }
+  var curMon = selectedWeekMon || getCurrentWeekMon();
+  var liveMonStr = getCurrentWeekMon().toDateString();
+
+  // find earliest week with data
+  var earliest = new Date();
+  allRows.forEach(function(r){
+    var dt = new Date(r['Date']); if(isNaN(dt)) return;
+    if(dt < earliest) earliest = dt;
+  });
+  var eMon = new Date(earliest); eMon.setHours(0,0,0,0);
+  var eDay = eMon.getDay();
+  eMon.setDate(eMon.getDate()-(eDay===0?6:eDay-1));
+
+  // build months
+  var liveMon = getCurrentWeekMon();
+  var byMonth = {};
+  var d = new Date(eMon);
+  while(d <= liveMon) {
+    var k = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    if(!byMonth[k]) byMonth[k] = {label: d.toLocaleDateString('en-US',{month:'long',year:'numeric'}), weeks:[]};
+    var fri = new Date(d); fri.setDate(d.getDate()+4);
+    byMonth[k].weeks.push({mon: new Date(d), fri: fri});
+    d.setDate(d.getDate()+7);
+  }
+
+  var monthsHTML = Object.keys(byMonth).sort().reverse().map(function(k){
+    var mo = byMonth[k];
+    var weeksHTML = mo.weeks.reverse().map(function(w){
+      var isSelected = curMon.toDateString()===w.mon.toDateString();
+      var isLive = liveMonStr===w.mon.toDateString();
+      var monFmt = w.mon.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+      var friFmt = w.fri.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+      var wn = getWeekNum(w.mon);
+      var bg = isSelected?'#1D9E75':isLive?'#0C447C':'transparent';
+      var color = isSelected?'#fff':isLive?'#85B7EB':'#e8e6e0';
+      return '<div onclick="pickWeek(\''+w.mon.toDateString()+'\')" style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border-radius:6px;cursor:pointer;background:'+bg+';color:'+color+';margin-bottom:2px;" onmouseover="if(!this.style.background||this.style.background===\'transparent\')this.style.background=\'#252829\'" onmouseout="this.style.background=\''+bg+'\'">'
+        +'<span style="font-size:11px;font-weight:'+(isSelected||isLive?'500':'400')+'">Wk '+wn+'</span>'
+        +'<span style="font-size:11px;opacity:0.7">'+monFmt+' – '+friFmt+'</span>'
+        +'</div>';
+    }).join('');
+    return '<div style="margin-bottom:1rem"><div style="font-size:11px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem">'+mo.label+'</div>'+weeksHTML+'</div>';
+  }).join('');
+
+  var picker = document.createElement('div');
+  picker.id = 'week-picker';
+  picker.style.cssText = 'position:absolute;z-index:1000;background:#1e2124;border:0.5px solid #444441;border-radius:12px;padding:1rem;max-height:400px;overflow-y:auto;min-width:260px;right:0;top:44px;';
+  picker.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem"><span style="font-size:11px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.04em">Select week</span><button onclick="closeWeekPicker()" style="background:transparent;border:none;color:#888780;cursor:pointer;font-size:16px;line-height:1;padding:0">&#x2715;</button></div>'+monthsHTML;
+  picker.addEventListener('click', function(e){ e.stopPropagation(); });
+  var anchor = document.getElementById('week-nav-anchor');
+  if(anchor){ anchor.style.position='relative'; anchor.appendChild(picker); }
+  setTimeout(function(){ document.addEventListener('click', closeWeekPicker, {once:true}); }, 0);
+}
+
+function closeWeekPicker() {
+  var p = document.getElementById('week-picker');
+  if(p) p.remove();
 }
 
 function render() {
@@ -897,13 +984,26 @@ function dateKey(d) { return (d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear(
 
 function renderWeekly() {
   var now = new Date();
-  var wk = getWeekDates(now);
-  var weekNum = getWeekNum(now);
+  if(!selectedWeekMon) selectedWeekMon = getCurrentWeekMon();
+  var liveMon = getCurrentWeekMon();
+  var isLiveWeek = selectedWeekMon.toDateString() === liveMon.toDateString();
+
+  // for historical weeks, use end of that Friday as the cutoff
+  var wkMon = selectedWeekMon;
+  var wkFri = new Date(wkMon); wkFri.setDate(wkMon.getDate()+4); wkFri.setHours(23,59,59,999);
+  var wkEnd = isLiveWeek ? now : wkFri;
+  var wk = getWeekDates(isLiveWeek ? now : new Date(wkMon.getTime()+3*86400000)); // midweek to get correct dates
+  wk.mon = wkMon;
+  wk.fri = new Date(wkMon); wk.fri.setDate(wkMon.getDate()+4);
+  wk.dates = [];
+  for(var i=0;i<5;i++){ var dd=new Date(wkMon); dd.setDate(wkMon.getDate()+i); wk.dates.push(dd); }
+
+  var weekNum = getWeekNum(wkMon);
 
   // weekly units from allRows
   var weekRows = allRows.filter(function(r){
     var dt=new Date(r['Date']); if(isNaN(dt)) return false;
-    return dt>=wk.mon && dt<=now;
+    return dt>=wk.mon && dt<=wkEnd;
   });
   var weekUnits = weekRows.reduce(function(s,r){return s+num(r['Final Units']);},0);
 
@@ -928,10 +1028,15 @@ function renderWeekly() {
   var targetIsEstimated = daysWithoutTarget > 0;
   var targetIsFullySet = daysWithoutTarget === 0;
 
-  // days elapsed (production days Mon-today, max 5)
-  var day=now.getDay();
-  var daysElapsed = day===0?5:day===6?5:day; // treat weekend as end of week
-  var daysRemaining = Math.max(0, 5-daysElapsed);
+  // days elapsed
+  var daysElapsed, daysRemaining;
+  if(isLiveWeek){
+    var day=now.getDay();
+    daysElapsed = day===0?5:day===6?5:day;
+  } else {
+    daysElapsed = 5;
+  }
+  daysRemaining = Math.max(0, 5-daysElapsed);
 
   // pace projection
   var dailyRate = daysElapsed ? weekUnits/daysElapsed : 0;
@@ -941,8 +1046,8 @@ function renderWeekly() {
   var vsTargetPct = weeklyTarget ? Math.round((vsTarget/weeklyTarget)*100) : 0;
 
   // vs last week
-  var lastMon = new Date(wk.mon); lastMon.setDate(wk.mon.getDate()-7);
-  var lastFri = new Date(lastMon); lastFri.setDate(lastMon.getDate()+4);
+  var lastMon = new Date(wkMon); lastMon.setDate(wkMon.getDate()-7);
+  var lastFri = new Date(lastMon); lastFri.setDate(lastMon.getDate()+4); lastFri.setHours(23,59,59,999);
   var lastWeekUnits = allRows.filter(function(r){ var dt=new Date(r['Date']); return !isNaN(dt)&&dt>=lastMon&&dt<=lastFri; })
     .reduce(function(s,r){return s+num(r['Final Units']);},0);
   var vsLastWk = lastWeekUnits ? ((weekUnits-lastWeekUnits)/lastWeekUnits*100) : null;
@@ -1033,13 +1138,26 @@ function renderWeekly() {
       +'</div>';
   }).join('');
 
+  var prevDisabled = false; // could limit to earliest data week if needed
+  var nextDisabled = isLiveWeek;
+  var weekNavHTML =
+    '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;" id="week-nav-anchor">'
+    +'<button onclick="navWeek(-1)" '+(prevDisabled?'disabled':'')+' style="width:28px;height:28px;flex-shrink:0;border-radius:8px;border:0.5px solid #444441;background:transparent;cursor:'+(prevDisabled?'default':'pointer')+';color:'+(prevDisabled?'#444441':'#e8e6e0')+';font-size:16px;display:flex;align-items:center;justify-content:center;font-family:system-ui">&#8249;</button>'
+    +'<div onclick="openWeekPicker()" style="text-align:center;width:260px;flex-shrink:0;cursor:pointer;padding:4px 12px;border-radius:8px;border:0.5px solid #444441;background:transparent;" onmouseover="this.style.background=\'#252829\'" onmouseout="this.style.background=\'transparent\'">'
+    +'<div style="font-size:13px;font-weight:500;color:#e8e6e0;white-space:nowrap;">Week '+weekNum+' &nbsp;·&nbsp; '+monFmt+' – '+friEndFmt+' &#x25BE;</div>'
+    +'<div style="font-size:10px;color:#5f5e5a;margin-top:2px;height:14px;">'+(isLiveWeek?'(This week)':daysElapsed+' of 5 days')+'</div>'
+    +'</div>'
+    +'<button onclick="navWeek(1)" '+(nextDisabled?'disabled':'')+' style="width:28px;height:28px;flex-shrink:0;border-radius:8px;border:0.5px solid #444441;background:transparent;cursor:'+(nextDisabled?'default':'pointer')+';color:'+(nextDisabled?'#444441':'#e8e6e0')+';font-size:16px;display:flex;align-items:center;justify-content:center;font-family:system-ui">&#8250;</button>'
+    +'<div style="width:70px;flex-shrink:0;display:flex;justify-content:flex-start;">'
+    +(isLiveWeek
+      ?'<span style="font-size:10px;color:#1D9E75;font-weight:500;padding:2px 8px;border-radius:10px;background:#085041;white-space:nowrap;">&#8635; Live</span>'
+      :'<button onclick="goWeekLive()" style="padding:4px 12px;border-radius:8px;border:0.5px solid #1D9E75;background:transparent;cursor:pointer;color:#1D9E75;font-size:11px;font-weight:500;font-family:system-ui;white-space:nowrap;">Live</button>')
+    +'</div></div>';
+
   document.getElementById('content').innerHTML=
     '<div style="background:#1e2124;border:0.5px solid #2c2c2a;border-radius:12px;padding:1rem;margin-bottom:10px;">'
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">'
-    +'<div>'
-    +'<div style="font-size:16px;font-weight:500;color:#e8e6e0;">Week '+weekNum+'</div>'
-    +'<div style="font-size:12px;color:#888780;margin-top:2px;">'+monFmt+' – '+friEndFmt+' &nbsp;·&nbsp; '+daysElapsed+' of 5 production days elapsed</div>'
-    +'</div>'
+    +weekNavHTML
     +'<span style="font-size:11px;font-weight:500;padding:4px 12px;border-radius:10px;background:'+(onPace?'#085041':'#633806')+';color:'+(onPace?'#9FE1CB':'#FAC775')+'">'+(onPace?'On pace':'Behind pace')+'</span>'
     +'</div>'
     +'<div style="display:flex;gap:10px;flex-wrap:wrap;">'
