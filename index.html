@@ -1119,17 +1119,8 @@ function renderDetail() {
   // Build filter options from scoped lots
   var customers = Array.from(new Set(lots.map(function(l){ return (l.product||'').split('-')[0].trim(); }).filter(Boolean))).sort();
   var products  = Array.from(new Set(lots.map(function(l){ return l.product; }).filter(Boolean))).sort();
-  var weekNums  = Array.from(new Set(lots.map(function(l){ return l.week; }).filter(Boolean))).sort(function(a,b){ return parseFloat(b)-parseFloat(a); });
-  var weekOpts  = weekNums.map(function(w){
-    var wn = parseInt(w);
-    var yr = selectedDetailYear || now.getFullYear();
-    var jan1 = new Date(yr,0,1);
-    var jan1Dow = jan1.getDay()===0 ? 7 : jan1.getDay();
-    var mon = new Date(jan1); mon.setDate(jan1.getDate() + (wn-1)*7 + (1-jan1Dow));
-    var fri = new Date(mon); fri.setDate(mon.getDate()+4);
-    var fmt = function(d){ return (d.getMonth()+1)+'/'+d.getDate(); };
-    return {val: String(w), label: 'Week '+wn+': '+fmt(mon)+' \u2013 '+fmt(fri)};
-  });
+  var weekNums  = [];
+  var weekOpts  = [];
   var bottleSizes = Array.from(new Set(sourceRows.map(function(r){ return r['Bottle Size']; }).filter(Boolean))).sort();
   var jarSizes    = Array.from(new Set(sourceRows.map(function(r){ return r['Jar Size']; }).filter(Boolean))).sort();
 
@@ -1144,9 +1135,6 @@ function renderDetail() {
     +products.map(function(p){ return '<option value="'+p+'">'+p+'</option>'; }).join('')
     +'</select>'
     +'<select id="fStatus" onchange="applyFilters()"><option value="">All statuses</option><option>Complete</option><option>Partial</option></select>'
-    +'<select id="fWeek" onchange="applyFilters()"><option value="">All weeks</option>'
-    +weekOpts.map(function(w){ return '<option value="'+w.val+'">'+w.label+'</option>'; }).join('')
-    +'</select>'
     +'<select id="fBottle" onchange="applyFilters()"><option value="">All bottle sizes</option>'
     +bottleSizes.map(function(s){ return '<option value="'+s+'">'+s+'</option>'; }).join('')
     +'</select>'
@@ -1173,7 +1161,6 @@ function getFilteredLots() {
   var cust    = (document.getElementById('fCustomer') ? document.getElementById('fCustomer').value : '');
   var prod    = (document.getElementById('fProduct')  ? document.getElementById('fProduct').value  : '');
   var status  = (document.getElementById('fStatus')   ? document.getElementById('fStatus').value   : '');
-  var week    = (document.getElementById('fWeek')     ? document.getElementById('fWeek').value     : '');
   var bottle  = (document.getElementById('fBottle')   ? document.getElementById('fBottle').value   : '');
   var jar     = (document.getElementById('fJar')      ? document.getElementById('fJar').value      : '');
   var srcMap  = window._detailLotMap || lotMap;
@@ -1182,7 +1169,6 @@ function getFilteredLots() {
     if(cust    && (l.product||'').split('-')[0].trim() !== cust) return false;
     if(prod    && l.product !== prod) return false;
     if(status  && !l.status.toLowerCase().includes(status.toLowerCase())) return false;
-    if(week    && l.week !== week) return false;
     if(bottle  && l.bottleSize !== bottle) return false;
     if(jar     && l.jarSize !== jar) return false;
     return true;
@@ -1190,7 +1176,7 @@ function getFilteredLots() {
 }
 
 function applyFilters(){ page=1; updateOpsTable(); }
-function clearFilters(){ ['fSearch','fCustomer','fProduct','fStatus','fWeek','fBottle','fJar'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; }); applyFilters(); }
+function clearFilters(){ ['fSearch','fCustomer','fProduct','fStatus','fBottle','fJar'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; }); applyFilters(); }
 function sortBy(col){ if(sortCol===col) sortDir*=-1; else{sortCol=col;sortDir=1;} updateOpsTable(); }
 function changePage(dir){ page+=dir; updateOpsTable(); }
 
