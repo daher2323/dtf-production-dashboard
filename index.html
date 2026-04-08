@@ -181,14 +181,15 @@ function pct(a,b) { return b ? Math.round((a/b)*100) : 0; }
 
 function buildLotMap(rows) {
   var m = {};
-  rows.forEach(function(r) {
+  rows.forEach(function(r, idx) {
     if (!r||typeof r!=='object') return;
     var lot = (r['Lot Number']||'').trim(); if (!lot) return;
-    if (!m[lot]) m[lot] = { lot:lot, date:r['Date']||'', product:r['Product']||'', bottleSize:r['Bottle Size']||'', jarSize:r['Jar Size']||'', projected:num(r['Projected Units']), finalUnits:0, status:r['Complete or Partial']||'', week:r['WEEK NUMBER']||'', line:r['Line']||'' };
+    if (!m[lot]) m[lot] = { lot:lot, date:r['Date']||'', product:r['Product']||'', bottleSize:r['Bottle Size']||'', jarSize:r['Jar Size']||'', projected:num(r['Projected Units']), finalUnits:0, status:r['Complete or Partial']||'', week:r['WEEK NUMBER']||'', line:r['Line']||'', startTime:r['Start Time']||'', rowIdx:idx };
     m[lot].finalUnits += num(r['Final Units']);
     if (r['Complete or Partial']) m[lot].status = r['Complete or Partial'];
     if (!m[lot].line && r['Line']) m[lot].line = r['Line'];
     if (!m[lot].date && r['Date']) m[lot].date = r['Date'];
+    if (!m[lot].startTime && r['Start Time']) m[lot].startTime = r['Start Time'];
   });
   return m;
 }
@@ -1065,9 +1066,60 @@ function clearFilters(){['fSearch','fProduct','fStatus','fWeek','fBottle','fJar'
 function sortBy(col){if(sortCol===col)sortDir*=-1;else{sortCol=col;sortDir=1;}updateOpsTable();}
 function changePage(dir){page+=dir;updateOpsTable();}
 
+function statusSortWeight(l) {
+  var s = (l.status||'').toLowerCase();
+  if(!s || (!s.includes('complete') && !s.includes('partial'))) return 0;
+  if(s.includes('partial')) return 1;
+  return 2;
+}
+
+function lotSortKey(l) {
+  // returns a comparable value for run order within a day
+  // prefer start time, fall back to sheet row index
+  if (l.startTime) {
+    var t = l.startTime.trim();
+    // normalise 12hr (e.g. "6:38 AM") and 24hr (e.g. "06:38") to minutes since midnight
+    var m12 = t.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (m12) {
+      var h=parseInt(m12[1]), min=parseInt(m12[2]), ampm=m12[3].toUpperCase();
+      if(ampm==='PM'&&h!==12) h+=12;
+      if(ampm==='AM'&&h===12) h=0;
+      return h*60+min;
+    }
+    var m24 = t.match(/^(\d{1,2}):(\d{2})$/);
+    if (m24) return parseInt(m24[1])*60+parseInt(m24[2]);
+  }
+  return 10000 + (l.rowIdx||0); // no start time — fall back to sheet row order, after any timed lots
+}
+
 function updateOpsTable(){
   var lots=getFilteredLots();
-  if(sortCol){lots=lots.slice().sort(function(a,b){var av=a[sortCol]!=null?a[sortCol]:'',bv=b[sortCol]!=null?b[sortCol]:'';if(sortCol==='dev'){av=lotDev(a)!=null?lotDev(a):-999;bv=lotDev(b)!=null?lotDev(b):-999;}if(sortCol==='date'){return(new Date(av)-new Date(bv))*sortDir;}if(typeof av==='number'||!isNaN(parseFloat(av)))return(parseFloat(av)-parseFloat(bv))*sortDir;return String(av).localeCompare(String(bv))*sortDir;});}
+  if(sortCol){lots=lots.slice().sort(function(a,b){
+    var av=a[sortCol]!=null?a[sortCol]:'',bv=b[sortCol]!=null?b[sortCol]:'';
+    if(sortCol==='dev'){av=lotDev(a)!=null?lotDev(a):-999;bv=lotDev(b)!=null?lotDev(b):-999;}
+    if(sortCol==='date'){
+      var dateDiff=(new Date(av)-new Date(bv))*sortDir;
+      if(dateDiff!==0) return dateDiff;
+      var sw=statusSortWeight(a)-statusSortWeight(b);
+      if(sw!==0) return sw;
+      return lotSortKey(b)-lotSortKey(a);
+    }
+    if(sortCol==='status'){
+      var sw=(statusSortWeight(a)-statusSortWeight(b))*sortDir;
+      if(sw!==0) return sw;
+      return lotSortKey(b)-lotSortKey(a);
+    }
+    if(typeof av==='number'||!isNaN(parseFloat(av)))return(parseFloat(av)-parseFloat(bv))*sortDir;
+    return String(av).localeCompare(String(bv))*sortDir;
+  });}else{
+    lots=lots.slice().sort(function(a,b){
+      var dateDiff=new Date(b.date)-new Date(a.date);
+      if(dateDiff!==0) return dateDiff;
+      var sw=statusSortWeight(a)-statusSortWeight(b);
+      if(sw!==0) return sw;
+      return lotSortKey(b)-lotSortKey(a);
+    });
+  }
   var total=lots.length,totalPages=Math.ceil(total/PAGE_SIZE)||1;
   page=Math.min(Math.max(1,page),totalPages);
   var slice=lots.slice((page-1)*PAGE_SIZE,page*PAGE_SIZE);
