@@ -556,26 +556,27 @@ function openDetailRangePicker() {
   )).sort();
 
   var html =
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">'
     +'<span style="font-size:11px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.04em;">Select date range</span>'
     +'<button onclick="closeDetailRangePicker()" style="background:transparent;border:none;color:#888780;cursor:pointer;font-size:16px;line-height:1;padding:0;">&#x2715;</button>'
     +'</div>'
-    +'<div style="margin-bottom:10px;"><div style="font-size:10px;color:#5f5e5a;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;">Year</div>'
+    +'<div style="margin-bottom:12px;"><div style="font-size:10px;color:#5f5e5a;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Year</div>'
     +'<div style="display:flex;gap:4px;">'
     + availYears.map(function(y){
         var active = y===yr;
         return '<button onclick="selectedDetailYear='+y+';refreshDetailRangePicker()" style="padding:4px 14px;border-radius:6px;border:'+(active?'1.5px solid #378ADD':'1.5px solid #444441')+';background:'+(active?'#0C447C':'transparent')+';color:'+(active?'#85B7EB':'#888780')+';font-size:12px;font-weight:'+(active?'500':'400')+';cursor:pointer;font-family:system-ui;">'+y+'</button>';
       }).join('')
     +'</div></div>'
-    +'<div style="margin-bottom:10px;"><div style="font-size:10px;color:#5f5e5a;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;">Quick select</div>'
+    +'<div style="margin-bottom:14px;"><div style="font-size:10px;color:#5f5e5a;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Quick select <span style="color:#444441;font-weight:400;text-transform:none;letter-spacing:0;">&mdash; applies immediately</span></div>'
     +'<div style="display:flex;gap:4px;flex-wrap:wrap;">'
     + ['YTD','Q1','Q2','Q3','Q4','Full'].map(function(s){
         var lbl = s==='YTD'?'YTD '+yr : s==='Full'?'Full year '+yr : s+' '+yr;
         var active = range.label===lbl;
-        return '<button onclick="applyDetailShortcut(\''+s+'\')" style="padding:4px 12px;border-radius:6px;border:'+(active?'1.5px solid #378ADD':'1.5px solid #444441')+';background:'+(active?'#0C447C':'transparent')+';color:'+(active?'#85B7EB':'#888780')+';font-size:11px;cursor:pointer;font-family:system-ui;">'+s+'</button>';
+        return '<button onclick="applyDetailShortcut(\''+s+'\')" style="padding:5px 14px;border-radius:6px;border:'+(active?'1.5px solid #378ADD':'1.5px solid #444441')+';background:'+(active?'#0C447C':'transparent')+';color:'+(active?'#85B7EB':'#e8e6e0')+';font-size:12px;font-weight:'+(active?'500':'400')+';cursor:pointer;font-family:system-ui;">'+s+'</button>';
       }).join('')
     +'</div></div>'
-    +'<div><div style="font-size:10px;color:#5f5e5a;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;">Custom range</div>'
+    +'<div style="border-top:0.5px solid #2c2c2a;padding-top:12px;">'
+    +'<div style="font-size:10px;color:#5f5e5a;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Custom range <span style="color:#444441;font-weight:400;text-transform:none;letter-spacing:0;">&mdash; click Apply to confirm</span></div>'
     +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
     +'<input type="date" id="detail-range-start" value="'+toInputDate(range.start)+'" style="padding:5px 8px;border:0.5px solid #444441;border-radius:6px;background:#141618;color:#e8e6e0;font-size:12px;">'
     +'<span style="color:#5f5e5a;font-size:12px;">to</span>'
@@ -585,17 +586,19 @@ function openDetailRangePicker() {
 
   var picker = document.createElement('div');
   picker.id = 'detail-range-picker';
-  picker.style.cssText = 'position:absolute;z-index:1000;background:#1e2124;border:0.5px solid #444441;border-radius:12px;padding:1rem;min-width:320px;left:0;top:44px;';
+  picker.style.cssText = 'position:absolute;z-index:1000;background:#1e2124;border:0.5px solid #444441;border-radius:12px;padding:1rem;min-width:340px;left:0;top:44px;';
   picker.innerHTML = html;
   picker.addEventListener('click', function(e){ e.stopPropagation(); });
   var anchor = document.getElementById('detail-range-anchor');
   if(anchor) anchor.appendChild(picker);
-  setTimeout(function(){
-    document.addEventListener('click', function handler(){
-      closeDetailRangePicker();
-      document.removeEventListener('click', handler);
-    });
-  }, 200);
+  // Use mousedown on document so click events on the picker itself are already stopped
+  // before this fires, eliminating the timing gap that caused the ~5s re-open delay.
+  function outsideHandler(e) {
+    if(!document.getElementById('detail-range-picker')) { document.removeEventListener('mousedown', outsideHandler); return; }
+    closeDetailRangePicker();
+    document.removeEventListener('mousedown', outsideHandler);
+  }
+  setTimeout(function(){ document.addEventListener('mousedown', outsideHandler); }, 0);
 }
 
 function closeDetailRangePicker() {
