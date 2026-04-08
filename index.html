@@ -1561,9 +1561,20 @@ function renderDetail() {
     });
   }
 
+  // build a units-within-scope map so finalUnits reflects only the scoped rows
+  var scopedUnitsByLot = {};
+  var sourceRows2 = (subView === 'performance' && selectedDetailYear === 2025) ? allRows25 : allRows;
+  sourceRows2.forEach(function(r){
+    var lot = (r['Lot Number']||'').trim(); if(!lot) return;
+    if(filteredLotKeys && !filteredLotKeys.has(lot)) return;
+    scopedUnitsByLot[lot] = (scopedUnitsByLot[lot]||0) + num(r['Final Units']);
+  });
+
   var sourceLotMap = (subView === 'performance' && selectedDetailYear === 2025) ? buildLotMap(allRows25) : lotMap;
   var lots = Object.values(sourceLotMap).filter(Boolean).filter(function(l){
     return filteredLotKeys ? filteredLotKeys.has(l.lot) : true;
+  }).map(function(l){
+    return Object.assign({}, l, { finalUnits: scopedUnitsByLot[l.lot] || 0 });
   });
 
   var products=Array.from(new Set(lots.map(function(l){return l.product;}).filter(Boolean))).sort();
