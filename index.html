@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DTF - Production Hub</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: system-ui, sans-serif; background: #141618; color: #e8e6e0; font-size: 14px; min-height: 100vh; }
@@ -121,6 +122,39 @@ var selectedDetailRange = null;
 var lastRefreshTime = 0;
 
 function lk(s) { return (s||'').replace(/\s/g,'').toLowerCase(); }
+
+function exportDetailExcel() {
+  var lots = getFilteredLots().slice().sort(function(a,b){ return new Date(b.date)-new Date(a.date); });
+  var headers = ['Date','Lot #','Customer','Product','Line','Bottle Size','Jar Size','Projected','Final Units','Deviation %','Status'];
+  var data = [headers].concat(lots.map(function(l){
+    var dev = lotDev(l);
+    var cust = (l.product||'').split('-')[0].trim();
+    var prod = (l.product||'').split('-').slice(1).join('-').trim() || l.product;
+    return [l.date, l.lot, cust, prod, l.line||'', l.bottleSize||'', l.jarSize||'',
+      l.projected||'', l.finalUnits||'', dev!==null?parseFloat(dev.toFixed(2)):'', l.status||''];
+  }));
+  var ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [{wch:12},{wch:12},{wch:22},{wch:34},{wch:10},{wch:14},{wch:14},{wch:12},{wch:12},{wch:13},{wch:12}];
+  var range = selectedDetailRange ? selectedDetailRange.label : 'All';
+  var summary = [
+    ['DTF Production Export'],
+    ['Generated', new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})],
+    ['Date range', range],
+    [],
+    ['Total lots', lots.length],
+    ['Complete', lots.filter(function(l){return l.status.toLowerCase().includes('complete');}).length],
+    ['Partial', lots.filter(function(l){return l.status.toLowerCase().includes('partial');}).length],
+    ['Total projected', lots.reduce(function(s,l){return s+(l.projected||0);},0)],
+    ['Total final units', lots.reduce(function(s,l){return s+(l.finalUnits||0);},0)]
+  ];
+  var ws2 = XLSX.utils.aoa_to_sheet(summary);
+  ws2['!cols'] = [{wch:22},{wch:40}];
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Production Detail');
+  XLSX.utils.book_append_sheet(wb, ws2, 'Summary');
+  var filename = 'DTF_' + range.replace(/[^a-zA-Z0-9]/g,'-').replace(/-+/g,'-') + '_' + new Date().toISOString().slice(0,10) + '.xlsx';
+  XLSX.writeFile(wb, filename);
+}
 
 function resetDashboard() {
   topView = 'summary';
@@ -1308,7 +1342,7 @@ function renderDetail() {
     +'<select id="fJar" onchange="applyFilters()"><option value="">All jar sizes</option>'
     +jarSizes.map(function(s){ return '<option value="'+s+'">'+s+'</option>'; }).join('')
     +'</select>'
-    +'<button onclick="clearFilters()" style="font-size:12px;padding:6px 12px;border:0.5px solid #444441;border-radius:8px;background:transparent;cursor:pointer;color:#888780">Clear</button>'
+    +'<button onclick="exportDetailExcel()" id="export-btn" style="font-size:12px;padding:5px 12px;border:1.5px solid #378ADD;border-radius:8px;background:#0C447C;cursor:pointer;color:#85B7EB;font-weight:500;display:inline-flex;align-items:center;gap:5px;flex-shrink:0;white-space:nowrap;"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="#85B7EB" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 1v7M3.5 5.5l3 3 3-3M2 11h9"/></svg><span id="export-count">Export</span></button>'
     +'</div>'
     +'<div id="ops-metrics" class="metrics" style="margin-bottom:1rem"></div>'
     +'<div class="full-card"><div class="tbl-wrap"><table style="min-width:600px"><thead><tr>'
