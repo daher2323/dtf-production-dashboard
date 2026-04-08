@@ -637,8 +637,8 @@ function renderToday() {
   var dateNavHTML=
     '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0" id="date-nav-anchor">'
     +'<button onclick="navDay(-1)" '+(prevDisabled?'disabled':'')+' style="width:28px;height:28px;flex-shrink:0;border-radius:8px;border:0.5px solid #444441;background:transparent;cursor:'+(prevDisabled?'default':'pointer')+';color:'+(prevDisabled?'#444441':'#e8e6e0')+';font-size:16px;display:flex;align-items:center;justify-content:center;font-family:system-ui">&#8249;</button>'
-    +'<div onclick="openPicker()" style="text-align:center;width:180px;flex-shrink:0;cursor:pointer;padding:4px 8px;border-radius:8px;border:0.5px solid #444441;background:transparent;" onmouseover="this.style.background=\'#252829\'" onmouseout="this.style.background=\'transparent\'">'
-    +'<div style="font-size:13px;font-weight:500;color:#e8e6e0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+viewFmt+' &#x25BE;</div>'
+    +'<div onclick="openPicker()" style="text-align:center;flex-shrink:0;cursor:pointer;padding:4px 12px;border-radius:8px;border:0.5px solid #444441;background:transparent;" onmouseover="this.style.background=\'#252829\'" onmouseout="this.style.background=\'transparent\'">'
+    +'<div style="font-size:13px;font-weight:500;color:#e8e6e0;white-space:nowrap;">'+viewFmt+' &#x25BE;</div>'
     +'<div style="font-size:10px;color:#5f5e5a;margin-top:2px;height:14px">'+dayLabel+'</div>'
     +'</div>'
     +'<button onclick="navDay(1)" '+(nextDisabled?'disabled':'')+' style="width:28px;height:28px;flex-shrink:0;border-radius:8px;border:0.5px solid #444441;background:transparent;cursor:'+(nextDisabled?'default':'pointer')+';color:'+(nextDisabled?'#444441':'#e8e6e0')+';font-size:16px;display:flex;align-items:center;justify-content:center;font-family:system-ui">&#8250;</button>'
@@ -651,14 +651,14 @@ function renderToday() {
   var gaugesHTML=ALL_LINES.map(function(line,i){
     var k2=lk(line),color=LINE_COLOR[k2]||'#888780',bg=LINE_BG[k2]||'#2c2c2a',txt=LINE_TXT[k2]||'#e8e6e0',type=LINE_TYPE[k2]||'';
     var goal=lineGoal(line);
-    var goalLabel=goal.isTarget?'target: '+goal.value.toLocaleString()+' / day':'avg: '+(lineAvg[line]||0).toLocaleString()+' / day';
+    var goalLabel=goal.isTarget?'Target: '+goal.value.toLocaleString()+' units':'Avg: '+(lineAvg[line]||0).toLocaleString()+' units/day';
     return '<div id="gcard_'+i+'" style="flex:1;background:#141618;border:0.5px solid #2c2c2a;border-radius:10px;padding:1rem;text-align:center;position:relative;transition:border .3s,box-shadow .3s;">'
       +'<div id="gcheck_'+i+'" style="position:absolute;top:8px;right:8px;display:none;width:20px;height:20px;border-radius:50%;background:#1D9E75;align-items:center;justify-content:center"><svg width="11" height="11" viewBox="0 0 11 11" fill="none"><polyline points="1.5,5.5 4.5,8.5 9.5,2.5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>'
       +'<div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem">'+line+(type?' \u2014 '+type:'')+'</div>'
       +'<canvas id="dial_'+i+'" width="140" height="82" style="display:block;margin:0 auto .25rem"></canvas>'
       +'<div id="gval_'+i+'" style="font-size:20px;font-weight:500;color:'+color+';margin-bottom:2px">0</div>'
       +'<div style="font-size:10px;color:'+(goal.isTarget?'#EF9F27':'#5f5e5a')+'">'+goalLabel+'</div>'
-      +'<div id="gbadge_'+i+'" style="display:inline-block;margin-top:6px;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500;background:'+bg+';color:'+txt+'">0% of '+(goal.isTarget?'target':'avg')+'</div>'
+      +'<div id="gbadge_'+i+'" style="display:inline-block;margin-top:6px;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500;background:'+bg+';color:'+txt+'">0% of '+(goal.isTarget?'Target':'Avg')+'</div>'
       +'</div>';
   }).join('');
 
