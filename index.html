@@ -1566,6 +1566,7 @@ function renderDetail() {
     return filteredLotKeys ? filteredLotKeys.has(l.lot) : true;
   });
 
+  var products=Array.from(new Set(lots.map(function(l){return l.product;}).filter(Boolean))).sort();
   var customers=Array.from(new Set(lots.map(function(l){return (l.product||'').split('-')[0].trim();}).filter(Boolean))).sort();
   var weekNums=Array.from(new Set(lots.map(function(l){return l.week;}).filter(Boolean)))
     .sort(function(a,b){return parseFloat(b)-parseFloat(a);});
