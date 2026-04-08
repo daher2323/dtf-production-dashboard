@@ -1079,10 +1079,21 @@ function renderWeekly() {
   var completeLots=weekLots.filter(function(l){return l.status.toLowerCase().includes('complete');}).length;
   var partialLots=weekLots.filter(function(l){return l.status.toLowerCase().includes('partial');}).length;
 
-  // last 8 weeks chart data
+  // last 8 weeks relative to selected week
   var byWeek={};
-  allRows.forEach(function(r){ var w=(r['WEEK NUMBER']||'').trim(); if(!w) return; byWeek[w]=(byWeek[w]||0)+num(r['Final Units']); });
-  var weeks8=Object.keys(byWeek).sort(function(a,b){return parseFloat(a)-parseFloat(b);}).slice(-8);
+  allRowsCombined.forEach(function(r){
+    var dt=new Date(r['Date']); if(isNaN(dt)) return;
+    var wn=getWeekNum(dt)+'-'+dt.getFullYear();
+    var mon=new Date(dt); mon.setHours(0,0,0,0); var day=mon.getDay(); mon.setDate(mon.getDate()-(day===0?6:day-1));
+    byWeek[wn]={units:(byWeek[wn]?byWeek[wn].units:0)+num(r['Final Units']),mon:mon};
+  });
+  // build 8-week window ending at selected week
+  var weeks8=[]; var ptr=new Date(wkMon);
+  for(var wi=0;wi<8;wi++){
+    var ptrKey=getWeekNum(ptr)+'-'+ptr.getFullYear();
+    weeks8.unshift({key:ptrKey,mon:new Date(ptr),units:byWeek[ptrKey]?byWeek[ptrKey].units:0,num:getWeekNum(ptr)});
+    ptr.setDate(ptr.getDate()-7);
+  }
 
   // per-line avg for weekly share
   var d=prepData();
@@ -1238,9 +1249,9 @@ function renderWeekly() {
     +'</div>';
 
   // render chart
-  var weekLabels=weeks8.map(function(w){return parseInt(w)===weekNum?'Wk '+w+' (current)':'Wk '+w;});
-  var weekData=weeks8.map(function(w){return byWeek[w]||0;});
-  var weekColors=weeks8.map(function(w){return parseInt(w)===weekNum?'rgba(55,138,221,0.35)':'#378ADD';});
+  var weekLabels=weeks8.map(function(w){return w.mon.toDateString()===wkMon.toDateString()?'Wk '+w.num+' (this)':'Wk '+w.num;});
+  var weekData=weeks8.map(function(w){return w.units;});
+  var weekColors=weeks8.map(function(w){return w.mon.toDateString()===wkMon.toDateString()?'rgba(55,138,221,0.35)':'#378ADD';});
   charts.weeklyW=new Chart(document.getElementById('cWeeklyW'),{
     type:'bar',
     data:{labels:weekLabels,datasets:[
@@ -1248,7 +1259,7 @@ function renderWeekly() {
       {type:'line',label:'Weekly target',data:weeks8.map(function(){return weeklyTarget;}),borderColor:'#1D9E75',borderWidth:2,borderDash:[6,4],pointRadius:0,fill:false,tension:0,order:1}
     ]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){if(ctx.dataset.label==='Weekly target')return 'Target: '+weeklyTarget.toLocaleString();return 'Units: '+ctx.raw.toLocaleString();}}}},scales:{x:{ticks:{color:'#888780',font:{size:10},maxRotation:20},grid:{color:'#2c2c2a'}},y:{ticks:{color:'#888780',callback:function(v){return(v/1000).toFixed(0)+'k';}},grid:{color:'#2c2c2a'}}}},
-    plugins:[{id:'wkLabels',afterDatasetsDraw:function(chart){var ctx2=chart.ctx,meta=chart.getDatasetMeta(0);ctx2.save();ctx2.font='500 10px system-ui,sans-serif';ctx2.textAlign='center';ctx2.textBaseline='bottom';meta.data.forEach(function(bar,i){ctx2.fillStyle=parseInt(weeks8[i])===weekNum?'rgba(133,183,235,0.7)':'#85B7EB';ctx2.fillText(weekData[i].toLocaleString(),bar.x,bar.y-4);});ctx2.restore();}}]
+    plugins:[{id:'wkLabels',afterDatasetsDraw:function(chart){var ctx2=chart.ctx,meta=chart.getDatasetMeta(0);ctx2.save();ctx2.font='500 10px system-ui,sans-serif';ctx2.textAlign='center';ctx2.textBaseline='bottom';meta.data.forEach(function(bar,i){ctx2.fillStyle=weeks8[i].mon.toDateString()===wkMon.toDateString()?'rgba(133,183,235,0.7)':'#85B7EB';ctx2.fillText(weekData[i].toLocaleString(),bar.x,bar.y-4);});ctx2.restore();}}]
   });
 }
 
