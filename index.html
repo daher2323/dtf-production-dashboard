@@ -110,7 +110,9 @@ var CSV_2026 = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ0Vqunj5euX6ZRN
 var CSV_2025 = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ0Vqunj5euX6ZRNwnYeF22UChTxiCd6gP_GVEiuFBeUo6o9c2Mc6Idt1pQkckhuyukmNJesy8_nZqX/pub?gid=2024063496&single=true&output=csv';
 var CSV_TARGETS = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ0Vqunj5euX6ZRNwnYeF22UChTxiCd6gP_GVEiuFBeUo6o9c2Mc6Idt1pQkckhuyukmNJesy8_nZqX/pub?gid=1686526578&single=true&output=csv';
 var YEAR_TARGET = 3927000;
+var YEAR_TARGET_2025 = 3300000;
 var WEEKLY_TARGET = Math.round(YEAR_TARGET / 52);
+var WEEKLY_TARGET_2025 = Math.round(YEAR_TARGET_2025 / 52);
 var ALL_LINES = ['Line #1', 'Line #2', 'Line #4'];
 var LINE_COLOR = {'line#1':'#378ADD','line#2':'#7F77DD','line#4':'#D4537E'};
 var LINE_TRACK = {'line#1':'#061d35','line#2':'#1a1840','line#4':'#4B1528'};
@@ -1060,6 +1062,9 @@ function renderWeekly() {
   });
   var lastWeekUnits = lastWeekRows.reduce(function(s,r){ return s + num(r['Final Units']); }, 0);
 
+  var viewYear = wkMon.getFullYear();
+  var annualTarget = viewYear <= 2025 ? YEAR_TARGET_2025 : YEAR_TARGET;
+
   var daysWithTarget = 0, daysWithoutTarget = 0, targetSum = 0;
   wkDates.forEach(function(d){
     var k = dateKey(d);
@@ -1068,10 +1073,12 @@ function renderWeekly() {
     if(dayTotal > 0){ targetSum += dayTotal; daysWithTarget++; }
     else daysWithoutTarget++;
   });
-  var avgDailyFallback = daysWithTarget > 0 ? Math.round(targetSum / daysWithTarget) : WEEKLY_TARGET / 5;
-  var weeklyTarget = targetSum + (daysWithoutTarget * avgDailyFallback);
-  var targetIsEstimated = daysWithoutTarget > 0 && daysWithTarget > 0;
-  var targetIsFullySet = daysWithoutTarget === 0;
+  var avgDailyFallback = daysWithTarget > 0 ? Math.round(targetSum / daysWithTarget) : Math.round(annualTarget / 52 / 5);
+  var weeklyTarget = viewYear <= 2025
+    ? Math.round(annualTarget / 52)
+    : targetSum + (daysWithoutTarget * avgDailyFallback);
+  var targetIsEstimated = viewYear > 2025 && daysWithoutTarget > 0 && daysWithTarget > 0;
+  var targetIsFullySet = viewYear > 2025 && daysWithoutTarget === 0;
 
   var day = now.getDay();
   var daysElapsed = isLiveWeek ? (day===0?5:day===6?5:day) : 5;
