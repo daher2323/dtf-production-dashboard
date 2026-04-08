@@ -1317,13 +1317,12 @@ function renderDetail() {
 
   var scopedLotMap = buildLotMap(sourceRows);
 
-  // Filter options always built from full dataset so widths never change during navigation
-  var allSourceRows = allRows.concat(allRows25);
-  var allLotsForFilters = Object.values(buildLotMap(allSourceRows)).filter(Boolean);
-  var customers   = Array.from(new Set(allLotsForFilters.map(function(l){ return (l.product||'').split('-')[0].trim(); }).filter(Boolean))).sort();
-  var products    = Array.from(new Set(allLotsForFilters.map(function(l){ return l.product; }).filter(Boolean))).sort();
-  var bottleSizes = Array.from(new Set(allSourceRows.map(function(r){ return r['Bottle Size']; }).filter(Boolean))).sort();
-  var jarSizes    = Array.from(new Set(allSourceRows.map(function(r){ return r['Jar Size']; }).filter(Boolean))).sort();
+  // Filter options scoped to the selected date range so only relevant options appear
+  var lots = Object.values(scopedLotMap).filter(Boolean);
+  var customers   = Array.from(new Set(lots.map(function(l){ return (l.product||'').split('-')[0].trim(); }).filter(Boolean))).sort();
+  var products    = Array.from(new Set(lots.map(function(l){ return l.product; }).filter(Boolean))).sort();
+  var bottleSizes = Array.from(new Set(sourceRows.map(function(r){ return r['Bottle Size']; }).filter(Boolean))).sort();
+  var jarSizes    = Array.from(new Set(sourceRows.map(function(r){ return r['Jar Size']; }).filter(Boolean))).sort();
 
   document.getElementById('content').innerHTML =
     navHTML
