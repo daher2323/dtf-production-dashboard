@@ -1150,7 +1150,8 @@ function renderDetail() {
     +'<div class="pagination"><button id="prevBtn" onclick="changePage(-1)">\u2190 Prev</button><span id="pageInfo"></span><button id="nextBtn" onclick="changePage(1)">Next \u2192</button><span id="rowCount" style="margin-left:auto"></span></div></div>';
 
   window._detailLotMap = scopedLotMap;
-  setTimeout(function(){ applyFilters(); }, 0);
+  page = 1;
+  updateOpsTable();
 }
 
 function setDetailQuarter(q) { selectedDetailQuarter = q; renderDetail(); }
