@@ -1574,11 +1574,12 @@ function renderDetail() {
     var wn=parseInt(w);
     var yr=selectedDetailYear||new Date().getFullYear();
     var jan1=new Date(yr,0,1);
-    var daysToMon=(wn-1)*7-(jan1.getDay()===0?6:jan1.getDay()-1);
+    var jan1Dow=jan1.getDay()===0?7:jan1.getDay();
+    var daysToMon=(wn-1)*7+(1-jan1Dow);
     var mon=new Date(jan1); mon.setDate(jan1.getDate()+daysToMon);
     var fri=new Date(mon); fri.setDate(mon.getDate()+4);
     var fmt=function(d){return (d.getMonth()+1)+'/'+d.getDate();};
-    return {value:w, label:'Week '+wn+': '+fmt(mon)+' \u2013 '+fmt(fri)};
+    return {value:String(w), label:'Week '+wn+': '+fmt(mon)+' \u2013 '+fmt(fri)};
   });
   var bottleSizes=Array.from(new Set(allRows.concat(allRows25).map(function(r){return r['Bottle Size'];}).filter(Boolean))).sort();
   var jarSizes=Array.from(new Set(allRows.concat(allRows25).map(function(r){return r['Jar Size'];}).filter(Boolean))).sort();
