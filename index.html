@@ -1468,53 +1468,129 @@ function renderPerformance() {
   charts.jar=new Chart(document.getElementById('cJar'),{type:'doughnut',data:{labels:jarEntries.map(function(e){return e[0];}),datasets:[{data:jarEntries.map(function(e){return e[1];}),backgroundColor:JAR_COLORS,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){var v=ctx.raw,p=jarTotal?((v/jarTotal)*100).toFixed(1):0;return v.toLocaleString()+' units ('+p+'%)';}}}}}});
 }
 
+var selectedDetailQuarter = 'ytd';
+var selectedDetailYear = new Date().getFullYear();
+
 function renderDetail() {
-  // filter allRows by subView scope
   var now = new Date();
-  var scopeLabel = 'All lots';
   var filteredLotKeys = null;
+  var navHTML = '';
 
   if(subView === 'today') {
     var viewStr = productionDays[selectedDayIdx] || ((now.getMonth()+1)+'/'+now.getDate()+'/'+now.getFullYear());
     var viewDate = new Date(viewStr);
-    scopeLabel = 'Daily \u2014 ' + viewDate.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
+    var isLive = selectedDayIdx === productionDays.length - 1;
+    var viewFmt = viewDate.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+    var dayLabel = isLive ? '(Today)' : (function(){ var diff=Math.round((now-viewDate)/86400000); return diff===1?'(Yesterday)':'('+diff+' days ago)'; })();
+    var prevDisabled = selectedDayIdx <= 0, nextDisabled = isLive;
     filteredLotKeys = new Set();
     allRows.forEach(function(r){
       var dt = new Date(r['Date']); if(isNaN(dt)) return;
       if(dt.getFullYear()===viewDate.getFullYear()&&dt.getMonth()===viewDate.getMonth()&&dt.getDate()===viewDate.getDate())
         filteredLotKeys.add((r['Lot Number']||'').trim());
     });
+    navHTML = '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;margin-bottom:12px;" id="date-nav-anchor">'
+      +'<button onclick="navDay(-1)" '+(prevDisabled?'disabled':'')+' style="width:28px;height:28px;flex-shrink:0;border-radius:8px;border:0.5px solid #444441;background:transparent;cursor:'+(prevDisabled?'default':'pointer')+';color:'+(prevDisabled?'#444441':'#e8e6e0')+';font-size:16px;display:flex;align-items:center;justify-content:center;font-family:system-ui">&#8249;</button>'
+      +'<div onclick="openPicker()" style="text-align:center;width:260px;flex-shrink:0;cursor:pointer;padding:4px 12px;border-radius:8px;border:0.5px solid #444441;background:transparent;" onmouseover="this.style.background=\'#252829\'" onmouseout="this.style.background=\'transparent\'">'
+      +'<div style="font-size:13px;font-weight:500;color:#e8e6e0;white-space:nowrap;">'+viewFmt+' &#x25BE;</div>'
+      +'<div style="font-size:10px;color:#5f5e5a;margin-top:2px;height:14px;">'+dayLabel+'</div>'
+      +'</div>'
+      +'<button onclick="navDay(1)" '+(nextDisabled?'disabled':'')+' style="width:28px;height:28px;flex-shrink:0;border-radius:8px;border:0.5px solid #444441;background:transparent;cursor:'+(nextDisabled?'default':'pointer')+';color:'+(nextDisabled?'#444441':'#e8e6e0')+';font-size:16px;display:flex;align-items:center;justify-content:center;font-family:system-ui">&#8250;</button>'
+      +'<div style="width:70px;flex-shrink:0;display:flex;justify-content:flex-start;">'
+      +(isLive?'<span style="font-size:10px;color:#1D9E75;font-weight:500;padding:2px 8px;border-radius:10px;background:#085041;white-space:nowrap;">&#8635; Live</span>':'<button onclick="goLive()" style="padding:4px 12px;border-radius:8px;border:0.5px solid #1D9E75;background:transparent;cursor:pointer;color:#1D9E75;font-size:11px;font-weight:500;font-family:system-ui;white-space:nowrap;">Live</button>')
+      +'</div></div>';
+
   } else if(subView === 'weekly') {
     if(!selectedWeekMon) selectedWeekMon = getCurrentWeekMon();
+    var isLiveWeek = selectedWeekMon.toDateString() === getCurrentWeekMon().toDateString();
     var wkFri = new Date(selectedWeekMon); wkFri.setDate(selectedWeekMon.getDate()+4); wkFri.setHours(23,59,59,999);
-    var wkEnd = selectedWeekMon.toDateString()===getCurrentWeekMon().toDateString() ? now : wkFri;
-    scopeLabel = 'Weekly \u2014 Wk '+getWeekNum(selectedWeekMon)+' ('+selectedWeekMon.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' \u2013 '+wkFri.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+')';
+    var wkEnd = isLiveWeek ? now : wkFri;
+    var weekNum = getWeekNum(selectedWeekMon);
+    var monFmt = selectedWeekMon.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    var friEndFmt = wkFri.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
     filteredLotKeys = new Set();
     allRows.forEach(function(r){
       var dt = new Date(r['Date']); if(isNaN(dt)) return;
       if(dt >= selectedWeekMon && dt <= wkEnd) filteredLotKeys.add((r['Lot Number']||'').trim());
     });
+    navHTML = '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;margin-bottom:12px;" id="week-nav-anchor">'
+      +'<button onclick="navWeek(-1)" style="width:28px;height:28px;flex-shrink:0;border-radius:8px;border:0.5px solid #444441;background:transparent;cursor:pointer;color:#e8e6e0;font-size:16px;display:flex;align-items:center;justify-content:center;font-family:system-ui">&#8249;</button>'
+      +'<div onclick="openWeekPicker()" style="text-align:center;width:260px;flex-shrink:0;cursor:pointer;padding:4px 12px;border-radius:8px;border:0.5px solid #444441;background:transparent;" onmouseover="this.style.background=\'#252829\'" onmouseout="this.style.background=\'transparent\'">'
+      +'<div style="font-size:13px;font-weight:500;color:#e8e6e0;white-space:nowrap;">Week '+weekNum+' &nbsp;&middot;&nbsp; '+monFmt+' \u2013 '+friEndFmt+' &#x25BE;</div>'
+      +'<div style="font-size:10px;color:#5f5e5a;margin-top:2px;height:14px;">'+(isLiveWeek?'(This week)':'')+'</div>'
+      +'</div>'
+      +'<button onclick="navWeek(1)" '+(isLiveWeek?'disabled':'')+' style="width:28px;height:28px;flex-shrink:0;border-radius:8px;border:0.5px solid #444441;background:transparent;cursor:'+(isLiveWeek?'default':'pointer')+';color:'+(isLiveWeek?'#444441':'#e8e6e0')+';font-size:16px;display:flex;align-items:center;justify-content:center;font-family:system-ui">&#8250;</button>'
+      +'<div style="width:70px;flex-shrink:0;display:flex;justify-content:flex-start;">'
+      +(isLiveWeek?'<span style="font-size:10px;color:#1D9E75;font-weight:500;padding:2px 8px;border-radius:10px;background:#085041;white-space:nowrap;">&#8635; Live</span>':'<button onclick="goWeekLive()" style="padding:4px 12px;border-radius:8px;border:0.5px solid #1D9E75;background:transparent;cursor:pointer;color:#1D9E75;font-size:11px;font-weight:500;font-family:system-ui;white-space:nowrap;">Live</button>')
+      +'</div></div>';
+
   } else {
-    scopeLabel = 'Trend \u2014 All lots year-to-date';
+    // Trend — quarter/year selector
+    var years = Array.from(new Set(allRows.concat(allRows25).map(function(r){ var dt=new Date(r['Date']); return isNaN(dt)?null:dt.getFullYear(); }).filter(Boolean))).sort();
+    var quarters = ['ytd','Q1','Q2','Q3','Q4'];
+    var qLabels = {ytd:'YTD', Q1:'Q1 (Jan–Mar)', Q2:'Q2 (Apr–Jun)', Q3:'Q3 (Jul–Sep)', Q4:'Q4 (Oct–Dec)'};
+    navHTML = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">'
+      +'<div style="display:flex;gap:2px;padding:3px;background:#1e2124;border:0.5px solid #2c2c2a;border-radius:8px;">'
+      +years.map(function(y){
+        var isActive = y === selectedDetailYear;
+        return '<button onclick="setDetailYear('+y+')" style="padding:5px 14px;border-radius:6px;border:'+(isActive?'1.5px solid #378ADD':'1.5px solid transparent')+';background:'+(isActive?'#0C447C':'transparent')+';color:'+(isActive?'#85B7EB':'#888780')+';font-size:12px;font-weight:'+(isActive?'500':'400')+';cursor:pointer;font-family:system-ui;">'+y+'</button>';
+      }).join('')
+      +'</div>'
+      +'<div style="width:0.5px;height:28px;background:#2c2c2a;flex-shrink:0;"></div>'
+      +'<div style="display:flex;gap:2px;padding:3px;background:#1e2124;border:0.5px solid #2c2c2a;border-radius:8px;">'
+      +quarters.map(function(q){
+        var isActive = q === selectedDetailQuarter;
+        return '<button onclick="setDetailQuarter(\''+q+'\')" style="padding:5px 14px;border-radius:6px;border:'+(isActive?'1.5px solid #378ADD':'1.5px solid transparent')+';background:'+(isActive?'#0C447C':'transparent')+';color:'+(isActive?'#85B7EB':'#888780')+';font-size:12px;font-weight:'+(isActive?'500':'400')+';cursor:pointer;font-family:system-ui;">'+qLabels[q]+'</button>';
+      }).join('')
+      +'</div></div>';
+
+    var yr = selectedDetailYear;
+    var qRanges = {
+      ytd: [new Date(yr,0,1), now.getFullYear()===yr ? now : new Date(yr,11,31)],
+      Q1:  [new Date(yr,0,1), new Date(yr,2,31,23,59,59)],
+      Q2:  [new Date(yr,3,1), new Date(yr,5,30,23,59,59)],
+      Q3:  [new Date(yr,6,1), new Date(yr,8,30,23,59,59)],
+      Q4:  [new Date(yr,9,1), new Date(yr,11,31,23,59,59)]
+    };
+    var range = qRanges[selectedDetailQuarter];
+    var sourceRows = yr === 2025 ? allRows25 : allRows;
+    filteredLotKeys = new Set();
+    sourceRows.forEach(function(r){
+      var dt = new Date(r['Date']); if(isNaN(dt)) return;
+      if(dt >= range[0] && dt <= range[1]) filteredLotKeys.add((r['Lot Number']||'').trim());
+    });
   }
 
-  var lots = Object.values(lotMap).filter(Boolean).filter(function(l){
+  var sourceLotMap = (subView === 'performance' && selectedDetailYear === 2025) ? buildLotMap(allRows25) : lotMap;
+  var lots = Object.values(sourceLotMap).filter(Boolean).filter(function(l){
     return filteredLotKeys ? filteredLotKeys.has(l.lot) : true;
   });
 
   var products=Array.from(new Set(lots.map(function(l){return l.product;}).filter(Boolean))).sort();
   var weeks=Array.from(new Set(lots.map(function(l){return l.week;}).filter(Boolean))).sort();
-  var bottleSizes=Array.from(new Set(allRows.map(function(r){return r['Bottle Size'];}).filter(Boolean))).sort();
-  var jarSizes=Array.from(new Set(allRows.map(function(r){return r['Jar Size'];}).filter(Boolean))).sort();
+  var bottleSizes=Array.from(new Set(allRows.concat(allRows25).map(function(r){return r['Bottle Size'];}).filter(Boolean))).sort();
+  var jarSizes=Array.from(new Set(allRows.concat(allRows25).map(function(r){return r['Jar Size'];}).filter(Boolean))).sort();
 
   document.getElementById('content').innerHTML=
-    '<div style="font-size:12px;font-weight:500;color:#888780;margin-bottom:12px;padding:.5rem 1rem;background:#1e2124;border:0.5px solid #2c2c2a;border-radius:8px;display:inline-block;">'+scopeLabel+'</div>'
+    navHTML
     +'<div class="filters"><input type="text" id="fSearch" placeholder="Search lot # or product\u2026" style="min-width:180px" oninput="applyFilters()"><select id="fProduct" onchange="applyFilters()"><option value="">All products</option>'+products.map(function(p){return '<option>'+p+'</option>';}).join('')+'</select><select id="fStatus" onchange="applyFilters()"><option value="">All statuses</option><option>Complete</option><option>Partial</option></select><select id="fWeek" onchange="applyFilters()"><option value="">All weeks</option>'+weeks.map(function(w){return '<option>'+w+'</option>';}).join('')+'</select><select id="fBottle" onchange="applyFilters()"><option value="">All bottle sizes</option>'+bottleSizes.map(function(s){return '<option>'+s+'</option>';}).join('')+'</select><select id="fJar" onchange="applyFilters()"><option value="">All jar sizes</option>'+jarSizes.map(function(s){return '<option>'+s+'</option>';}).join('')+'</select><button onclick="clearFilters()" style="font-size:12px;padding:6px 12px;border:0.5px solid #444441;border-radius:8px;background:transparent;cursor:pointer;color:#888780">Clear</button></div>'
     +'<div id="ops-metrics" class="metrics" style="margin-bottom:1rem"></div>'
     +'<div class="full-card"><div class="tbl-wrap"><table style="min-width:600px"><thead><tr><th onclick="sortBy(\'date\')">Date \u21d5</th><th onclick="sortBy(\'lot\')">Lot # \u21d5</th><th onclick="sortBy(\'product\')">Product \u21d5</th><th onclick="sortBy(\'line\')">Line \u21d5</th><th onclick="sortBy(\'bottleSize\')">Bottle \u21d5</th><th onclick="sortBy(\'jarSize\')">Jar \u21d5</th><th onclick="sortBy(\'projected\')">Projected \u21d5</th><th onclick="sortBy(\'finalUnits\')">Final units \u21d5</th><th onclick="sortBy(\'dev\')">Dev % \u21d5</th><th onclick="sortBy(\'status\')">Status \u21d5</th></tr></thead><tbody id="ops-body"></tbody></table></div><div class="pagination"><button id="prevBtn" onclick="changePage(-1)">\u2190 Prev</button><span id="pageInfo"></span><button id="nextBtn" onclick="changePage(1)">Next \u2192</button><span id="rowCount" style="margin-left:auto"></span></div></div>';
 
   window._detailFilteredKeys = filteredLotKeys;
+  window._detailLotMap = sourceLotMap;
   applyFilters();
+}
+
+function setDetailQuarter(q) {
+  selectedDetailQuarter = q;
+  renderDetail();
+}
+
+function setDetailYear(y) {
+  selectedDetailYear = y;
+  if(selectedDetailQuarter !== 'ytd') selectedDetailQuarter = selectedDetailQuarter;
+  renderDetail();
 }
 
 function getFilteredLots(){
@@ -1525,7 +1601,8 @@ function getFilteredLots(){
   var bottle=document.getElementById('fBottle')?document.getElementById('fBottle').value:'';
   var jar=document.getElementById('fJar')?document.getElementById('fJar').value:'';
   var scopeKeys = window._detailFilteredKeys || null;
-  return Object.values(lotMap).filter(Boolean).filter(function(l){
+  var sourceLM = window._detailLotMap || lotMap;
+  return Object.values(sourceLM).filter(Boolean).filter(function(l){
     if(scopeKeys && !scopeKeys.has(l.lot)) return false;
     if(search&&!(l.lot.toLowerCase().includes(search)||l.product.toLowerCase().includes(search)))return false;
     if(prod&&l.product!==prod)return false;
