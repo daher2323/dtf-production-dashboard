@@ -1372,8 +1372,30 @@ function renderPerformance() {
   var typeSplitHTML=
     '<div style="font-size:11px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.6rem">Product type split</div>'
     +'<div style="display:flex;gap:10px;margin-bottom:1rem">'
-    +'<div style="flex:1;background:#141618;border:0.5px solid #2c2c2a;border-radius:8px;padding:.75rem 1rem"><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px">Powder (Lines 1 &amp; 4)</div><div style="font-size:18px;font-weight:500;color:#1D9E75;margin-bottom:3px">'+powU.toLocaleString()+'</div><div style="font-size:10px;color:#5f5e5a;margin-bottom:8px">'+powPct+'% of total production</div><div style="height:5px;background:#2c2c2a;border-radius:3px;overflow:hidden;margin-bottom:4px"><div style="height:100%;width:'+powPct+'%;background:#1D9E75;border-radius:3px"></div></div><div style="display:flex;justify-content:space-between;font-size:10px;color:#5f5e5a"><span>L1: '+l1u.toLocaleString()+'</span><span>L4: '+l4u.toLocaleString()+'</span></div></div>'
-    +'<div style="flex:1;background:#141618;border:0.5px solid #2c2c2a;border-radius:8px;padding:.75rem 1rem"><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px">Capsules (Line 2)</div><div style="font-size:18px;font-weight:500;color:#7F77DD;margin-bottom:3px">'+capU.toLocaleString()+'</div><div style="font-size:10px;color:#5f5e5a;margin-bottom:8px">'+capPct+'% of total production</div><div style="height:5px;background:#2c2c2a;border-radius:3px;overflow:hidden;margin-bottom:4px"><div style="height:100%;width:'+capPct+'%;background:#7F77DD;border-radius:3px"></div></div><div style="font-size:10px;color:#5f5e5a">L2: '+l2u.toLocaleString()+'</div></div></div>'
+
+    +'<div style="flex:1;background:#141618;border:0.5px solid #2c2c2a;border-radius:8px;padding:.75rem 1rem;">'
+    +'<div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px;">Powder (Lines 1 &amp; 4)</div>'
+    +'<div style="font-size:18px;font-weight:500;color:#e8e6e0;margin-bottom:3px;">'+powU.toLocaleString()+'</div>'
+    +'<div style="font-size:10px;color:#5f5e5a;margin-bottom:8px;">'+powPct+'% of total production</div>'
+    +'<div style="height:6px;background:#2c2c2a;border-radius:3px;overflow:hidden;margin-bottom:6px;display:flex;">'
+    +'<div style="height:100%;width:'+(totalUnits?((l1u/totalUnits)*100).toFixed(1):0)+'%;background:#378ADD;border-radius:3px 0 0 3px;"></div>'
+    +'<div style="height:100%;width:'+(totalUnits?((l4u/totalUnits)*100).toFixed(1):0)+'%;background:#D4537E;"></div>'
+    +'</div>'
+    +'<div style="display:flex;justify-content:space-between;font-size:10px;">'
+    +'<span style="color:#85B7EB;">&#9646; L1: '+l1u.toLocaleString()+'</span>'
+    +'<span style="color:#ED93B1;">&#9646; L4: '+l4u.toLocaleString()+'</span>'
+    +'</div></div>'
+
+    +'<div style="flex:1;background:#141618;border:0.5px solid #2c2c2a;border-radius:8px;padding:.75rem 1rem;">'
+    +'<div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px;">Capsules (Line 2)</div>'
+    +'<div style="font-size:18px;font-weight:500;color:#7F77DD;margin-bottom:3px;">'+capU.toLocaleString()+'</div>'
+    +'<div style="font-size:10px;color:#5f5e5a;margin-bottom:8px;">'+capPct+'% of total production</div>'
+    +'<div style="height:6px;background:#2c2c2a;border-radius:3px;overflow:hidden;margin-bottom:6px;">'
+    +'<div style="height:100%;width:'+capPct+'%;background:#7F77DD;border-radius:3px;"></div>'
+    +'</div>'
+    +'<div style="font-size:10px;color:#AFA9EC;">&#9646; L2: '+l2u.toLocaleString()+'</div>'
+    +'</div></div>'
+
     +'<div style="border-top:0.5px solid #2c2c2a;margin-bottom:.75rem"></div>'
     +'<div style="font-size:11px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.6rem">Units by line breakdown</div>';
 
