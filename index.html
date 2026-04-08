@@ -230,14 +230,6 @@ function parseTargets(text) {
   } catch(e) { return {}; }
 }
 
-function fetchData() {
-  return Promise.all([
-    fetch(CSV_2026).then(function(r){return r.text();}),
-    fetch(CSV_2025).then(function(r){return r.text();}),
-    fetch(CSV_TARGETS).then(function(r){return r.text();}).catch(function(){return '';})
-  ]);
-}
-
 function buildProductionDays() {
   var now = new Date();
   var todayStr = (now.getMonth()+1)+'/'+now.getDate()+'/'+now.getFullYear();
@@ -267,30 +259,56 @@ function loadDashboard() {
   }).catch(function(e){ document.getElementById('loading').textContent='Failed to load data: '+e.message; });
 }
 
+function fetchWithRetry(url, retries, delay) {
+  retries = retries || 3; delay = delay || 1500;
+  return fetch(url).then(function(r){
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.text();
+  }).catch(function(e){
+    if (retries <= 1) throw e;
+    return new Promise(function(res){ setTimeout(res, delay); })
+      .then(function(){ return fetchWithRetry(url, retries-1, delay*1.5); });
+  });
+}
+
+function fetchData() {
+  return Promise.all([
+    fetchWithRetry(CSV_2026),
+    fetchWithRetry(CSV_2025),
+    fetchWithRetry(CSV_TARGETS).catch(function(){ return ''; })
+  ]);
+}
+
+function applyFreshData(res) {
+  // Parse everything into locals first — only swap globals once all data is ready
+  var newRows   = parseCSV(res[0]).filter(isValid);
+  var newRows25  = parseCSV(res[1]).filter(isValid);
+  var newTargets = parseTargets(res[2]);
+  // Validate: if the primary sheet came back nearly empty, something went wrong — abort
+  if (newRows.length < 3) { console.warn('Refresh aborted: suspiciously few rows returned'); return false; }
+  var newLotMap  = buildLotMap(newRows);
+  // Atomic swap
+  allRows = newRows; allRows25 = newRows25; dailyTargets = newTargets; lotMap = newLotMap;
+  buildProductionDays();
+  return true;
+}
+
 function startRefreshTimers() {
   if (refreshTimer) clearInterval(refreshTimer);
   if (todayTimer) clearInterval(todayTimer);
   refreshTimer = setInterval(function(){
     fetchData().then(function(res){
-      allRows=parseCSV(res[0]).filter(isValid);
-      allRows25=parseCSV(res[1]).filter(isValid);
-      dailyTargets=parseTargets(res[2]);
-      lotMap=buildLotMap(allRows);
-      buildProductionDays();
-      if(topView==='summary'&&subView==='performance') render();
-      else if(topView==='detail') render();
-    }).catch(function(e){console.error(e);});
+      if(applyFreshData(res)){
+        if(topView==='summary'&&subView==='performance') render();
+        else if(topView==='detail') render();
+      }
+    }).catch(function(e){ console.error('Background refresh failed:', e); });
   }, 5*60*1000);
   todayTimer = setInterval(function(){
     if(topView==='summary'&&subView==='today'){
       fetchData().then(function(res){
-        allRows=parseCSV(res[0]).filter(isValid);
-        allRows25=parseCSV(res[1]).filter(isValid);
-        dailyTargets=parseTargets(res[2]);
-        lotMap=buildLotMap(allRows);
-        buildProductionDays();
-        render();
-      }).catch(function(e){console.error(e);});
+        if(applyFreshData(res)) render();
+      }).catch(function(e){ console.error('Today refresh failed:', e); });
     }
   }, 60*1000);
 }
