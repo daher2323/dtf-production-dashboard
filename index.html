@@ -883,7 +883,7 @@ function renderToday() {
   var ytdUnits=Object.values(buildLotMap(ytdRows)).filter(Boolean).reduce(function(s,l){return s+l.finalUnits;},0);
   var viewMo=viewDateObj.getMonth(), viewDy=viewDateObj.getDate();
   var total25banner=allRows25.filter(function(r){ var dt=new Date(r['Date']); if(isNaN(dt)) return false; return (dt.getMonth()<viewMo)||(dt.getMonth()===viewMo&&dt.getDate()<=viewDy); }).reduce(function(s,r){return s+num(r['Final Units']);},0);
-  var viewDayOfYear=Math.ceil((viewDateObj-new Date(viewDateObj.getFullYear(),0,1))/86400000);
+  var viewDayOfYear=Math.floor((new Date(viewDateObj.getFullYear(),viewDateObj.getMonth(),viewDateObj.getDate())-new Date(viewDateObj.getFullYear(),0,1))/86400000)+1;
   var yearProjBanner=viewDayOfYear?Math.round((ytdUnits/viewDayOfYear)*365):0;
   var targetPctBanner=Math.round((yearProjBanner/YEAR_TARGET)*100);
   var onTrackBanner=yearProjBanner>=YEAR_TARGET;
@@ -1398,7 +1398,7 @@ function renderPerformance() {
   var devColor=avgDev<-2?'#EF9F27':avgDev>2?'#1D9E75':'#e8e6e0';
   var devClass=avgDev<-2?'warn':avgDev>2?'good':'';
   var compPct=pct(completeLots.length,totalLots);
-  var dayOfYear=Math.ceil((now-new Date(now.getFullYear(),0,1))/86400000);
+  var dayOfYear=Math.floor((new Date(now.getFullYear(),now.getMonth(),now.getDate())-new Date(now.getFullYear(),0,1))/86400000)+1;
   var yearProj=Math.round((totalUnits/dayOfYear)*365);
   var toTarget=yearProj-YEAR_TARGET, targetPct=Math.round((yearProj/YEAR_TARGET)*100);
   var onTrack=yearProj>=YEAR_TARGET;
