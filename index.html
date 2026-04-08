@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DTF - Production Hub</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: system-ui, sans-serif; background: #141618; color: #e8e6e0; font-size: 14px; min-height: 100vh; }
@@ -1160,23 +1160,121 @@ function getFilteredLots() {
   var search  = (document.getElementById('fSearch')  ? document.getElementById('fSearch').value.toLowerCase()  : '');
   var cust    = (document.getElementById('fCustomer') ? document.getElementById('fCustomer').value : '');
   var prod    = (document.getElementById('fProduct')  ? document.getElementById('fProduct').value  : '');
+  var line    = (document.getElementById('fLine')     ? document.getElementById('fLine').value     : '');
   var status  = (document.getElementById('fStatus')   ? document.getElementById('fStatus').value   : '');
   var bottle  = (document.getElementById('fBottle')   ? document.getElementById('fBottle').value   : '');
   var jar     = (document.getElementById('fJar')      ? document.getElementById('fJar').value      : '');
+  var dev     = (document.getElementById('fDev')      ? document.getElementById('fDev').value      : '');
   var srcMap  = window._detailLotMap || lotMap;
   return Object.values(srcMap).filter(Boolean).filter(function(l){
     if(search  && !(l.lot.toLowerCase().includes(search) || l.product.toLowerCase().includes(search))) return false;
     if(cust    && (l.product||'').split('-')[0].trim() !== cust) return false;
     if(prod    && l.product !== prod) return false;
+    if(line    && l.line !== line) return false;
     if(status  && !l.status.toLowerCase().includes(status.toLowerCase())) return false;
     if(bottle  && l.bottleSize !== bottle) return false;
     if(jar     && l.jarSize !== jar) return false;
+    if(dev) {
+      var d = lotDev(l);
+      if(dev==='on'          && (d===null || Math.abs(d)>2))  return false;
+      if(dev==='minor'       && (d===null || Math.abs(d)<=2 || Math.abs(d)>5)) return false;
+      if(dev==='significant' && (d===null || Math.abs(d)<=5)) return false;
+    }
     return true;
   });
 }
 
-function applyFilters(){ page=1; updateOpsTable(); }
-function clearFilters(){ ['fSearch','fCustomer','fProduct','fStatus','fBottle','fJar'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; }); applyFilters(); }
+function exportDetailExcel() {
+  var lots = getFilteredLots();
+
+  // sort same as current table view
+  if(sortCol){
+    lots = lots.slice().sort(function(a,b){
+      var av=a[sortCol]!=null?a[sortCol]:'', bv=b[sortCol]!=null?b[sortCol]:'';
+      if(sortCol==='dev'){ av=lotDev(a)!=null?lotDev(a):-999; bv=lotDev(b)!=null?lotDev(b):-999; }
+      if(sortCol==='date'){ var dd=(new Date(av)-new Date(bv))*sortDir; if(dd!==0) return dd; }
+      if(typeof av==='number'||!isNaN(parseFloat(av))) return (parseFloat(av)-parseFloat(bv))*sortDir;
+      return String(av).localeCompare(String(bv))*sortDir;
+    });
+  } else {
+    lots = lots.slice().sort(function(a,b){ return new Date(b.date)-new Date(a.date); });
+  }
+
+  // build rows
+  var headers = ['Date','Lot #','Product','Line','Bottle Size','Jar Size','Projected','Final Units','Deviation %','Status'];
+  var data = [headers].concat(lots.map(function(l){
+    var dev = lotDev(l);
+    return [
+      l.date,
+      l.lot,
+      l.product,
+      l.line || '',
+      l.bottleSize || '',
+      l.jarSize || '',
+      l.projected || '',
+      l.finalUnits || '',
+      dev !== null ? parseFloat(dev.toFixed(2)) : '',
+      l.status || ''
+    ];
+  }));
+
+  var ws = XLSX.utils.aoa_to_sheet(data);
+
+  // column widths
+  ws['!cols'] = [
+    {wch:12}, {wch:12}, {wch:48}, {wch:10}, {wch:16}, {wch:18},
+    {wch:12}, {wch:12}, {wch:13}, {wch:12}
+  ];
+
+  // bold header row
+  headers.forEach(function(h, i){
+    var cell = ws[XLSX.utils.encode_cell({r:0, c:i})];
+    if(cell) cell.s = {font:{bold:true}};
+  });
+
+  // build filename from active filters
+  var parts = ['DTF'];
+  var cust = document.getElementById('fCustomer') ? document.getElementById('fCustomer').value : '';
+  var prod = document.getElementById('fProduct')  ? document.getElementById('fProduct').value  : '';
+  var line = document.getElementById('fLine')     ? document.getElementById('fLine').value     : '';
+  if(cust) parts.push(cust.replace(/\s+/g,'-'));
+  if(prod) parts.push(prod.replace(/[^a-zA-Z0-9]/g,'-').replace(/-+/g,'-').substring(0,20));
+  if(line) parts.push(line.replace(/\s+/g,''));
+  var range = window._currentDetailRange || '';
+  if(range) parts.push(range.replace(/[^a-zA-Z0-9]/g,'-').replace(/-+/g,'-'));
+  var filename = parts.join('_') + '.xlsx';
+
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Production Detail');
+
+  // summary sheet
+  var totalProj  = lots.reduce(function(s,l){ return s+(l.projected||0); }, 0);
+  var totalFinal = lots.reduce(function(s,l){ return s+(l.finalUnits||0); }, 0);
+  var devs       = lots.map(function(l){ return lotDev(l); }).filter(function(d){ return d!==null; });
+  var avgDev     = devs.length ? devs.reduce(function(s,d){ return s+d; },0)/devs.length : 0;
+  var complete   = lots.filter(function(l){ return l.status.toLowerCase().includes('complete'); }).length;
+  var summaryData = [
+    ['DTF Production Export'],
+    ['Generated', new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})],
+    ['Date range', range || 'All'],
+    [''],
+    ['Metric','Value'],
+    ['Total lots', lots.length],
+    ['Complete lots', complete],
+    ['Partial lots', lots.length - complete],
+    ['Completion rate', lots.length ? (Math.round((complete/lots.length)*100)+'%') : '—'],
+    ['Total projected units', totalProj],
+    ['Total final units', totalFinal],
+    ['Avg deviation', avgDev ? (avgDev.toFixed(1)+'%') : '—'],
+  ];
+  var ws2 = XLSX.utils.aoa_to_sheet(summaryData);
+  ws2['!cols'] = [{wch:24},{wch:40}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Summary');
+
+  XLSX.writeFile(wb, filename);
+}
+
+function clearFilters(){ ['fSearch','fCustomer','fProduct','fLine','fStatus','fDev','fBottle','fJar'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; }); applyFilters(); }
 function sortBy(col){ if(sortCol===col) sortDir*=-1; else{sortCol=col;sortDir=1;} updateOpsTable(); }
 function changePage(dir){ page+=dir; updateOpsTable(); }
 
