@@ -134,12 +134,6 @@ function checkPw() {
   }
 }
 
-if (sessionStorage.getItem('dtf_auth') === '1') {
-  document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('main-app').style.display = 'block';
-  loadDashboard();
-}
-
 function parseCSV(text) {
   var clean = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
   var lines = clean.trim().split('\n');
@@ -480,8 +474,6 @@ function openWeekPicker() {
 
 function closeWeekPicker() { var p=document.getElementById('week-picker'); if(p) p.remove(); }
 
-// ─── Detail range picker ───────────────────────────────────────────────────
-
 function getDefaultDetailRange() {
   var now=new Date();
   return {start:new Date(now.getFullYear(),0,1), end:now, label:'YTD '+now.getFullYear()};
@@ -532,7 +524,6 @@ function openDetailRangePicker() {
   var yr=selectedDetailYear;
   var range=selectedDetailRange||getDefaultDetailRange();
   var availYears=Array.from(new Set(allRows.concat(allRows25).map(function(r){ var dt=new Date(r['Date']); return isNaN(dt)?null:dt.getFullYear(); }).filter(Boolean))).sort();
-
   var html=
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
     +'<span style="font-size:11px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.04em;">Select date range</span>'
@@ -560,7 +551,6 @@ function openDetailRangePicker() {
     +'<input type="date" id="detail-range-end" value="'+toInputDate(range.end>now?now:range.end)+'" style="padding:5px 8px;border:0.5px solid #444441;border-radius:6px;background:#141618;color:#e8e6e0;font-size:12px;">'
     +'<button onclick="applyDetailCustomRange()" style="padding:5px 14px;border-radius:6px;border:1.5px solid #378ADD;background:#0C447C;color:#85B7EB;font-size:12px;font-weight:500;cursor:pointer;font-family:system-ui;">Apply</button>'
     +'</div></div>';
-
   var picker=document.createElement('div');
   picker.id='detail-range-picker';
   picker.style.cssText='position:absolute;z-index:1000;background:#1e2124;border:0.5px solid #444441;border-radius:12px;padding:1rem;min-width:320px;left:0;top:44px;';
@@ -577,8 +567,6 @@ function openDetailRangePicker() {
 }
 
 function closeDetailRangePicker() { var p=document.getElementById('detail-range-picker'); if(p) p.remove(); }
-
-// ─── Export ────────────────────────────────────────────────────────────────
 
 function exportDetailExcel() {
   var lots=getFilteredLots().slice().sort(function(a,b){ return new Date(b.date)-new Date(a.date); });
@@ -626,8 +614,6 @@ function exportDetailExcel() {
   if(rangeLabel) parts.push(rangeLabel.replace(/[^a-zA-Z0-9]/g,'-').replace(/-+/g,'-'));
   XLSX.writeFile(wb, parts.join('_')+'.xlsx');
 }
-
-// ─── Render ────────────────────────────────────────────────────────────────
 
 function render() {
   Object.values(charts).forEach(function(c){ try{ c.destroy(); }catch(e){} });
@@ -864,12 +850,12 @@ function renderToday() {
   if(!completedToday.length){
     completedHTML='<div style="font-size:12px;color:#5f5e5a;font-style:italic;padding:6px 0">'+(isLive?'No completed lots yet today':'No completed lots for this day')+'</div>';
   } else {
-    var byLine={'Line #1':[],'Line #2':[],'Line #4':[]};
-    completedToday.forEach(function(l){ if(byLine[l.line]) byLine[l.line].push(l); else byLine[l.line]=[l]; });
+    var byLine2={'Line #1':[],'Line #2':[],'Line #4':[]};
+    completedToday.forEach(function(l){ if(byLine2[l.line]) byLine2[l.line].push(l); else byLine2[l.line]=[l]; });
     completedHTML='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;align-items:start">'
       +ALL_LINES.map(function(line){
         var k2=lk(line), bg2=LINE_BG[k2]||'#2c2c2a', txt2=LINE_TXT[k2]||'#e8e6e0', type2=LINE_TYPE[k2]||'';
-        var llots=byLine[line]||[];
+        var llots=byLine2[line]||[];
         var rows=llots.length===0?'<div style="padding:10px;font-size:11px;color:#5f5e5a;font-style:italic">No completed lots</div>'
           :llots.map(function(l){
             var parts=(l.product||'').split('-'); var brand=parts[0].trim(); var prod2=parts.slice(1).join('-').trim()||brand;
@@ -1248,4 +1234,83 @@ function renderPerformance() {
     +'<div class="metric"><div class="label">Avg units / day</div><div class="value">'+avgPerDay.toLocaleString()+'</div><div class="sub">'+uniqDays+' production days</div><div class="yoy">'+deltaTag(avgPerDay,avg25perDay,true,'pct',avg25perDay.toLocaleString())+'</div></div>'
     +'<div class="metric"><div class="label">Total lots</div><div class="value">'+totalLots.toLocaleString()+'</div><div class="sub">'+completeLots.length+' complete \u00b7 '+partialLots.length+' partial</div><div class="yoy">'+deltaTag(totalLots,total25lots,true,'pct',total25lots.toLocaleString())+'</div></div>'
     +'<div class="metric good"><div class="label">Completion rate</div><div class="value">'+compPct+'%</div><div class="sub">'+completeLots.length+' of '+totalLots+' lots</div><div class="yoy">'+deltaTag(compPct,comp25pct,true,'num',comp25pct+'%')+'</div></div>'
-    +'<div class="metric '+devClass+'"><div class="label">Avg deviation</div><div class="value" style="color:'+devColor+'">'+(avgDev>0?'+':'')+avgDev.toFixed(1)+'%</div><div class="sub">'+high
+    +'<div class="metric '+devClass+'"><div class="label">Avg deviation</div><div class="value" style="color:'+devColor+'">'+(avgDev>0?'+':'')+avgDev.toFixed(1)+'%</div><div class="sub">'+highDevCount+' lots >5% off</div><div class="yoy">'+deltaTag(avgDev,avgDev25,true,'num',avgDev25.toFixed(1)+'%')+'</div></div>'
+    +'<div class="metric"><div class="label">Customers</div><div class="value">'+uniqueCusts+'</div><div class="sub">unique customers YTD</div><div class="yoy">'+deltaTag(uniqueCusts,custs25,true,'num',custs25+'')+'</div></div>';
+
+  var ytdProgressHTML=
+    '<div class="full-card" style="margin-bottom:10px;">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px;">'
+    +'<h3>Year-to-date progress</h3>'
+    +'<div style="display:flex;align-items:center;gap:6px;"><span style="font-size:12px;font-weight:500;color:'+(onTrack?'#1D9E75':'#EF9F27')+'">'+(onTrack?'On pace ':'Behind pace ')+'</span><span style="font-size:11px;padding:2px 8px;border-radius:6px;background:'+(onTrack?'#085041':'#633806')+';color:'+(onTrack?'#9FE1CB':'#FAC775')+'">'+(onTrack?'+':'')+targetPct+'% of target</span></div>'
+    +'</div>'
+    +'<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;">'
+    +'<div style="flex:1;min-width:120px;"><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;">Units produced</div><div style="font-size:20px;font-weight:500;color:#e8e6e0;">'+totalUnits.toLocaleString()+'</div></div>'
+    +'<div style="flex:1;min-width:120px;"><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;">Year-end projection</div><div style="font-size:20px;font-weight:500;color:'+(onTrack?'#1D9E75':'#EF9F27')+'">'+yearProj.toLocaleString()+'</div></div>'
+    +'<div style="flex:1;min-width:120px;"><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;">Annual target</div><div style="font-size:20px;font-weight:500;color:#888780;">'+YEAR_TARGET.toLocaleString()+'</div></div>'
+    +'<div style="flex:1;min-width:120px;"><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;">Gap to target</div><div style="font-size:20px;font-weight:500;color:'+(onTrack?'#1D9E75':'#EF9F27')+'">'+(onTrack?'+':'')+toTarget.toLocaleString()+'</div></div>'
+    +'</div>'
+    +'<div style="font-size:10px;color:#888780;margin-bottom:6px;display:flex;justify-content:space-between;"><span>Day '+dayOfYear+' of 365</span><span>Projection based on YTD run rate</span></div>'
+    +'<div style="background:#2c2c2a;border-radius:6px;height:10px;position:relative;overflow:hidden;">'
+    +'<div style="position:absolute;top:0;left:0;height:100%;width:'+Math.min(actualPct,100).toFixed(1)+'%;background:#94A3B8;border-radius:6px;"></div>'
+    +'<div style="position:absolute;top:0;left:'+Math.min(tOnBar,100).toFixed(1)+'%;width:2px;height:100%;background:#e8e6e0;opacity:0.5;"></div>'
+    +'</div>'
+    +'<div style="display:flex;justify-content:space-between;font-size:10px;color:#5f5e5a;margin-top:4px;"><span style="color:#94A3B8;">'+totalUnits.toLocaleString()+' produced</span><span>target: '+YEAR_TARGET.toLocaleString()+'</span></div>'
+    +'</div>';
+
+  var monthChartHTML='<div class="full-card" style="margin-bottom:10px;"><h3>Monthly units vs target</h3><div style="position:relative;height:240px;"><canvas id="cMonthly"></canvas></div></div>';
+
+  var lineBreakHTML='<div class="charts-row" style="margin-bottom:10px;">'
+    +'<div class="chart-card"><h3>Output by line</h3>'
+    +lineEntries.map(function(e,i){ var k2=lk(e[0]),color=LINE_COLOR[k2]||lineColors[i]||'#888780',type=LINE_TYPE[k2]||''; var pct2=lineTotal?Math.round((e[1].units/lineTotal)*100):0; var barW=maxLU?Math.round((e[1].units/maxLU)*100):0; return '<div style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font-size:12px;color:#e8e6e0;">'+e[0]+(type?' \u2014 '+type:'')+'</span><span style="font-size:12px;color:'+color+';">'+e[1].units.toLocaleString()+'</span></div><div style="background:#2c2c2a;border-radius:4px;height:6px;"><div style="height:100%;width:'+barW+'%;background:'+color+';border-radius:4px;"></div></div><div style="font-size:10px;color:#5f5e5a;margin-top:2px;">'+pct2+'% of total</div></div>'; }).join('')
+    +'<div style="border-top:0.5px solid #2c2c2a;margin-top:8px;padding-top:8px;display:flex;gap:12px;flex-wrap:wrap;">'
+    +'<div><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;">Powder (L1+L4)</div><div style="font-size:16px;font-weight:500;color:#e8e6e0;">'+powPct+'%</div></div>'
+    +'<div><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;">Capsules (L2)</div><div style="font-size:16px;font-weight:500;color:#e8e6e0;">'+capPct+'%</div></div>'
+    +'</div></div>'
+    +'<div class="chart-card"><h3>Top customers by units</h3>'
+    +top10.map(function(e){ var pct2=maxCU?Math.round((e[1].units/maxCU)*100):0; return '<div style="margin-bottom:8px;"><div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="font-size:11px;color:#e8e6e0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%;">'+e[0]+'</span><span style="font-size:11px;color:#888780;">'+e[1].units.toLocaleString()+'</span></div><div style="background:#2c2c2a;border-radius:3px;height:4px;"><div style="height:100%;width:'+pct2+'%;background:#378ADD;border-radius:3px;"></div></div></div>'; }).join('')+'</div></div>';
+
+  var jarHTML='<div class="full-card" style="margin-bottom:10px;"><h3>Units by jar size</h3><div style="position:relative;height:220px;"><canvas id="cJar"></canvas></div></div>';
+
+  var monthTableHTML='<div class="full-card"><h3>Monthly breakdown</h3><div class="tbl-wrap"><table><thead><tr>'
+    +'<th>Month</th><th style="text-align:right">Units</th><th style="text-align:right">Target</th><th style="text-align:right">% of target</th><th style="text-align:right">vs 2025</th>'
+    +'</tr></thead><tbody>'
+    +monthRows.map(function(m){ var pBar=Math.min(m.pctOfTarget,100), pColor=m.pctOfTarget>=100?'#1D9E75':m.pctOfTarget>=80?'#EF9F27':'#D4537E'; var yoyS=m.yoyDiff!==null?(m.yoyDiff>=0?'+':'')+m.yoyDiff.toFixed(1)+'%':'—'; var yoyC=m.yoyDiff===null?'#5f5e5a':m.yoyDiff>=0?'#1D9E75':'#EF9F27'; return '<tr><td>'+m.label+(m.isCurrentMonth?' <span style="font-size:10px;color:#888780">(MTD)</span>':'')+'</td><td style="text-align:right;font-weight:500">'+m.units.toLocaleString()+'</td><td style="text-align:right;color:#5f5e5a">'+m.target.toLocaleString()+'</td><td style="text-align:right"><div style="display:flex;align-items:center;justify-content:flex-end;gap:6px;"><div style="width:60px;background:#2c2c2a;border-radius:3px;height:4px;"><div style="height:100%;width:'+pBar+'%;background:'+pColor+';border-radius:3px;"></div></div><span style="color:'+pColor+';font-weight:500;min-width:36px;">'+Math.round(m.pctOfTarget)+'%</span></div></td><td style="text-align:right;color:'+yoyC+'">'+yoyS+'</td></tr>'; }).join('')
+    +'</tbody></table></div></div>';
+
+  document.getElementById('content').innerHTML=
+    '<div class="metrics">'+metricsHTML+'</div>'
+    +ytdProgressHTML
+    +monthChartHTML
+    +lineBreakHTML
+    +jarHTML
+    +monthTableHTML;
+
+  var mLabels=monthRows.map(function(m){ return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(m.label.split('/')[0])-1]; });
+  var mUnits=monthRows.map(function(m){ return m.units; });
+  var mTargets=monthRows.map(function(m){ return m.target; });
+  var mColors=monthRows.map(function(m){ return m.pctOfTarget>=100?'rgba(29,158,117,0.7)':m.pctOfTarget>=80?'rgba(239,159,39,0.7)':'rgba(212,83,126,0.7)'; });
+  charts.monthly=new Chart(document.getElementById('cMonthly'),{
+    type:'bar',
+    data:{labels:mLabels,datasets:[{type:'bar',label:'Units',data:mUnits,backgroundColor:mColors,borderRadius:4,order:2},{type:'line',label:'Target',data:mTargets,borderColor:'#378ADD',borderWidth:2,pointRadius:3,pointBackgroundColor:'#378ADD',fill:false,tension:0.3,order:1}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){ return ctx.dataset.label+': '+ctx.raw.toLocaleString(); }}}},scales:{x:{ticks:{color:'#888780',font:{size:10}},grid:{color:'#2c2c2a'}},y:{ticks:{color:'#888780',callback:function(v){ return (v/1000).toFixed(0)+'k'; }},grid:{color:'#2c2c2a'}}}}
+  });
+
+  if(jarEntries.length){
+    charts.jar=new Chart(document.getElementById('cJar'),{
+      type:'doughnut',
+      data:{labels:jarEntries.map(function(e){ return e[0]; }),datasets:[{data:jarEntries.map(function(e){ return e[1]; }),backgroundColor:JAR_COLORS.slice(0,jarEntries.length),borderWidth:0,hoverOffset:4}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#888780',font:{size:11},boxWidth:12,padding:10}},tooltip:{callbacks:{label:function(ctx){ var pct2=jarTotal?((ctx.raw/jarTotal)*100).toFixed(1):0; return ctx.label+': '+ctx.raw.toLocaleString()+' ('+pct2+'%)'; }}}}}
+    });
+  }
+}
+
+// ─── Boot ──────────────────────────────────────────────────────────────────
+// Auto-login check MUST be at the bottom, after all functions are defined
+if (sessionStorage.getItem('dtf_auth') === '1') {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('main-app').style.display = 'block';
+  loadDashboard();
+}
+</script>
+</body>
+</html>
