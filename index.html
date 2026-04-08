@@ -67,10 +67,12 @@
 <div class="shell">
   <div class="top-bar">
     <div class="brand">
-      <svg width="54" height="54" viewBox="0 0 54 54" style="flex-shrink:0"><rect x="2" y="2" width="50" height="50" rx="10" fill="#0C447C" stroke="#378ADD" stroke-width="1.5"/><text x="27" y="35" text-anchor="middle" font-size="20" font-weight="700" fill="#85B7EB" font-family="system-ui,sans-serif" letter-spacing="-1">DTF</text></svg>
-      <div>
-        <div class="brand-name">Dynamic Technical Formulations</div>
-        <div class="brand-sub">Production Hub</div>
+      <div onclick="resetDashboard()" style="display:flex;align-items:center;gap:14px;cursor:pointer;" title="Return to home">
+        <svg width="54" height="54" viewBox="0 0 54 54" style="flex-shrink:0"><rect x="2" y="2" width="50" height="50" rx="10" fill="#0C447C" stroke="#378ADD" stroke-width="1.5"/><text x="27" y="35" text-anchor="middle" font-size="20" font-weight="700" fill="#85B7EB" font-family="system-ui,sans-serif" letter-spacing="-1">DTF</text></svg>
+        <div>
+          <div class="brand-name">Dynamic Technical Formulations</div>
+          <div class="brand-sub">Production Hub</div>
+        </div>
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:10px;">
@@ -119,6 +121,23 @@ var selectedDetailRange = null;
 var lastRefreshTime = 0;
 
 function lk(s) { return (s||'').replace(/\s/g,'').toLowerCase(); }
+
+function resetDashboard() {
+  topView = 'summary';
+  subView = 'today';
+  selectedDayIdx = productionDays.length - 1;
+  selectedWeekMon = null;
+  selectedDetailRange = null;
+  sortCol = 'date'; sortDir = -1; page = 1;
+  document.getElementById('btn-summary').style.cssText = navBtnStyle(true);
+  document.getElementById('btn-detail').style.cssText = navBtnStyle(false);
+  ['today','weekly','performance'].forEach(function(k){
+    var b = document.getElementById('btn-'+k);
+    if(b) b.style.cssText = navBtnStyle(k==='today');
+  });
+  render();
+  window.scrollTo(0, 0);
+}
 
 function checkPw() {
   var v = document.getElementById('pw-input').value;
