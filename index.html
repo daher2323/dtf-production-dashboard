@@ -489,7 +489,15 @@ function applyHitStates(gaugeData, todayTotal, totalGoal, statusLabel, statusCol
     var frac = g.avg ? (g.units/g.avg) : 0, hit = frac >= 1;
     var card = document.getElementById('gcard_'+g.idx);
     var check = document.getElementById('gcheck_'+g.idx);
-    if(card) card.style.border = hit ? '2.5px solid #1D9E75' : '0.5px solid #2c2c2a';
+    if(card) {
+      if(hit) {
+        card.style.border = '2.5px solid #1D9E75';
+        card.style.boxShadow = '0 0 12px 2px rgba(29,158,117,0.45), 0 0 28px 4px rgba(29,158,117,0.18)';
+      } else {
+        card.style.border = '0.5px solid #2c2c2a';
+        card.style.boxShadow = 'none';
+      }
+    }
     if(check) check.style.display = hit ? 'flex' : 'none';
   });
   var allHit = todayTotal >= totalGoal;
@@ -644,7 +652,7 @@ function renderToday() {
     var k2=lk(line),color=LINE_COLOR[k2]||'#888780',bg=LINE_BG[k2]||'#2c2c2a',txt=LINE_TXT[k2]||'#e8e6e0',type=LINE_TYPE[k2]||'';
     var goal=lineGoal(line);
     var goalLabel=goal.isTarget?'target: '+goal.value.toLocaleString()+' / day':'avg: '+(lineAvg[line]||0).toLocaleString()+' / day';
-    return '<div id="gcard_'+i+'" style="flex:1;background:#141618;border:0.5px solid #2c2c2a;border-radius:10px;padding:1rem;text-align:center;position:relative">'
+    return '<div id="gcard_'+i+'" style="flex:1;background:#141618;border:0.5px solid #2c2c2a;border-radius:10px;padding:1rem;text-align:center;position:relative;transition:border .3s,box-shadow .3s;">'
       +'<div id="gcheck_'+i+'" style="position:absolute;top:8px;right:8px;display:none;width:20px;height:20px;border-radius:50%;background:#1D9E75;align-items:center;justify-content:center"><svg width="11" height="11" viewBox="0 0 11 11" fill="none"><polyline points="1.5,5.5 4.5,8.5 9.5,2.5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>'
       +'<div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem">'+line+(type?' \u2014 '+type:'')+'</div>'
       +'<canvas id="dial_'+i+'" width="140" height="82" style="display:block;margin:0 auto .25rem"></canvas>'
