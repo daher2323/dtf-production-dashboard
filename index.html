@@ -557,8 +557,9 @@ function openDetailRangePicker() {
   availYears.forEach(function(yr){
     var yrStart = new Date(yr,0,1);
     // YTD
-    var ytdEnd = yr===now.getFullYear() ? now : new Date(yr,11,31,23,59,59);
-    if(yrStart <= now) periods.push({label:'Year to date '+yr, key:'YTD-'+yr, yr:yr, start:yrStart, end:ytdEnd, hint: yr===now.getFullYear() ? 'Jan 1 \u2013 today' : 'Jan 1 \u2013 Dec 31'});
+    var ytdEnd = new Date(yr, now.getMonth(), now.getDate(), 23, 59, 59);
+    var ytdHint = 'Jan 1 \u2013 ' + ytdEnd.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + (yr===now.getFullYear()?' (today)':'');
+    if(yrStart <= now) periods.push({label:'Year to date '+yr, key:'YTD-'+yr, yr:yr, start:yrStart, end:ytdEnd, hint:ytdHint});
     // Quarters
     var quarters=[['Q1',0,2],['Q2',3,5],['Q3',6,8],['Q4',9,11]];
     quarters.forEach(function(q){
@@ -644,7 +645,7 @@ function applyDetailPeriod(key) {
   var start, end, label;
   if(type==='YTD') {
     start = new Date(yr,0,1);
-    end = yr===now.getFullYear() ? now : new Date(yr,11,31,23,59,59);
+    end = new Date(yr, now.getMonth(), now.getDate(), 23, 59, 59);
     label = 'Year to date '+yr;
   } else if(type==='Full') {
     start = new Date(yr,0,1);
