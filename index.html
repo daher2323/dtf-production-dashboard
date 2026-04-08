@@ -359,8 +359,8 @@ function setTop(v) {
   if(btnD){ btnD.style.background = !isSummary ? '#378ADD' : 'transparent'; btnD.style.color = !isSummary ? '#fff' : '#888780'; btnD.style.fontWeight = !isSummary ? '500' : '400'; }
   var subNav = document.getElementById('sub-nav');
   var subDiv = document.getElementById('sub-nav-divider');
-  if(subNav) subNav.style.display = isSummary ? 'flex' : 'none';
-  if(subDiv) subDiv.style.display = isSummary ? 'block' : 'none';
+  if(subNav){ subNav.style.opacity = isSummary ? '1' : '0.3'; subNav.style.pointerEvents = isSummary ? 'auto' : 'none'; }
+  if(subDiv){ subDiv.style.opacity = isSummary ? '1' : '0.3'; }
   render();
 }
 
@@ -371,8 +371,7 @@ function setSub(v) {
     var btn = document.getElementById(map[k]);
     if(!btn) return;
     var isActive = k === v;
-    var activeBg = k === 'today' || k === 'performance' ? '#378ADD' : '#1D9E75';
-    btn.style.background = isActive ? activeBg : 'transparent';
+    btn.style.background = isActive ? '#378ADD' : 'transparent';
     btn.style.color = isActive ? '#fff' : '#888780';
     btn.style.fontWeight = isActive ? '500' : '400';
   });
