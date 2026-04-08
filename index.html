@@ -612,6 +612,12 @@ function renderToday() {
   var runningByLine={'Line #1':[],'Line #2':[],'Line #4':[]};
   var completedToday=[];
   var seenLots=new Set();
+  var todayUnitsByLot={};
+  allRows.forEach(function(r){
+    if(!matchDate(r['Date'])) return;
+    var lot=(r['Lot Number']||'').trim(); if(!lot) return;
+    todayUnitsByLot[lot]=(todayUnitsByLot[lot]||0)+num(r['Final Units']);
+  });
   allRows.forEach(function(r){
     if(!matchDate(r['Date'])) return;
     var lot=(r['Lot Number']||'').trim(); if(!lot||seenLots.has(lot)) return; seenLots.add(lot);
@@ -622,9 +628,10 @@ function renderToday() {
     var status=lotData?lotData.status:(r['Complete or Partial']||'');
     var line=(r['Line']||'').trim();
     var startTime=(r['Start Time']||'').trim();
+    var todayUnits=todayUnitsByLot[lot]||0;
     var st=status.toLowerCase();
     if(st.includes('complete')||st.includes('partial')){
-      completedToday.push({product:product,projected:projected,finalUnits:finalUnits,status:status,line:line});
+      completedToday.push({product:product,projected:projected,finalUnits:finalUnits,todayUnits:todayUnits,status:status,line:line});
     } else {
       if(!runningByLine[line]) runningByLine[line]=[];
       runningByLine[line].push({product:product,projected:projected,startTime:startTime});
@@ -796,6 +803,27 @@ function renderToday() {
                     var devS=dev!==null?(dev>0?'+':'')+dev.toFixed(1)+'%':'—';
                     var devBg=dev===null?'#2c2c2a':Math.abs(dev)<=2?'#2c2c2a':dev<0?'#791F1F':'#0F6E56';
                     var devTxt=dev===null?'#888780':Math.abs(dev)<=2?'#888780':dev<0?'#F09595':'#9FE1CB';
+                    var isPartial=l.status.toLowerCase().includes('partial');
+                    var statusBg=isPartial?'#633806':'#0F6E56';
+                    var statusTxt=isPartial?'#FAC775':'#9FE1CB';
+                    var runPct=l.projected?Math.min(Math.round((l.finalUnits/l.projected)*100),100):0;
+                    if(isPartial){
+                      return '<div style="padding:8px 10px;border-bottom:0.5px solid #2c2c2a;">'
+                        +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">'
+                        +'<div style="font-size:11px;font-weight:500;color:#e8e6e0;">'+brand+'</div>'
+                        +'<span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:10px;background:'+statusBg+';color:'+statusTxt+'">Partial</span>'
+                        +'</div>'
+                        +'<div style="font-size:11px;color:#888780;margin-bottom:6px;">'+product+'</div>'
+                        +'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">'
+                        +'<div><span style="font-size:12px;font-weight:500;color:#e8e6e0;">'+l.todayUnits.toLocaleString()+'</span><span style="font-size:10px;color:#5f5e5a;"> today</span></div>'
+                        +'<div style="text-align:right;">'
+                        +'<div style="font-size:11px;color:#888780;margin-bottom:3px;">'+l.finalUnits.toLocaleString()+' of '+(l.projected?l.projected.toLocaleString():'—')+' proj</div>'
+                        +'<div style="height:3px;background:#2c2c2a;border-radius:2px;width:80px;margin-left:auto;">'
+                        +'<div style="height:100%;width:'+runPct+'%;background:#EF9F27;border-radius:2px;"></div>'
+                        +'</div></div>'
+                        +'<span style="font-size:10px;font-weight:500;padding:2px 6px;border-radius:6px;background:'+devBg+';color:'+devTxt+';">'+devS+'</span>'
+                        +'</div></div>';
+                    }
                     return '<div style="padding:8px 10px;border-bottom:0.5px solid #2c2c2a;">'
                       +'<div style="font-size:11px;font-weight:500;color:#e8e6e0;margin-bottom:1px">'+brand+'</div>'
                       +'<div style="font-size:11px;color:#888780;margin-bottom:5px">'+product+'</div>'
