@@ -1725,10 +1725,10 @@ function renderPerformance() {
         +'<td style="font-weight:500">'+c+'</td>'
         +'<td style="text-align:right">'+cd.units.toLocaleString()+compUnits+'</td>'
         +'<td style="padding:6px 10px;width:90px"><div style="background:#2c2c2a;border-radius:2px;height:4px;overflow:hidden"><div style="height:100%;width:'+bw+'%;background:#94A3B8;border-radius:2px"></div></div></td>'
+        +yoyCell
         +'<td style="text-align:right;color:#888780">'+cd.lots+compLots+'</td>'
         +'<td style="text-align:right;color:#888780">'+avg2.toLocaleString()+compAvg+'</td>'
         +'<td style="text-align:right;color:#888780">'+sp+'%'+compSp+'</td>'
-        +yoyCell
         +'</tr>';
     }).join('');
 
@@ -1755,10 +1755,10 @@ function renderPerformance() {
         +'<td style="font-weight:600;color:#e8e6e0;font-size:12px;">All '+allCustSorted.length+' customers</td>'
         +'<td style="text-align:right;font-weight:500">'+sumUnits.toLocaleString()+comp25UnitsStr+'</td>'
         +'<td style="padding:6px 10px;width:90px"></td>'
+        +sumYoyCell
         +'<td style="text-align:right;color:#888780;font-weight:500">'+sumLots+comp25LotsStr+'</td>'
         +'<td style="text-align:right;color:#888780;font-weight:500">'+sumAvg.toLocaleString()+comp25AvgStr+'</td>'
         +'<td style="text-align:right;color:#888780;font-weight:500">100%</td>'
-        +sumYoyCell
         +'</tr>';
     }
     return rows;
@@ -1801,10 +1801,10 @@ function renderPerformance() {
     +'<th>Customer</th>'
     +'<th style="text-align:right">Units produced *</th>'
     +'<th style="width:90px"></th>'
+    +'<th style="text-align:right">YoY</th>'
     +'<th style="text-align:right">Lots *</th>'
     +'<th style="text-align:right">Avg run size *</th>'
     +'<th style="text-align:right">% of production *</th>'
-    +'<th style="text-align:right">YoY</th>'
     +'</tr></thead><tbody>'+custHTML+'</tbody></table>'
     +'<div style="font-size:10px;color:#5f5e5a;margin-top:10px;padding-top:8px;border-top:0.5px solid #2c2c2a;">* Values in <span style="color:#5f5e5a;">parentheses</span> show '+compYearLabel+' actuals for the same period.</div>'
     +'</div></div>';
