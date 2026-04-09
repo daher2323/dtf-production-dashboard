@@ -47,7 +47,7 @@
   .ms-chk.on { background:#0C447C;border-color:#378ADD; }
   .tbl-wrap { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  thead th { text-align: left; padding: 6px 10px; border-bottom: 0.5px solid #2c2c2a; color: #888780; font-weight: 500; white-space: nowrap; cursor: pointer; user-select: none; font-size: 11px; text-transform: uppercase; letter-spacing: .03em; }
+  thead th { text-align: left; padding: 6px 10px; border-bottom: 0.5px solid #2c2c2a; color: #888780; font-weight: 500; white-space: nowrap; cursor: default; user-select: none; font-size: 11px; text-transform: uppercase; letter-spacing: .03em; }
   thead th:hover { color: #e8e6e0; }
   tbody tr { border-bottom: 0.5px solid #2c2c2a; }
   tbody tr:hover { background: #252829; }
@@ -1146,7 +1146,7 @@ function renderToday() {
   var contextBanner='<div style="background:#1e2124;border:0.5px solid #2c2c2a;border-radius:12px;padding:.875rem 1.25rem;margin-bottom:10px">'
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem"><div style="font-size:11px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.05em">Year-to-date (YTD) Performance</div><div style="font-size:10px;color:#5f5e5a">YTD as of '+viewFmt+' '+dayLabel+'</div></div>'
     +'<div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">'
-    +'<div style="flex:1;min-width:120px"><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Units produced YTD</div><div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:22px;font-weight:500;color:#e8e6e0">'+ytdUnits.toLocaleString()+'</span><span style="font-size:11px;font-weight:500;padding:1px 6px;border-radius:6px;background:'+(yoyPctBanner>=0?'#085041':'#791F1F')+';color:'+(yoyPctBanner>=0?'#9FE1CB':'#F09595')+'">'+(yoyPctBanner>=0?'+':'')+yoyPctBanner.toFixed(1)+'% vs 2025</span></div></div>'
+    +'<div style="flex:1;min-width:120px"><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Units produced YTD</div><div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:22px;font-weight:500;color:#e8e6e0">'+ytdUnits.toLocaleString()+'</span><span style="font-size:11px;font-weight:500;padding:1px 6px;border-radius:6px;background:'+(yoyPctBanner>=0?'#085041':'#791F1F')+';color:'+(yoyPctBanner>=0?'#9FE1CB':'#F09595')+'">'+(yoyPctBanner>=0?'+':'')+yoyPctBanner.toFixed(1)+'% vs '+(viewDateObj.getFullYear()-1)+'</span></div></div>'
     +'<div style="width:0.5px;background:#2c2c2a;height:36px;flex-shrink:0"></div>'
     +'<div style="flex:1;min-width:120px"><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Year-end projection</div><div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:22px;font-weight:500;color:'+(onTrackBanner?'#1D9E75':'#EF9F27')+'">'+yearProjBanner.toLocaleString()+'</span><span style="font-size:11px;color:#5f5e5a">target: 3,927,000</span></div></div>'
     +'<div style="width:0.5px;background:#2c2c2a;height:36px;flex-shrink:0"></div>'
@@ -1484,7 +1484,7 @@ function renderDetail() {
     +'</div>'
     +'<div id="ops-metrics" class="metrics" style="margin-bottom:1rem"></div>'
     +'<div class="full-card"><div class="tbl-wrap"><table style="min-width:600px"><thead><tr>'
-    +'<th onclick="sortBy(\'date\')">Date \u21d5</th><th onclick="sortBy(\'lot\')">Lot # \u21d5</th><th onclick="sortBy(\'product\')">Product \u21d5</th><th onclick="sortBy(\'line\')">Line \u21d5</th><th onclick="sortBy(\'bottleSize\')">Bottle \u21d5</th><th onclick="sortBy(\'jarSize\')">Jar \u21d5</th><th onclick="sortBy(\'projected\')">Projected \u21d5</th><th onclick="sortBy(\'finalUnits\')">Final units \u21d5</th><th onclick="sortBy(\'dev\')">Dev % \u21d5</th><th onclick="sortBy(\'status\')">Status \u21d5</th>'
+    +'<th onclick="sortBy(\'date\')" style="cursor:pointer">Date &#x21d5;</th><th onclick="sortBy(\'lot\')" style="cursor:pointer">Lot # &#x21d5;</th><th onclick="sortBy(\'product\')" style="cursor:pointer">Product &#x21d5;</th><th onclick="sortBy(\'line\')" style="cursor:pointer">Line &#x21d5;</th><th onclick="sortBy(\'bottleSize\')" style="cursor:pointer">Bottle &#x21d5;</th><th onclick="sortBy(\'jarSize\')" style="cursor:pointer">Jar &#x21d5;</th><th onclick="sortBy(\'projected\')" style="cursor:pointer">Projected &#x21d5;</th><th onclick="sortBy(\'finalUnits\')" style="cursor:pointer">Final units &#x21d5;</th><th onclick="sortBy(\'dev\')" style="cursor:pointer">Dev % &#x21d5;</th><th onclick="sortBy(\'status\')" style="cursor:pointer">Status &#x21d5;</th>'
     +'</tr></thead><tbody id="ops-body"></tbody></table></div>'
     +'<div class="pagination"><button id="prevBtn" onclick="changePage(-1)">\u2190 Prev</button><span id="pageInfo"></span><button id="nextBtn" onclick="changePage(1)">Next \u2192</button><span id="rowCount" style="margin-left:auto"></span></div></div>';
 
