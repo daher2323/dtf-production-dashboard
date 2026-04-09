@@ -28,63 +28,15 @@
   .chart-card h3 { font-size: 11px; font-weight: 500; color: #888780; margin-bottom: .75rem; text-transform: uppercase; letter-spacing: .04em; }
   .full-card { background: #1e2124; border: 0.5px solid #2c2c2a; border-radius: 12px; padding: 1rem; margin-bottom: 10px; }
   .full-card h3 { font-size: 11px; font-weight: 500; color: #888780; margin-bottom: .75rem; text-transform: uppercase; letter-spacing: .04em; }
-
-  /* ── Filter bar ── */
-  .filters {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 1rem;
-    width: 100%;
-  }
-  .filters input[type=text] {
-    flex: 1 1 0;
-    min-width: 120px;
-    padding: 5px 7px;
-    border: 0.5px solid #444441;
-    border-radius: 8px;
-    background: #1e2124;
-    color: #e8e6e0;
-    font-size: 12px;
-    height: 28px;
-  }
-  /* Each ms-wrap stretches equally */
-  .filters .ms-wrap {
-    flex: 1 1 0;
-    min-width: 0;
-  }
-  /* Trigger fills its wrapper */
-  .filters .ms-wrap .ms-trigger {
-    width: 100%;
-    justify-content: space-between;
-  }
-  /* Clear button: fixed, no stretch */
-  .filters .filter-clear-btn {
-    flex: 0 0 auto;
-  }
-  /* Export button: fixed, no stretch, pushed to far right via margin-left:auto */
-  .filters .filter-export-btn {
-    flex: 0 0 auto;
-    margin-left: auto;
-    position: relative;
-  }
-  /* Export popover */
-  .export-popover {
-    position: absolute;
-    right: 0;
-    top: calc(100% + 6px);
-    background: #1e2124;
-    border: 0.5px solid #444441;
-    border-radius: 10px;
-    padding: 10px 12px;
-    min-width: 300px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-    z-index: 99998;
-    white-space: nowrap;
-  }
+  .filters { display: flex; align-items: center; gap: 6px; margin-bottom: 1rem; width: 100%; }
+  .filters input[type=text] { flex: 1 1 0; min-width: 120px; padding: 5px 7px; border: 0.5px solid #444441; border-radius: 8px; background: #1e2124; color: #e8e6e0; font-size: 12px; height: 28px; }
+  .filters .ms-wrap { flex: 1 1 0; min-width: 0; }
+  .filters .ms-wrap .ms-trigger { width: 100%; justify-content: space-between; }
+  .filters .filter-clear-btn { flex: 0 0 auto; }
+  .filters .filter-export-btn { flex: 0 0 auto; margin-left: auto; position: relative; }
+  .export-popover { position: absolute; right: 0; top: calc(100% + 6px); background: #1e2124; border: 0.5px solid #444441; border-radius: 10px; padding: 10px 12px; min-width: 300px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); z-index: 99998; white-space: nowrap; }
   .export-popover-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .export-popover-meta { font-size: 11px; color: #5f5e5a; margin-top: 8px; padding-top: 8px; border-top: 0.5px solid #2c2c2a; }
-
   .ms-trigger { display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border-radius:8px;border:0.5px solid #444441;background:#1e2124;color:#888780;font-size:12px;cursor:pointer;white-space:nowrap;height:28px;user-select:none; }
   .ms-trigger.active { border-color:#378ADD;color:#e8e6e0; }
   .ms-badge { background:#378ADD;color:#042C53;font-size:10px;font-weight:500;padding:1px 6px;border-radius:8px; }
@@ -109,17 +61,7 @@
   .pagination { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 12px; color: #888780; }
   .pagination button { padding: 4px 10px; border: 0.5px solid #444441; border-radius: 6px; background: transparent; cursor: pointer; font-size: 12px; color: #e8e6e0; }
   .pagination button:disabled { opacity: .3; cursor: default; }
-  /* Multi-select panel — fixed position, very high z-index, never clipped */
-  .ms-panel-fixed {
-    position: fixed;
-    z-index: 99999;
-    background: #1e2124;
-    border: 0.5px solid #444441;
-    border-radius: 10px;
-    padding: 8px;
-    min-width: 220px;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.6);
-  }
+  .ms-panel-fixed { position: fixed; z-index: 99999; background: #1e2124; border: 0.5px solid #444441; border-radius: 10px; padding: 8px; min-width: 220px; box-shadow: 0 4px 24px rgba(0,0,0,0.6); }
   .ms-search { width:100%;padding:5px 8px;border:0.5px solid #444441;border-radius:6px;background:#141618;color:#e8e6e0;font-size:12px;margin-bottom:6px;outline:none; }
   .ms-list { max-height:200px;overflow-y:auto; }
   .ms-footer { border-top:0.5px solid #2c2c2a;margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;align-items:center; }
@@ -201,31 +143,24 @@ var selectedPerfRange = null;
 var lastRefreshTime = 0;
 var filterState = { customer:[], product:[], status:[], bottle:[], jar:[] };
 
-// Currently open ms panel id
 var _openMsId = null;
 
 function lk(s) { return (s||'').replace(/\s/g,'').toLowerCase(); }
-
-// ─── Multi-select: open/close ─────────────────────────────────────────────
 
 function toggleMsPanel(id) {
   if (_openMsId === id) { closeMsPanel(); return; }
   closeMsPanel();
   _openMsId = id;
-
   var trig = document.getElementById('ms-trig-' + id);
   if (!trig) return;
   var rect = trig.getBoundingClientRect();
-
   var allOpts = (window._msOptions && window._msOptions[id]) ? window._msOptions[id] : [];
   var selected = filterState[id] || [];
-
   var panel = document.createElement('div');
   panel.id = 'ms-panel-' + id;
   panel.className = 'ms-panel-fixed';
   panel.style.top  = (rect.bottom + 4) + 'px';
   panel.style.left = rect.left + 'px';
-
   panel.innerHTML =
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
     + '<input class="ms-search" id="ms-search-' + id + '" placeholder="Search\u2026">'
@@ -236,62 +171,34 @@ function toggleMsPanel(id) {
     + '<span class="ms-count" id="ms-count-' + id + '">' + selected.length + ' selected</span>'
     + '<button class="ms-clear" id="ms-clear-btn-' + id + '">Clear</button>'
     + '</div>';
-
   document.body.appendChild(panel);
-
-  // Wire up search
   var si = document.getElementById('ms-search-' + id);
-  if (si) {
-    si.addEventListener('input', function() { filterMsList(id); });
-    si.focus();
-  }
-
-  // Wire up close button
+  if (si) { si.addEventListener('input', function() { filterMsList(id); }); si.focus(); }
   var closeBtn = document.getElementById('ms-close-btn-' + id);
-  if (closeBtn) {
-    closeBtn.addEventListener('click', function(e) { e.stopPropagation(); closeMsPanel(); });
-  }
-
-  // Wire up clear button
+  if (closeBtn) closeBtn.addEventListener('click', function(e) { e.stopPropagation(); closeMsPanel(); });
   var clearBtn = document.getElementById('ms-clear-btn-' + id);
-  if (clearBtn) {
-    clearBtn.addEventListener('click', function(e) { e.stopPropagation(); clearMsFilter(id); });
-  }
-
-  // Wire up item clicks
+  if (clearBtn) clearBtn.addEventListener('click', function(e) { e.stopPropagation(); clearMsFilter(id); });
   panel.addEventListener('click', function(e) {
     e.stopPropagation();
     var item = e.target.closest('[data-ms-val]');
-    if (item) {
-      toggleMsItem(id, item.getAttribute('data-ms-val'));
-    }
+    if (item) toggleMsItem(id, item.getAttribute('data-ms-val'));
   });
-
-  // Outside-click closes panel — use setTimeout so this handler doesn't fire on the same click that opened it
-  setTimeout(function() {
-    document.addEventListener('click', outsideClickHandler, true);
-  }, 0);
+  setTimeout(function() { document.addEventListener('click', outsideClickHandler, true); }, 0);
 }
 
 function outsideClickHandler(e) {
   if (!_openMsId) { document.removeEventListener('click', outsideClickHandler, true); return; }
   var panel = document.getElementById('ms-panel-' + _openMsId);
   var trig  = document.getElementById('ms-trig-' + _openMsId);
-  if (panel && panel.contains(e.target)) return;  // click inside panel — ignore
-  if (trig  && trig.contains(e.target))  return;  // click on trigger — toggleMsPanel handles it
+  if (panel && panel.contains(e.target)) return;
+  if (trig  && trig.contains(e.target))  return;
   closeMsPanel();
 }
 
 function closeMsPanel() {
   document.removeEventListener('click', outsideClickHandler, true);
-  if (_openMsId) {
-    var p = document.getElementById('ms-panel-' + _openMsId);
-    if (p) p.remove();
-    _openMsId = null;
-  }
+  if (_openMsId) { var p = document.getElementById('ms-panel-' + _openMsId); if (p) p.remove(); _openMsId = null; }
 }
-
-// ─── Multi-select: rendering & state ─────────────────────────────────────
 
 function renderMsItems(id, opts, selected, search) {
   var filtered = search ? opts.filter(function(o){ return o.toLowerCase().includes(search.toLowerCase()); }) : opts;
@@ -318,12 +225,10 @@ function toggleMsItem(id, val) {
   var idx = arr.indexOf(val);
   if (idx === -1) arr.push(val); else arr.splice(idx, 1);
   filterState[id] = arr;
-
   var si   = document.getElementById('ms-search-' + id);
   var opts = (window._msOptions && window._msOptions[id]) ? window._msOptions[id] : [];
   var li   = document.getElementById('ms-list-' + id);
   if (li) li.innerHTML = renderMsItems(id, opts, arr, si ? si.value : '');
-
   var cc = document.getElementById('ms-count-' + id); if (cc) cc.textContent = arr.length + ' selected';
   rebuildMsTrigger(id);
   if (id === 'customer') rebuildProductOptions();
@@ -403,8 +308,6 @@ function clearFilters() {
   applyFilters();
 }
 
-// ─── Export ───────────────────────────────────────────────────────────────
-
 function exportDetailExcel() {
   var lots = getFilteredLots().slice().sort(function(a,b){ return new Date(b.date)-new Date(a.date); });
   var headers = ['Date','Lot #','Customer','Product','Line','Bottle Size','Jar Size','Projected','Final Units','Deviation %','Status'];
@@ -436,8 +339,6 @@ function exportDetailExcel() {
   var filename = 'DTF_' + range.replace(/[^a-zA-Z0-9]/g,'-').replace(/-+/g,'-') + '_' + new Date().toISOString().slice(0,10) + '.xlsx';
   XLSX.writeFile(wb, filename);
 }
-
-// ─── Reset ────────────────────────────────────────────────────────────────
 
 function resetDashboard() {
   closeMsPanel();
@@ -773,7 +674,6 @@ function navWeek(dir) {
 }
 
 function goWeekLive() { selectedWeekMon = getCurrentWeekMon(); render(); }
-
 function pickWeek(monStr) { selectedWeekMon = new Date(monStr); closeWeekPicker(); render(); }
 
 function openWeekPicker() {
@@ -822,8 +722,6 @@ function openWeekPicker() {
 }
 
 function closeWeekPicker() { var p = document.getElementById('week-picker'); if(p) p.remove(); }
-
-// ─── Detail range picker ──────────────────────────────────────────────────
 
 function getDefaultDetailRange() {
   var now = new Date();
@@ -933,8 +831,6 @@ function applyDetailPeriod(key) {
 
 function closeDetailRangePicker() { var p = document.getElementById('detail-range-picker'); if(p) p.remove(); }
 
-// ─── Perf range picker (Summary / Trend) ─────────────────────────────────
-
 function getDefaultPerfRange() {
   var now = new Date();
   return {start: new Date(now.getFullYear(),0,1), end: now, label: 'Year to date '+now.getFullYear()};
@@ -1034,8 +930,6 @@ function applyPerfCustomRange() {
 }
 
 function closePerfRangePicker() { var p = document.getElementById('perf-range-picker'); if(p) p.remove(); }
-
-// ─── Render ───────────────────────────────────────────────────────────────
 
 function render() {
   closeMsPanel();
@@ -1572,7 +1466,6 @@ function renderDetail() {
   window._msOptions = {customer:customers, product:products, status:['Complete','Partial'], bottle:bottleSizes, jar:jarSizes};
   if((filterState.customer||[]).length) rebuildProductOptions();
 
-  // ── The filter bar: date-picker on left, filters stretch, Export anchored right ──
   document.getElementById('content').innerHTML =
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;gap:12px;">'
     +  '<div style="flex-shrink:0;">'+navHTML+'</div>'
@@ -1646,9 +1539,9 @@ function renderPerformance() {
   if(!selectedPerfRange) selectedPerfRange = getDefaultPerfRange();
   var range = selectedPerfRange;
 
-  // Filter rows to the selected range — combine both CSVs so 2025 ranges work
   var allRowsCombined = allRows.concat(allRows25);
   var rangeRows = allRowsCombined.filter(function(r){ var dt=new Date(r['Date']); return !isNaN(dt)&&dt>=range.start&&dt<=range.end; });
+
   // Prior-year comparison: shift back one year, but if range is in 2025 shift forward to 2026 instead
   var rangeYear = range.start.getFullYear();
   var compShift = (rangeYear === 2025) ? 1 : -1;
@@ -1657,7 +1550,6 @@ function renderPerformance() {
   var compEnd   = new Date(range.end);   compEnd.setFullYear(compEnd.getFullYear() + compShift);
   var rangeRows25 = allRowsCombined.filter(function(r){ var dt=new Date(r['Date']); return !isNaN(dt)&&dt>=compStart&&dt<=compEnd; });
 
-  // Rebuild all metrics from ranged rows
   var rangeLotMap = buildLotMap(rangeRows);
   var lots = Object.values(rangeLotMap).filter(Boolean);
   var completeLots = lots.filter(function(l){return l.status.toLowerCase().includes('complete');});
@@ -1699,7 +1591,6 @@ function renderPerformance() {
   var compPct=pct(completeLots.length,totalLots);
   var compYearLabel = String(compStart.getFullYear());
 
-  // Year-end projection: only for current-year YTD or full-year ranges
   var currentYear = now.getFullYear();
   var rangeIsCurrentYear = range.start.getFullYear() === currentYear && range.end.getFullYear() === currentYear;
   var rangeCoversFullYearStart = range.start.getMonth() === 0 && range.start.getDate() === 1;
@@ -1714,7 +1605,6 @@ function renderPerformance() {
 
   var byMonth26={},byMonth25r={};
   rangeRows.forEach(function(r){ var dt=new Date(r['Date']); if(isNaN(dt)) return; var k=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0'); if(!byMonth26[k]) byMonth26[k]={month:dt.getMonth()+1,year:dt.getFullYear(),units:0}; byMonth26[k].units+=num(r['Final Units']); });
-  // Index comparison rows by their month number so they match across years
   rangeRows25.forEach(function(r){
     var dt=new Date(r['Date']); if(isNaN(dt)) return;
     var mo=dt.getMonth()+1;
@@ -1747,10 +1637,16 @@ function renderPerformance() {
   var jarEntries=Object.entries(byJar).sort(function(a,b){return b[1]-a[1];}).slice(0,10);
   var jarTotal=jarEntries.reduce(function(s,e){return s+e[1];},0);
   var JAR_COLORS=['#378ADD','#1D9E75','#EF9F27','#D4537E','#7F77DD','#D85A30','#639922','#E24B4A','#85B7EB','#5DCAA5'];
+
+  // ── Customer table: build comparison lookup from comp-year lots ──────────
   var byCust={};
   lots.forEach(function(l){ var c=(l.product||'').split('-')[0].trim(); if(!c) return; if(!byCust[c]) byCust[c]={units:0,lots:0}; byCust[c].units+=l.finalUnits; byCust[c].lots++; });
   var top10=Object.entries(byCust).sort(function(a,b){return b[1].units-a[1].units;}).slice(0,10);
   var maxCU=top10[0]?top10[0][1].units:1;
+
+  // Build per-customer totals from comparison-year rows
+  var byCust25={};
+  lots25.forEach(function(l){ var c=(l.product||'').split('-')[0].trim(); if(!c) return; if(!byCust25[c]) byCust25[c]={units:0,lots:0}; byCust25[c].units+=l.finalUnits; byCust25[c].lots++; });
 
   var metricsHTML=
     '<div class="metric info"><div class="label">Units produced</div><div class="value">'+totalUnits.toLocaleString()+'</div><div class="sub">vs '+totalProj.toLocaleString()+' projected</div><div class="yoy">'+deltaTag(totalUnits,total25,true,'pct',total25.toLocaleString(),compYearLabel)+'</div></div>'
@@ -1797,7 +1693,36 @@ function renderPerformance() {
   var curMo=monthRows.find(function(m){return m.isCurrentMonth;});
   var asterisk=curMo?'<div style="font-size:10px;color:#5f5e5a;margin-top:10px;padding-top:8px;border-top:0.5px solid #2c2c2a"><sup style="color:#9FE1CB">*</sup> '+curMo.label+' target adjusted for month-to-date ('+curMo.daysSoFar+'/'+curMo.daysInMonth+' days). Full month target: '+curMo.fullMonthTarget.toLocaleString()+'. '+compYearLabel+' figure shown is also MTD for comparison.</div>':'';
   var jarLegHTML=jarEntries.map(function(e,i){ var j=e[0],v=e[1],p=jarTotal?((v/jarTotal)*100).toFixed(1):0; return '<tr style="border-bottom:0.5px solid #2c2c2a"><td style="padding:3px 6px;width:16px"><div style="width:10px;height:10px;border-radius:2px;background:'+JAR_COLORS[i]+'"></div></td><td style="padding:3px 6px;font-weight:500">'+j+'</td><td style="padding:3px 6px;text-align:right;white-space:nowrap">'+v.toLocaleString()+'</td><td style="padding:3px 6px;text-align:right;color:#888780;width:40px">'+p+'%</td></tr>'; }).join('');
-  var custHTML=top10.map(function(e,i){ var c=e[0],cd=e[1],avg2=cd.lots?Math.round(cd.units/cd.lots):0,bw=Math.round((cd.units/maxCU)*100),sp=totalUnits?((cd.units/totalUnits)*100).toFixed(1):0; return '<tr><td style="color:#5f5e5a;font-size:11px;width:24px">'+(i+1)+'</td><td style="font-weight:500">'+c+'</td><td style="text-align:right">'+cd.units.toLocaleString()+'</td><td style="padding:6px 10px;width:90px"><div style="background:#2c2c2a;border-radius:2px;height:4px;overflow:hidden"><div style="height:100%;width:'+bw+'%;background:#94A3B8;border-radius:2px"></div></div></td><td style="text-align:right;color:#888780">'+cd.lots+'</td><td style="text-align:right;color:#888780">'+avg2.toLocaleString()+'</td><td style="text-align:right;color:#888780">'+sp+'%</td></tr>'; }).join('');
+
+  // ── Customer rows: now with comparison units + YoY badge ─────────────────
+  var custHTML=top10.map(function(e,i){
+    var c=e[0],cd=e[1];
+    var avg2=cd.lots?Math.round(cd.units/cd.lots):0;
+    var bw=Math.round((cd.units/maxCU)*100);
+    var sp=totalUnits?((cd.units/totalUnits)*100).toFixed(1):0;
+    var cd25=byCust25[c];
+    var compStr=cd25?'<span style="color:#5f5e5a;font-weight:400"> ('+cd25.units.toLocaleString()+')</span>':'';
+    var yoyCell='<td style="text-align:right">';
+    if(cd25&&cd25.units){
+      var yPos=(cd.units-cd25.units)>=0;
+      var yPct=((cd.units-cd25.units)/cd25.units*100);
+      var yBg=yPos?'#085041':'#791F1F', yTxt=yPos?'#9FE1CB':'#F09595';
+      yoyCell+='<span style="display:inline-block;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:500;background:'+yBg+';color:'+yTxt+'">'+(yPos?'+':'')+yPct.toFixed(1)+'%</span>';
+    } else {
+      yoyCell+='\u2014';
+    }
+    yoyCell+='</td>';
+    return '<tr>'
+      +'<td style="color:#5f5e5a;font-size:11px;width:24px">'+(i+1)+'</td>'
+      +'<td style="font-weight:500">'+c+'</td>'
+      +'<td style="text-align:right">'+cd.units.toLocaleString()+compStr+'</td>'
+      +'<td style="padding:6px 10px;width:90px"><div style="background:#2c2c2a;border-radius:2px;height:4px;overflow:hidden"><div style="height:100%;width:'+bw+'%;background:#94A3B8;border-radius:2px"></div></div></td>'
+      +'<td style="text-align:right;color:#888780">'+cd.lots+'</td>'
+      +'<td style="text-align:right;color:#888780">'+avg2.toLocaleString()+'</td>'
+      +'<td style="text-align:right;color:#888780">'+sp+'%</td>'
+      +yoyCell
+      +'</tr>';
+  }).join('');
 
   document.getElementById('content').innerHTML=
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;padding:.625rem 1rem;background:#1e2124;border:0.5px solid #2c2c2a;border-radius:10px;">'
@@ -1820,25 +1745,29 @@ function renderPerformance() {
     +'</tr></thead><tbody>'+linesHTML+'</tbody></table></div>'
     +'<div class="chart-card"><h3>Powder product mix \u2014 units by jar size</h3><div style="display:flex;align-items:center;gap:12px"><div style="position:relative;height:200px;min-width:200px;flex-shrink:0"><canvas id="cJar"></canvas></div><div id="jar-legend" style="flex:1;overflow-y:auto"></div></div></div></div>'
     +'<div class="full-card"><h3>Units produced by month vs. target</h3><div class="tbl-wrap"><table><thead><tr><th>Month</th><th style="text-align:right">Actual <span style="color:#5f5e5a;font-weight:400">('+compYearLabel+' actual)</span></th><th style="text-align:right">Target</th><th style="text-align:right">% of target</th><th></th><th style="text-align:right">YoY</th></tr></thead><tbody>'+monthHTML+'</tbody></table>'+asterisk+'</div></div>'
-    +'<div class="full-card"><h3>Top 10 customers by units produced</h3><div class="tbl-wrap"><table><thead><tr><th style="width:24px">#</th><th>Customer</th><th style="text-align:right">Units produced</th><th style="width:90px"></th><th style="text-align:right">Lots</th><th style="text-align:right">Avg run size</th><th style="text-align:right">% of production</th></tr></thead><tbody>'+custHTML+'</tbody></table></div></div>';
+    +'<div class="full-card"><h3>Top 10 customers by units produced</h3><div class="tbl-wrap"><table><thead><tr>'
+    +'<th style="width:24px">#</th>'
+    +'<th>Customer</th>'
+    +'<th style="text-align:right">Units produced <span style="color:#5f5e5a;font-weight:400">('+compYearLabel+' actual)</span></th>'
+    +'<th style="width:90px"></th>'
+    +'<th style="text-align:right">Lots</th>'
+    +'<th style="text-align:right">Avg run size</th>'
+    +'<th style="text-align:right">% of production</th>'
+    +'<th style="text-align:right">YoY</th>'
+    +'</tr></thead><tbody>'+custHTML+'</tbody></table></div></div>';
 
   document.getElementById('jar-legend').innerHTML='<table style="width:100%;border-collapse:collapse;font-size:11px"><tbody>'+jarLegHTML+'</tbody></table>';
   charts.jar=new Chart(document.getElementById('cJar'),{type:'doughnut',data:{labels:jarEntries.map(function(e){return e[0];}),datasets:[{data:jarEntries.map(function(e){return e[1];}),backgroundColor:JAR_COLORS,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){var v=ctx.raw,p=jarTotal?((v/jarTotal)*100).toFixed(1):0;return v.toLocaleString()+' units ('+p+'%)';}}}}}});
 }
 
-// ─── Export popover ──────────────────────────────────────────────────────
-
 function toggleExportPopover(e) {
   e.stopPropagation();
   var existing = document.getElementById('export-popover');
   if (existing) { existing.remove(); return; }
-
   var lots = getFilteredLots();
   var count = lots.length;
   var ec = document.getElementById('export-count');
   if (ec) ec.textContent = 'Export ' + count.toLocaleString() + ' lots';
-
-  // Build meta line: active filters + range
   var metaParts = [];
   var range = selectedDetailRange ? selectedDetailRange.label : (subView === 'today' ? (productionDays[selectedDayIdx] || 'Today') : subView === 'weekly' ? 'This week' : 'YTD');
   metaParts.push(range);
@@ -1849,7 +1778,6 @@ function toggleExportPopover(e) {
   });
   if (activeFilters.length) metaParts.push(activeFilters.join(', ') + ' filtered');
   var metaStr = count.toLocaleString() + ' lots · ' + metaParts.join(' · ');
-
   var popover = document.createElement('div');
   popover.id = 'export-popover';
   popover.className = 'export-popover';
@@ -1862,23 +1790,16 @@ function toggleExportPopover(e) {
     + '</div>'
     + '</div>'
     + '<div class="export-popover-meta">' + metaStr + '</div>';
-
   popover.addEventListener('click', function(ev) { ev.stopPropagation(); });
-
   var wrap = document.getElementById('export-wrap');
   if (wrap) wrap.appendChild(popover);
-
-  setTimeout(function() {
-    document.addEventListener('click', closeExportPopoverOutside, true);
-  }, 0);
+  setTimeout(function() { document.addEventListener('click', closeExportPopoverOutside, true); }, 0);
 }
 
 function closeExportPopoverOutside(e) {
   var pop = document.getElementById('export-popover');
   var wrap = document.getElementById('export-wrap');
-  if (pop && !pop.contains(e.target) && wrap && !wrap.contains(e.target)) {
-    closeExportPopover();
-  }
+  if (pop && !pop.contains(e.target) && wrap && !wrap.contains(e.target)) closeExportPopover();
 }
 
 function closeExportPopover() {
@@ -1887,12 +1808,8 @@ function closeExportPopover() {
   if (pop) pop.remove();
 }
 
-function confirmExport() {
-  closeExportPopover();
-  exportDetailExcel();
-}
+function confirmExport() { closeExportPopover(); exportDetailExcel(); }
 
-// ─── Boot ─────────────────────────────────────────────────────────────────
 if (sessionStorage.getItem('dtf_auth') === '1') {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('main-app').style.display = 'block';
