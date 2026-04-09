@@ -150,21 +150,24 @@ function buildMultiSelect(id, label, options, selectedArr) {
 
 function toggleMsPanel(id) {
   var existing = document.getElementById('ms-panel-'+id);
-  if(existing){ existing.remove(); return; }
+  if(existing){ existing.remove(); document.removeEventListener('mousedown', closeMsOnOutside); return; }
   closeAllMsPanels();
-  var wrap = document.getElementById('ms-wrap-'+id); if(!wrap) return;
+  var trig = document.getElementById('ms-trig-'+id); if(!trig) return;
+  var rect = trig.getBoundingClientRect();
   var allOpts = window._msOptions && window._msOptions[id] ? window._msOptions[id] : [];
   var selected = filterState[id] || [];
   var panel = document.createElement('div');
-  panel.className = 'ms-panel';
   panel.id = 'ms-panel-'+id;
+  panel.style.cssText = 'position:fixed;z-index:9999;background:#1e2124;border:0.5px solid #444441;border-radius:10px;padding:8px;min-width:220px;box-shadow:0 4px 20px rgba(0,0,0,0.5);';
+  panel.style.top = (rect.bottom + 4) + 'px';
+  panel.style.left = rect.left + 'px';
   panel.innerHTML =
     '<input class="ms-search" id="ms-search-'+id+'" placeholder="Search\u2026" oninput="filterMsList(\''+id+'\')">'
     +'<div class="ms-list" id="ms-list-'+id+'">'+renderMsItems(id, allOpts, selected, '')+'</div>'
     +'<div class="ms-footer"><span class="ms-count" id="ms-count-'+id+'">'+selected.length+' selected</span>'
     +'<button class="ms-clear" onclick="clearMsFilter(\''+id+'\')">Clear</button></div>';
   panel.addEventListener('mousedown', function(e){ e.stopPropagation(); });
-  wrap.appendChild(panel);
+  document.body.appendChild(panel);
   var si = document.getElementById('ms-search-'+id); if(si) si.focus();
   setTimeout(function(){ document.addEventListener('mousedown', closeMsOnOutside); }, 0);
 }
