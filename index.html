@@ -202,7 +202,7 @@ function toggleMsPanel(id) {
     +'<div class="ms-footer"><span class="ms-count" id="ms-count-'+id+'">'+selected.length+' selected</span>'
     +'<button class="ms-clear" onclick="clearMsFilter(\''+id+'\')">Clear</button></div>';
   panel.addEventListener('mousedown', function(e){ e.stopPropagation(); });
-  document.body.appendChild(panel);
+  document.getElementById('content').appendChild(panel);
   var si = document.getElementById('ms-search-'+id); if(si) si.focus();
   setTimeout(function(){ document.addEventListener('mousedown', closeMsOnOutside); }, 0);
 }
