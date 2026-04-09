@@ -1694,14 +1694,23 @@ function renderPerformance() {
   var asterisk=curMo?'<div style="font-size:10px;color:#5f5e5a;margin-top:10px;padding-top:8px;border-top:0.5px solid #2c2c2a"><sup style="color:#9FE1CB">*</sup> '+curMo.label+' target adjusted for month-to-date ('+curMo.daysSoFar+'/'+curMo.daysInMonth+' days). Full month target: '+curMo.fullMonthTarget.toLocaleString()+'. '+compYearLabel+' figure shown is also MTD for comparison.</div>':'';
   var jarLegHTML=jarEntries.map(function(e,i){ var j=e[0],v=e[1],p=jarTotal?((v/jarTotal)*100).toFixed(1):0; return '<tr style="border-bottom:0.5px solid #2c2c2a"><td style="padding:3px 6px;width:16px"><div style="width:10px;height:10px;border-radius:2px;background:'+JAR_COLORS[i]+'"></div></td><td style="padding:3px 6px;font-weight:500">'+j+'</td><td style="padding:3px 6px;text-align:right;white-space:nowrap">'+v.toLocaleString()+'</td><td style="padding:3px 6px;text-align:right;color:#888780;width:40px">'+p+'%</td></tr>'; }).join('');
 
-  // ── Customer rows: now with comparison units + YoY badge ─────────────────
+  // ── Customer rows: comparison values for all columns + YoY badge ─────────
+  var total25units = lots25.reduce(function(s,l){return s+l.finalUnits;},0);
   var custHTML=top10.map(function(e,i){
     var c=e[0],cd=e[1];
     var avg2=cd.lots?Math.round(cd.units/cd.lots):0;
     var bw=Math.round((cd.units/maxCU)*100);
     var sp=totalUnits?((cd.units/totalUnits)*100).toFixed(1):0;
     var cd25=byCust25[c];
-    var compStr=cd25?'<span style="color:#5f5e5a;font-weight:400"> ('+cd25.units.toLocaleString()+')</span>':'';
+
+    // comparison strings for each column
+    var compUnits  = cd25 ? '<span style="color:#5f5e5a;font-weight:400"> ('+cd25.units.toLocaleString()+')</span>' : '';
+    var avg225     = cd25&&cd25.lots ? Math.round(cd25.units/cd25.lots) : null;
+    var compAvg    = avg225!==null ? '<span style="color:#5f5e5a;font-weight:400"> ('+avg225.toLocaleString()+')</span>' : '';
+    var sp25       = total25units&&cd25 ? ((cd25.units/total25units)*100).toFixed(1) : null;
+    var compSp     = sp25!==null ? '<span style="color:#5f5e5a;font-weight:400"> ('+sp25+'%)</span>' : '';
+    var compLots   = cd25 ? '<span style="color:#5f5e5a;font-weight:400"> ('+cd25.lots+')</span>' : '';
+
     var yoyCell='<td style="text-align:right">';
     if(cd25&&cd25.units){
       var yPos=(cd.units-cd25.units)>=0;
@@ -1715,11 +1724,11 @@ function renderPerformance() {
     return '<tr>'
       +'<td style="color:#5f5e5a;font-size:11px;width:24px">'+(i+1)+'</td>'
       +'<td style="font-weight:500">'+c+'</td>'
-      +'<td style="text-align:right">'+cd.units.toLocaleString()+compStr+'</td>'
+      +'<td style="text-align:right">'+cd.units.toLocaleString()+compUnits+'</td>'
       +'<td style="padding:6px 10px;width:90px"><div style="background:#2c2c2a;border-radius:2px;height:4px;overflow:hidden"><div style="height:100%;width:'+bw+'%;background:#94A3B8;border-radius:2px"></div></div></td>'
-      +'<td style="text-align:right;color:#888780">'+cd.lots+'</td>'
-      +'<td style="text-align:right;color:#888780">'+avg2.toLocaleString()+'</td>'
-      +'<td style="text-align:right;color:#888780">'+sp+'%</td>'
+      +'<td style="text-align:right;color:#888780">'+cd.lots+compLots+'</td>'
+      +'<td style="text-align:right;color:#888780">'+avg2.toLocaleString()+compAvg+'</td>'
+      +'<td style="text-align:right;color:#888780">'+sp+'%'+compSp+'</td>'
       +yoyCell
       +'</tr>';
   }).join('');
@@ -1748,13 +1757,15 @@ function renderPerformance() {
     +'<div class="full-card"><h3>Top 10 customers by units produced</h3><div class="tbl-wrap"><table><thead><tr>'
     +'<th style="width:24px">#</th>'
     +'<th>Customer</th>'
-    +'<th style="text-align:right">Units produced <span style="color:#5f5e5a;font-weight:400">('+compYearLabel+' actual)</span></th>'
+    +'<th style="text-align:right">Units produced *</th>'
     +'<th style="width:90px"></th>'
-    +'<th style="text-align:right">Lots</th>'
-    +'<th style="text-align:right">Avg run size</th>'
-    +'<th style="text-align:right">% of production</th>'
+    +'<th style="text-align:right">Lots *</th>'
+    +'<th style="text-align:right">Avg run size *</th>'
+    +'<th style="text-align:right">% of production *</th>'
     +'<th style="text-align:right">YoY</th>'
-    +'</tr></thead><tbody>'+custHTML+'</tbody></table></div></div>';
+    +'</tr></thead><tbody>'+custHTML+'</tbody></table>'
+    +'<div style="font-size:10px;color:#5f5e5a;margin-top:10px;padding-top:8px;border-top:0.5px solid #2c2c2a;">* Values in <span style="color:#5f5e5a;">parentheses</span> show '+compYearLabel+' actuals for the same period.</div>'
+    +'</div></div>';
 
   document.getElementById('jar-legend').innerHTML='<table style="width:100%;border-collapse:collapse;font-size:11px"><tbody>'+jarLegHTML+'</tbody></table>';
   charts.jar=new Chart(document.getElementById('cJar'),{type:'doughnut',data:{labels:jarEntries.map(function(e){return e[0];}),datasets:[{data:jarEntries.map(function(e){return e[1];}),backgroundColor:JAR_COLORS,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){var v=ctx.raw,p=jarTotal?((v/jarTotal)*100).toFixed(1):0;return v.toLocaleString()+' units ('+p+'%)';}}}}}});
