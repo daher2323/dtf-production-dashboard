@@ -537,6 +537,56 @@ function loadDashboard() {
 
 function isViewingLive() { return selectedDayIdx === productionDays.length - 1; }
 
+// ── Record computation ────────────────────────────────────────────────────
+function computeRecords() {
+  var allRowsBoth = allRows.concat(allRows25);
+
+  // Build daily totals: { dateStr -> { total, byLine: {line -> units} } }
+  var dailyMap = {};
+  allRowsBoth.forEach(function(r) {
+    var dt = new Date(r['Date']); if(isNaN(dt)) return;
+    var dk = (dt.getMonth()+1)+'/'+dt.getDate()+'/'+dt.getFullYear();
+    var line = (r['Line']||'').trim();
+    var units = num(r['Final Units']);
+    if(!dailyMap[dk]) dailyMap[dk] = {date:dk, total:0, byLine:{}};
+    dailyMap[dk].total += units;
+    if(line) dailyMap[dk].byLine[line] = (dailyMap[dk].byLine[line]||0) + units;
+  });
+
+  // Build weekly totals: { weekKey -> { mon, units } }
+  var weeklyMap = {};
+  allRowsBoth.forEach(function(r) {
+    var dt = new Date(r['Date']); if(isNaN(dt)) return;
+    var d = new Date(dt); d.setHours(0,0,0,0);
+    var dow = d.getDay();
+    var mon = new Date(d); mon.setDate(d.getDate()-(dow===0?6:dow-1));
+    var wk = mon.getFullYear()+'-'+String(getWeekNum(mon)).padStart(2,'0');
+    if(!weeklyMap[wk]) weeklyMap[wk] = {mon:mon, units:0};
+    weeklyMap[wk].units += num(r['Final Units']);
+  });
+
+  var days = Object.values(dailyMap);
+  var weeks = Object.values(weeklyMap);
+
+  // Top 5 days overall
+  var top5days = days.slice().sort(function(a,b){return b.total-a.total;}).slice(0,5);
+
+  // Top 5 days per line
+  var top5byLine = {};
+  ALL_LINES.forEach(function(line) {
+    top5byLine[line] = days
+      .filter(function(d){ return d.byLine[line]; })
+      .sort(function(a,b){ return b.byLine[line]-a.byLine[line]; })
+      .slice(0,5)
+      .map(function(d){ return {date:d.date, units:d.byLine[line]}; });
+  });
+
+  // Top 5 weeks overall
+  var top5weeks = weeks.slice().sort(function(a,b){return b.units-a.units;}).slice(0,5);
+
+  return { dailyMap:dailyMap, top5days:top5days, top5byLine:top5byLine, top5weeks:top5weeks };
+}
+
 function refreshAndRender(forceRender) {
   fetchData().then(function(res){
     if(applyFreshData(res)){
@@ -1130,6 +1180,36 @@ function renderToday() {
   var statusColor=isLive&&!dayComplete?'#888780':(todayPct>=100?'#1D9E75':'#EF9F27');
   var barColor=isLive&&!dayComplete?'#5f5e5a':(todayPct>=100?'#1D9E75':'#EF9F27');
 
+  // ── Records ───────────────────────────────────────────────────────────────
+  var recs = computeRecords();
+  var recTotalRank = recs.top5days.findIndex(function(d){ return d.date===viewStr; });
+  var recLineRank = {};
+  ALL_LINES.forEach(function(line){
+    recLineRank[line] = (recs.top5byLine[line]||[]).findIndex(function(d){ return d.date===viewStr; });
+  });
+  var recMedals = ['🥇','🥈','🥉','4th','5th'];
+  // For live day, check if currently on pace to beat any record
+  var recLinePace = {}; // rank if current pace holds (extrapolate to end of day)
+  if(isLive && !dayComplete) {
+    var etNow = parseInt(new Date().toLocaleString('en-US',{hour:'numeric',hour12:false,timeZone:'America/New_York'}));
+    var dayFrac = Math.min(etNow / 16, 1); // assume 16-hour production day
+    ALL_LINES.forEach(function(line){
+      if(!dayFrac) return;
+      var proj = Math.round((todayByLine[line]||0) / dayFrac);
+      var list = recs.top5byLine[line]||[];
+      var rank = list.length < 5 ? list.length : -1;
+      for(var ri=0;ri<list.length;ri++){ if(proj > list[ri].units){ rank=ri; break; } }
+      if(rank !== -1) recLinePace[line] = rank;
+    });
+    // total pace
+    var totalProj2 = dayFrac ? Math.round(todayTotal / dayFrac) : 0;
+    var totalList = recs.top5days;
+    var totalRank2 = totalList.length < 5 ? totalList.length : -1;
+    for(var ri2=0;ri2<totalList.length;ri2++){ if(totalProj2 > totalList[ri2].total){ totalRank2=ri2; break; } }
+    if(totalRank2 !== -1) recTotalPaceRank = totalRank2;
+  }
+  var recTotalPaceRank = (typeof recTotalPaceRank !== 'undefined') ? recTotalPaceRank : -1;
+
   var ytdRows=allRows.filter(function(r){ var dt=new Date(r['Date']); return !isNaN(dt)&&dt<=viewDateObj; });
   var ytdUnits=Object.values(buildLotMap(ytdRows)).filter(Boolean).reduce(function(s,l){return s+l.finalUnits;},0);
   var viewMo=viewDateObj.getMonth(), viewDy=viewDateObj.getDate();
@@ -1175,9 +1255,21 @@ function renderToday() {
     var pillStyle=goal.isTarget?'background:'+lineBg+';border:0.5px solid '+lineClr+';color:'+lineTxt+';':'background:#1a1f12;border:0.5px solid #3B5010;color:#C0DD97;';
     var pillDotStyle=goal.isTarget?'background:'+lineClr+';':'background:#639922;';
     var pillLabel=goal.isTarget?'Target: '+goal.value.toLocaleString()+' units':'Avg: '+(lineAvg[line]||0).toLocaleString()+' units/day';
+    // Record badge for this line
+    var lineRank = recLineRank[line];
+    var linePaceRank = recLinePace[line] !== undefined ? recLinePace[line] : -1;
+    var recBadgeHTML = '';
+    if(lineRank !== -1 && lineRank !== undefined) {
+      var medal = recMedals[lineRank]||'';
+      recBadgeHTML = '<div style="position:absolute;top:8px;left:8px;font-size:10px;font-weight:600;padding:2px 7px;border-radius:8px;background:#2D1F00;border:1px solid #B8860B;color:#FFD700;white-space:nowrap;">'+medal+' '+(lineRank===0?'Line Record':'#'+(lineRank+1)+' All-Time')+'</div>';
+    } else if(linePaceRank !== -1) {
+      var paceMedal = recMedals[linePaceRank]||'';
+      recBadgeHTML = '<div style="position:absolute;top:8px;left:8px;font-size:10px;font-weight:500;padding:2px 7px;border-radius:8px;background:#1a1d12;border:1px solid #639922;color:#C0DD97;white-space:nowrap;">On pace: '+paceMedal+' '+(linePaceRank===0?'Record':'#'+(linePaceRank+1)+' All-Time')+'</div>';
+    }
     return '<div id="gcard_'+i+'" style="flex:1;background:#141618;border:0.5px solid #2c2c2a;border-radius:10px;padding:1rem;text-align:center;position:relative;transition:border .3s,box-shadow .3s;">'
+      +recBadgeHTML
       +'<div id="gcheck_'+i+'" style="position:absolute;top:8px;right:8px;display:none;width:20px;height:20px;border-radius:50%;background:#1D9E75;align-items:center;justify-content:center"><svg width="11" height="11" viewBox="0 0 11 11" fill="none"><polyline points="1.5,5.5 4.5,8.5 9.5,2.5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>'
-      +'<div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">'+line+(type?' \u2014 '+type:'')+'</div>'
+      +'<div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:'+(recBadgeHTML?'20':'6')+'px">'+line+(type?' \u2014 '+type:'')+'</div>'
       +'<div style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11px;margin-bottom:6px;'+pillStyle+'"><span style="width:6px;height:6px;border-radius:50%;flex-shrink:0;'+pillDotStyle+'"></span>'+pillLabel+'</div>'
       +'<canvas id="dial_'+i+'" width="140" height="82" style="display:block;margin:0 auto .25rem"></canvas>'
       +'<div id="gval_'+i+'" style="font-size:20px;font-weight:500;color:'+color+';margin-bottom:4px">0</div>'
@@ -1245,7 +1337,7 @@ function renderToday() {
     +'<div style="display:flex;gap:12px;margin-bottom:10px">'+gaugesHTML+'</div>'
     +'<div id="today-banner" style="background:#141618;border:0.5px solid #2c2c2a;border-radius:10px;padding:.875rem 1.25rem;margin-bottom:1rem">'
     +'<div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:8px;">'
-    +'<div style="flex:1;text-align:center"><div id="banner-lbl-total" style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">'+(isLive?'Total units today':'Total units')+'</div><div style="display:flex;align-items:center;justify-content:center;gap:6px;"><span id="banner-total" style="font-size:26px;font-weight:500;color:#e8e6e0;line-height:1">0</span><span id="banner-bullseye" style="display:none;font-size:22px;line-height:1">&#127919;</span></div></div>'
+    +'<div style="flex:1;text-align:center"><div id="banner-lbl-total" style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">'+(isLive?'Total units today':'Total units')+'</div><div style="display:flex;align-items:center;justify-content:center;gap:6px;"><span id="banner-total" style="font-size:26px;font-weight:500;color:#e8e6e0;line-height:1">0</span><span id="banner-bullseye" style="display:none;font-size:22px;line-height:1">&#127919;</span>'+(recTotalRank!==-1?'<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;background:#2D1F00;border:1px solid #B8860B;color:#FFD700;">'+(recMedals[recTotalRank]||'')+' '+(recTotalRank===0?'All-Time Record':'#'+(recTotalRank+1)+' All-Time')+'</span>':(recTotalPaceRank!==-1?'<span style="font-size:10px;font-weight:500;padding:2px 8px;border-radius:8px;background:#1a1d12;border:1px solid #639922;color:#C0DD97;">On pace: '+(recMedals[recTotalPaceRank]||'')+' '+(recTotalPaceRank===0?'Record':'#'+(recTotalPaceRank+1)+' All-Time')+'</span>':''))+'</div></div>'
     +'<div id="banner-div1" style="width:0.5px;background:#2c2c2a;height:36px;flex-shrink:0;align-self:center"></div>'
     +'<div style="flex:1;text-align:center"><div id="banner-lbl-goal" style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">'+(allLinesHaveTarget?'Daily target (all lines)':'Daily avg (all lines)')+'</div><div style="font-size:18px;font-weight:500;color:#e8e6e0;line-height:1.2">'+totalGoal.toLocaleString()+'</div></div>'
     +'<div id="banner-div2" style="width:0.5px;background:#2c2c2a;height:36px;flex-shrink:0;align-self:center"></div>'
@@ -1788,6 +1880,58 @@ function renderPerformance() {
   var showSummaryRow = custLimit === 0;
   var custHTML = buildCustTableHTML(visibleCusts, showSummaryRow);
 
+  // ── Records card HTML ─────────────────────────────────────────────────────
+  var recs2 = computeRecords();
+  var medals2 = ['🥇','🥈','🥉','4th','5th'];
+  function fmtRecDate(str){ var d=new Date(str); return isNaN(d)?str:d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+  function recCol(line){ return LINE_COLOR[lk(line)]||'#888780'; }
+
+  // Top 5 days — overall
+  var top5DaysHTML = recs2.top5days.map(function(d,i){
+    var isToday = d.date === ((now.getMonth()+1)+'/'+now.getDate()+'/'+now.getFullYear());
+    return '<tr style="border-bottom:0.5px solid #2c2c2a;'+(i===0?'background:#1c1a0a;':'')+'"><td style="padding:5px 8px;font-size:13px;width:28px">'+medals2[i]+'</td><td style="padding:5px 8px;font-weight:500;color:#e8e6e0;">'+d.total.toLocaleString()+'</td><td style="padding:5px 8px;color:#888780;font-size:11px;">'+fmtRecDate(d.date)+(isToday?' <span style="color:#1D9E75;font-weight:500;">(today)</span>':'')+'</td></tr>';
+  }).join('');
+
+  // Top 5 days per line
+  var lineRecsHTML = ALL_LINES.map(function(line){
+    var col = recCol(line);
+    var k2 = lk(line);
+    var bg = LINE_BG[k2]||'#2c2c2a', txt2 = LINE_TXT[k2]||'#e8e6e0';
+    var entries = recs2.top5byLine[line]||[];
+    var rows2 = entries.length ? entries.map(function(d,i){
+      var isToday = d.date === ((now.getMonth()+1)+'/'+now.getDate()+'/'+now.getFullYear());
+      return '<tr style="border-bottom:0.5px solid #2c2c2a;'+(i===0?'background:#1c1a0a;':'')+'"><td style="padding:4px 6px;font-size:12px;width:24px">'+medals2[i]+'</td><td style="padding:4px 6px;font-weight:500;color:'+col+';">'+d.units.toLocaleString()+'</td><td style="padding:4px 6px;color:#888780;font-size:11px;">'+fmtRecDate(d.date)+(isToday?' <span style="color:#1D9E75;font-weight:500;">(today)</span>':'')+'</td></tr>';
+    }).join('') : '<tr><td colspan="3" style="padding:6px 8px;font-size:11px;color:#5f5e5a;font-style:italic;">No data</td></tr>';
+    return '<div style="flex:1;min-width:160px;background:#141618;border:0.5px solid #2c2c2a;border-radius:8px;overflow:hidden;">'
+      +'<div style="padding:7px 10px;border-bottom:0.5px solid #2c2c2a;display:flex;align-items:center;gap:6px;"><span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:6px;background:'+bg+';color:'+txt2+'">'+line+'</span><span style="font-size:10px;color:#888780;">'+LINE_TYPE[k2]+'</span></div>'
+      +'<table style="width:100%;border-collapse:collapse;font-size:12px;"><tbody>'+rows2+'</tbody></table></div>';
+  }).join('');
+
+  // Top 5 weeks
+  var top5WeeksHTML = recs2.top5weeks.map(function(w,i){
+    var wn = getWeekNum(w.mon);
+    var fri = new Date(w.mon); fri.setDate(w.mon.getDate()+4);
+    var label = 'Wk '+wn+' \u2013 '+w.mon.toLocaleDateString('en-US',{month:'short',day:'numeric'})+'\u2013'+fri.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    return '<tr style="border-bottom:0.5px solid #2c2c2a;'+(i===0?'background:#1c1a0a;':'')+'"><td style="padding:5px 8px;font-size:13px;width:28px">'+medals2[i]+'</td><td style="padding:5px 8px;font-weight:500;color:#e8e6e0;">'+w.units.toLocaleString()+'</td><td style="padding:5px 8px;color:#888780;font-size:11px;">'+label+'</td></tr>';
+  }).join('');
+
+  var recordsCardHTML = '<div class="full-card" style="margin-bottom:10px;">'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:1rem;"><span style="font-size:16px;">🏆</span><h3 style="margin:0;">Production records</h3><span style="font-size:10px;color:#5f5e5a;margin-left:4px;">All-time top 5 · across all available data</span></div>'
+    +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:start;">'
+    // Best days overall
+    +'<div style="flex:1;min-width:200px;background:#141618;border:0.5px solid #2c2c2a;border-radius:8px;overflow:hidden;">'
+    +'<div style="padding:7px 10px;border-bottom:0.5px solid #2c2c2a;font-size:10px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.04em;">Best days — all lines combined</div>'
+    +'<table style="width:100%;border-collapse:collapse;font-size:12px;"><tbody>'+top5DaysHTML+'</tbody></table></div>'
+    // Best weeks overall
+    +'<div style="flex:1;min-width:200px;background:#141618;border:0.5px solid #2c2c2a;border-radius:8px;overflow:hidden;">'
+    +'<div style="padding:7px 10px;border-bottom:0.5px solid #2c2c2a;font-size:10px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.04em;">Best weeks — all lines combined</div>'
+    +'<table style="width:100%;border-collapse:collapse;font-size:12px;"><tbody>'+top5WeeksHTML+'</tbody></table></div>'
+    +'</div>'
+    // Per-line records
+    +'<div style="font-size:10px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin:1rem 0 .5rem;">Best days by line</div>'
+    +'<div style="display:flex;gap:10px;flex-wrap:wrap;">'+lineRecsHTML+'</div>'
+    +'</div>';
+
   document.getElementById('content').innerHTML=
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;padding:.625rem 1rem;background:#1e2124;border:0.5px solid #2c2c2a;border-radius:10px;">'
     +'<div style="position:relative;" id="perf-range-anchor">'
@@ -1798,6 +1942,7 @@ function renderPerformance() {
     +'<div style="font-size:11px;color:#5f5e5a;">Comparing to same period in '+compYearLabel+'</div>'
     +'</div>'
     +'<div class="metrics">'+metricsHTML+'</div>'
+    +recordsCardHTML
     +'<div class="full-card"><h3>Year-end projection vs target</h3>'+yearEndHTML+'</div>'
     +'<div class="charts-row"><div class="chart-card">'+typeSplitHTML
     +'<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>'
