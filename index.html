@@ -1670,6 +1670,25 @@ function renderPerformance() {
   Object.keys(byCust25raw).forEach(function(ck){ byCust25[ck]=byCust25raw[ck]; });
   function getCust25(name){ return byCust25[(name||'').toLowerCase()]||null; }
 
+  // ── DEBUG PANEL (temporary) ───────────────────────────────────────────────
+  var _debugInfo = {
+    rangeLabel: range.label,
+    rangeStart: range.start.toDateString(),
+    rangeEnd: range.end.toDateString(),
+    compStart: compStart.toDateString(),
+    compEnd: compEnd.toDateString(),
+    compShift: compShift,
+    rangeRowsCount: rangeRows.length,
+    rangeRows25Count: rangeRows25.length,
+    byCust25Keys: Object.keys(byCust25).slice(0,20),
+    sampleRangeRow25Product: rangeRows25.length ? (rangeRows25[0]['Product']||'') : 'NONE',
+    ancestralIn25: !!byCust25['ancestral'],
+    ancestralRaw25Rows: rangeRows25.filter(function(r){ return (r['Product']||'').toLowerCase().includes('ancestral'); }).length
+  };
+  window._dtfDebug = _debugInfo;
+  console.log('DTF DEBUG', JSON.stringify(_debugInfo, null, 2));
+  // ── END DEBUG ─────────────────────────────────────────────────────────────
+
   var metricsHTML=
     '<div class="metric info"><div class="label">Units produced</div><div class="value">'+totalUnits.toLocaleString()+'</div><div class="sub">vs '+totalProj.toLocaleString()+' projected</div><div class="yoy">'+deltaTag(totalUnits,total25,true,'pct',total25.toLocaleString(),compYearLabel)+'</div></div>'
     +'<div class="metric"><div class="label">Avg units / day</div><div class="value">'+avgPerDay.toLocaleString()+'</div><div class="sub">'+uniqDays+' production days</div><div class="yoy">'+deltaTag(avgPerDay,avg25perDay,true,'pct',avg25perDay.toLocaleString(),compYearLabel)+'</div></div>'
@@ -1827,6 +1846,18 @@ function renderPerformance() {
     +'<th style="text-align:right">% of production *</th>'
     +'</tr></thead><tbody>'+custHTML+'</tbody></table>'
     +'<div style="font-size:10px;color:#5f5e5a;margin-top:10px;padding-top:8px;border-top:0.5px solid #2c2c2a;">* Values in parentheses show '+compYearLabel+' actuals for the same period. No parentheses means no '+compYearLabel+' data was found for that customer.</div>'
+    +'<div style="margin-top:12px;padding:10px 12px;background:#0d1117;border:1px solid #444;border-radius:8px;font-size:10px;font-family:monospace;color:#7ee787;line-height:1.6;">'
+    +'<div style="color:#f0883e;font-weight:bold;margin-bottom:6px;">🔍 DEBUG (temporary — will remove after fix)</div>'
+    +'<div>Range: '+range.label+' ('+range.start.toDateString()+' → '+range.end.toDateString()+')</div>'
+    +'<div>CompShift: '+compShift+' → comp window: '+compStart.toDateString()+' → '+compEnd.toDateString()+'</div>'
+    +'<div>rangeRows (current year): '+rangeRows.length+' rows</div>'
+    +'<div>rangeRows25 (comp year): '+rangeRows25.length+' rows</div>'
+    +'<div>byCust25 keys ('+Object.keys(byCust25).length+'): '+Object.keys(byCust25).slice(0,15).join(', ')+'</div>'
+    +'<div>Sample comp row product: "'+(rangeRows25.length ? (rangeRows25[0]['Product']||'EMPTY') : 'NO ROWS')
+    +'" | date: "'+(rangeRows25.length ? (rangeRows25[0]['Date']||'EMPTY') : 'NO ROWS')+'"</div>'
+    +'<div>Ancestral in byCust25: '+(byCust25['ancestral']?'YES ✓':'NO ✗')+' | rows with "ancestral" in product: '+rangeRows25.filter(function(r){return (r["Product"]||"").toLowerCase().includes("ancestral");}).length+'</div>'
+    +'<div>allRows count: '+allRows.length+' | allRows25 count: '+allRows25.length+'</div>'
+    +'</div>'
     +'</div></div>';
 
   document.getElementById('jar-legend').innerHTML='<table style="width:100%;border-collapse:collapse;font-size:11px"><tbody>'+jarLegHTML+'</tbody></table>';
