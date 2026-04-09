@@ -28,12 +28,50 @@
   .chart-card h3 { font-size: 11px; font-weight: 500; color: #888780; margin-bottom: .75rem; text-transform: uppercase; letter-spacing: .04em; }
   .full-card { background: #1e2124; border: 0.5px solid #2c2c2a; border-radius: 12px; padding: 1rem; margin-bottom: 10px; }
   .full-card h3 { font-size: 11px; font-weight: 500; color: #888780; margin-bottom: .75rem; text-transform: uppercase; letter-spacing: .04em; }
-  .filters { display: flex; gap: 6px; flex-wrap: nowrap; overflow-x: auto; margin-bottom: 1rem; padding-bottom: 2px; align-items: center; }
-  .filters input[type=text] { padding: 5px 7px; border: 0.5px solid #444441; border-radius: 8px; background: #1e2124; color: #e8e6e0; font-size: 12px; min-width: 0; }
-  .ms-trigger { display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border-radius:8px;border:0.5px solid #444441;background:#1e2124;color:#888780;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;height:28px;user-select:none; }
+
+  /* ── Filter bar ── */
+  .filters {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 1rem;
+    width: 100%;
+  }
+  .filters input[type=text] {
+    flex: 1 1 0;
+    min-width: 120px;
+    padding: 5px 7px;
+    border: 0.5px solid #444441;
+    border-radius: 8px;
+    background: #1e2124;
+    color: #e8e6e0;
+    font-size: 12px;
+    height: 28px;
+  }
+  /* Each ms-wrap stretches equally */
+  .filters .ms-wrap {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  /* Trigger fills its wrapper */
+  .filters .ms-wrap .ms-trigger {
+    width: 100%;
+    justify-content: space-between;
+  }
+  /* Clear button: fixed, no stretch */
+  .filters .filter-clear-btn {
+    flex: 0 0 auto;
+  }
+  /* Export button: fixed, no stretch, pushed to far right via margin-left:auto */
+  .filters .filter-export-btn {
+    flex: 0 0 auto;
+    margin-left: auto;
+  }
+
+  .ms-trigger { display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border-radius:8px;border:0.5px solid #444441;background:#1e2124;color:#888780;font-size:12px;cursor:pointer;white-space:nowrap;height:28px;user-select:none; }
   .ms-trigger.active { border-color:#378ADD;color:#e8e6e0; }
   .ms-badge { background:#378ADD;color:#042C53;font-size:10px;font-weight:500;padding:1px 6px;border-radius:8px; }
-  .ms-wrap { position:relative;flex-shrink:0; }
+  .ms-wrap { position:relative; }
   .ms-item { display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;font-size:12px;color:#e8e6e0;cursor:pointer; }
   .ms-item:hover { background:#252829; }
   .ms-chk { width:14px;height:14px;border-radius:3px;border:0.5px solid #444441;background:#141618;flex-shrink:0;display:flex;align-items:center;justify-content:center; }
@@ -1359,7 +1397,7 @@ function renderDetail() {
     var dayLabel=isLive?'(Today)':(function(){ var diff=Math.round((now-viewDate)/86400000); return diff===1?'(Yesterday)':'('+diff+' days ago)'; })();
     var prevDisabled=selectedDayIdx<=0, nextDisabled=isLive;
     sourceRows=allRows.concat(allRows25).filter(function(r){ var dt=new Date(r['Date']); if(isNaN(dt)) return false; return dt.getFullYear()===viewDate.getFullYear()&&dt.getMonth()===viewDate.getMonth()&&dt.getDate()===viewDate.getDate(); });
-    navHTML='<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;margin-bottom:12px;position:relative;" id="date-nav-anchor">'
+    navHTML='<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;position:relative;" id="date-nav-anchor">'
       +'<button onclick="navDay(-1)" '+(prevDisabled?'disabled':'')+' style="width:28px;height:28px;flex-shrink:0;border-radius:8px;border:0.5px solid #444441;background:transparent;cursor:'+(prevDisabled?'default':'pointer')+';color:'+(prevDisabled?'#444441':'#e8e6e0')+';font-size:16px;display:flex;align-items:center;justify-content:center;font-family:system-ui">&#8249;</button>'
       +'<div onclick="openPicker()" style="text-align:center;width:260px;flex-shrink:0;cursor:pointer;padding:4px 12px;border-radius:8px;border:0.5px solid #444441;background:transparent;" onmouseover="this.style.background=\'#252829\'" onmouseout="this.style.background=\'transparent\'">'
       +'<div style="font-size:13px;font-weight:500;color:#e8e6e0;white-space:nowrap;">'+viewFmt+' &#x25BE;</div>'
@@ -1379,7 +1417,7 @@ function renderDetail() {
     var monFmt2=selectedWeekMon.toLocaleDateString('en-US',{month:'short',day:'numeric'});
     var friEndFmt2=wkFri2.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
     sourceRows=allRows.concat(allRows25).filter(function(r){ var dt=new Date(r['Date']); return !isNaN(dt)&&dt>=selectedWeekMon&&dt<=wkEnd2; });
-    navHTML='<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;margin-bottom:12px;position:relative;" id="week-nav-anchor">'
+    navHTML='<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;position:relative;" id="week-nav-anchor">'
       +'<button onclick="navWeek(-1)" style="width:28px;height:28px;flex-shrink:0;border-radius:8px;border:0.5px solid #444441;background:transparent;cursor:pointer;color:#e8e6e0;font-size:16px;display:flex;align-items:center;justify-content:center;font-family:system-ui">&#8249;</button>'
       +'<div onclick="openWeekPicker()" style="text-align:center;width:260px;flex-shrink:0;cursor:pointer;padding:4px 12px;border-radius:8px;border:0.5px solid #444441;background:transparent;" onmouseover="this.style.background=\'#252829\'" onmouseout="this.style.background=\'transparent\'">'
       +'<div style="font-size:13px;font-weight:500;color:#e8e6e0;white-space:nowrap;">Week '+weekNum2+' &nbsp;&middot;&nbsp; '+monFmt2+' \u2013 '+friEndFmt2+' &#x25BE;</div>'
@@ -1396,7 +1434,7 @@ function renderDetail() {
     var fmtShort=function(d){ return (d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear(); };
     var displayLabel=range.label||(fmtShort(range.start)+' \u2013 '+fmtShort(range.end));
     sourceRows=allRows.concat(allRows25).filter(function(r){ var dt=new Date(r['Date']); if(isNaN(dt)) return false; return dt>=range.start&&dt<=range.end; });
-    navHTML='<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;margin-bottom:12px;position:relative;" id="detail-range-anchor">'
+    navHTML='<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;position:relative;" id="detail-range-anchor">'
       +'<div onclick="openDetailRangePicker()" style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;padding:6px 14px;border-radius:8px;border:0.5px solid #444441;background:transparent;" onmouseover="this.style.background=\'#252829\'" onmouseout="this.style.background=\'transparent\'">'
       +'<svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1" y="2" width="11" height="10" rx="2" stroke="#888780" stroke-width="1.2"/><line x1="4" y1="1" x2="4" y2="4" stroke="#888780" stroke-width="1.2" stroke-linecap="round"/><line x1="9" y1="1" x2="9" y2="4" stroke="#888780" stroke-width="1.2" stroke-linecap="round"/><line x1="1" y1="6" x2="12" y2="6" stroke="#888780" stroke-width="1.2"/></svg>'
       +'<span style="font-size:13px;font-weight:500;color:#e8e6e0;white-space:nowrap;">'+displayLabel+' &#x25BE;</span>'
@@ -1413,17 +1451,20 @@ function renderDetail() {
   window._msOptions = {customer:customers, product:products, status:['Complete','Partial'], bottle:bottleSizes, jar:jarSizes};
   if((filterState.customer||[]).length) rebuildProductOptions();
 
+  // ── The filter bar: date-picker on left, filters stretch, Export anchored right ──
   document.getElementById('content').innerHTML =
-    navHTML
-    +'<div class="filters">'
-    +'<input type="text" id="fSearch" placeholder="Search lot # or product\u2026" style="min-width:160px;height:28px;" oninput="applyFilters()">'
-    +buildMultiSelect('customer','Customer',customers,filterState.customer)
-    +buildMultiSelect('product','Product',products,filterState.product)
-    +buildMultiSelect('status','Status',['Complete','Partial'],filterState.status)
-    +buildMultiSelect('bottle','Bottle',bottleSizes,filterState.bottle)
-    +buildMultiSelect('jar','Jar size',jarSizes,filterState.jar)
-    +'<button onclick="clearFilters()" style="font-size:12px;padding:5px 12px;border:0.5px solid #444441;border-radius:8px;background:transparent;cursor:pointer;color:#888780;flex-shrink:0;">Clear</button>'
-    +'<button onclick="exportDetailExcel()" id="export-btn" style="font-size:12px;padding:5px 12px;border:1.5px solid #378ADD;border-radius:8px;background:#0C447C;cursor:pointer;color:#85B7EB;font-weight:500;display:inline-flex;align-items:center;gap:5px;flex-shrink:0;white-space:nowrap;"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="#85B7EB" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 1v7M3.5 5.5l3 3 3-3M2 11h9"/></svg><span id="export-count">Export</span></button>'
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;gap:12px;">'
+    +  '<div style="flex-shrink:0;">'+navHTML+'</div>'
+    +  '<div class="filters" style="flex:1;margin-bottom:0;">'
+    +    '<input type="text" id="fSearch" placeholder="Search lot # or product\u2026" oninput="applyFilters()">'
+    +    buildMultiSelect('customer','Customer',customers,filterState.customer)
+    +    buildMultiSelect('product','Product',products,filterState.product)
+    +    buildMultiSelect('status','Status',['Complete','Partial'],filterState.status)
+    +    buildMultiSelect('bottle','Bottle',bottleSizes,filterState.bottle)
+    +    buildMultiSelect('jar','Jar size',jarSizes,filterState.jar)
+    +    '<button onclick="clearFilters()" class="filter-clear-btn" style="font-size:12px;padding:5px 12px;border:0.5px solid #444441;border-radius:8px;background:transparent;cursor:pointer;color:#888780;">Clear</button>'
+    +    '<button onclick="exportDetailExcel()" id="export-btn" class="filter-export-btn" style="font-size:12px;padding:5px 12px;border:1.5px solid #378ADD;border-radius:8px;background:#0C447C;cursor:pointer;color:#85B7EB;font-weight:500;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="#85B7EB" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 1v7M3.5 5.5l3 3 3-3M2 11h9"/></svg><span id="export-count">Export</span></button>'
+    +  '</div>'
     +'</div>'
     +'<div id="ops-metrics" class="metrics" style="margin-bottom:1rem"></div>'
     +'<div class="full-card"><div class="tbl-wrap"><table style="min-width:600px"><thead><tr>'
