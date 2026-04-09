@@ -137,7 +137,39 @@ var filterState = { customer:[], product:[], status:[], bottle:[], jar:[] };
 
 function lk(s) { return (s||'').replace(/\s/g,'').toLowerCase(); }
 
-// ─── Multi-select filters ─────────────────────────────────────────────────
+// ─── Multi-select event delegation ───────────────────────────────────────
+document.addEventListener('click', function(e) {
+  // Close button inside panel
+  if(e.target.closest('[data-ms-close]')) {
+    closeAllMsPanels();
+    return;
+  }
+  // Trigger button — open/close panel
+  var trig = e.target.closest('[data-ms-id]');
+  if(trig) {
+    var id = trig.getAttribute('data-ms-id');
+    toggleMsPanel(id);
+    return;
+  }
+  // Checkbox item inside panel
+  var item = e.target.closest('[data-ms-item]');
+  if(item) {
+    var id = item.getAttribute('data-ms-item-id');
+    var val = item.getAttribute('data-ms-val');
+    toggleMsItem(id, val);
+    return;
+  }
+  // Clear button inside panel
+  var clr = e.target.closest('[data-ms-clear]');
+  if(clr) {
+    clearMsFilter(clr.getAttribute('data-ms-clear'));
+    return;
+  }
+  // Click outside any open panel — close all
+  if(!e.target.closest('[id^="ms-panel-"]')) {
+    closeAllMsPanels();
+  }
+});
 
 function buildMultiSelect(id, label, options, selectedArr) {
   var count = selectedArr.length;
@@ -180,8 +212,8 @@ function renderMsItems(id, opts, selected, search) {
   if(!filtered.length) return '<div style="padding:8px;font-size:12px;color:#5f5e5a;font-style:italic;">No options</div>';
   return filtered.map(function(o){
     var on = selected.indexOf(o) !== -1;
-    var safe = o.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-    return '<div class="ms-item" onclick="toggleMsItem(\''+id+'\',\''+safe+'\')">'
+    var safe = o.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+    return '<div class="ms-item" data-ms-item="1" data-ms-item-id="'+id+'" data-ms-val="'+safe+'">'
       +'<div class="ms-chk'+(on?' on':'')+'">'+( on?'<svg width="8" height="6" viewBox="0 0 8 6" fill="none"><polyline points="1,3 3,5 7,1" stroke="#85B7EB" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>':'' )+'</div>'
       +'<span>'+o+'</span></div>';
   }).join('');
