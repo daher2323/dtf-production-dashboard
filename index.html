@@ -133,6 +133,7 @@ var LINE_TYPE  = {'line#1':'Powder','line#2':'Capsules','line#4':'Powder'};
 var allRows = [], allRows25 = [], lotMap = {}, dailyTargets = {};
 var topView = 'summary', subView = 'today';
 var sortCol = 'date', sortDir = -1, page = 1, PAGE_SIZE = 50;
+var custLimit = 10; // 10 | 25 | 0 (all)
 var charts = {}, todayTimer = null, refreshTimer = null;
 var productionDays = [], selectedDayIdx = -1;
 var selectedWeekMon = null;
@@ -346,6 +347,7 @@ function resetDashboard() {
   selectedDayIdx = productionDays.length - 1;
   selectedWeekMon = null; selectedDetailRange = null; selectedPerfRange = null;
   sortCol = 'date'; sortDir = -1; page = 1;
+  custLimit = 10;
   ['customer','product','status','bottle','jar'].forEach(function(id){ filterState[id] = []; });
   document.getElementById('btn-summary').style.cssText = navBtnStyle(true);
   document.getElementById('btn-detail').style.cssText = navBtnStyle(false);
@@ -1641,8 +1643,8 @@ function renderPerformance() {
   // ── Customer table: build comparison lookup from comp-year lots ──────────
   var byCust={};
   lots.forEach(function(l){ var c=(l.product||'').split('-')[0].trim(); if(!c) return; if(!byCust[c]) byCust[c]={units:0,lots:0}; byCust[c].units+=l.finalUnits; byCust[c].lots++; });
-  var top10=Object.entries(byCust).sort(function(a,b){return b[1].units-a[1].units;}).slice(0,10);
-  var maxCU=top10[0]?top10[0][1].units:1;
+  var allCustSorted=Object.entries(byCust).sort(function(a,b){return b[1].units-a[1].units;});
+  var maxCU=allCustSorted[0]?allCustSorted[0][1].units:1;
 
   // Build per-customer totals from comparison-year rows
   var byCust25={};
@@ -1696,42 +1698,75 @@ function renderPerformance() {
 
   // ── Customer rows: comparison values for all columns + YoY badge ─────────
   var total25units = lots25.reduce(function(s,l){return s+l.finalUnits;},0);
-  var custHTML=top10.map(function(e,i){
-    var c=e[0],cd=e[1];
-    var avg2=cd.lots?Math.round(cd.units/cd.lots):0;
-    var bw=Math.round((cd.units/maxCU)*100);
-    var sp=totalUnits?((cd.units/totalUnits)*100).toFixed(1):0;
-    var cd25=byCust25[c];
 
-    // comparison strings for each column
-    var compUnits  = cd25 ? '<span style="color:#5f5e5a;font-weight:400"> ('+cd25.units.toLocaleString()+')</span>' : '';
-    var avg225     = cd25&&cd25.lots ? Math.round(cd25.units/cd25.lots) : null;
-    var compAvg    = avg225!==null ? '<span style="color:#5f5e5a;font-weight:400"> ('+avg225.toLocaleString()+')</span>' : '';
-    var sp25       = total25units&&cd25 ? ((cd25.units/total25units)*100).toFixed(1) : null;
-    var compSp     = sp25!==null ? '<span style="color:#5f5e5a;font-weight:400"> ('+sp25+'%)</span>' : '';
-    var compLots   = cd25 ? '<span style="color:#5f5e5a;font-weight:400"> ('+cd25.lots+')</span>' : '';
+  function buildCustTableHTML(limitedEntries, showSummary) {
+    var rows = limitedEntries.map(function(e,i){
+      var c=e[0],cd=e[1];
+      var avg2=cd.lots?Math.round(cd.units/cd.lots):0;
+      var bw=Math.round((cd.units/maxCU)*100);
+      var sp=totalUnits?((cd.units/totalUnits)*100).toFixed(1):0;
+      var cd25=byCust25[c];
+      var compUnits  = cd25 ? '<span style="color:#5f5e5a;font-weight:400"> ('+cd25.units.toLocaleString()+')</span>' : '';
+      var avg225     = cd25&&cd25.lots ? Math.round(cd25.units/cd25.lots) : null;
+      var compAvg    = avg225!==null ? '<span style="color:#5f5e5a;font-weight:400"> ('+avg225.toLocaleString()+')</span>' : '';
+      var sp25       = total25units&&cd25 ? ((cd25.units/total25units)*100).toFixed(1) : null;
+      var compSp     = sp25!==null ? '<span style="color:#5f5e5a;font-weight:400"> ('+sp25+'%)</span>' : '';
+      var compLots   = cd25 ? '<span style="color:#5f5e5a;font-weight:400"> ('+cd25.lots+')</span>' : '';
+      var yoyCell='<td style="text-align:right">';
+      if(cd25&&cd25.units){
+        var yPos=(cd.units-cd25.units)>=0;
+        var yPct=((cd.units-cd25.units)/cd25.units*100);
+        var yBg=yPos?'#085041':'#791F1F', yTxt=yPos?'#9FE1CB':'#F09595';
+        yoyCell+='<span style="display:inline-block;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:500;background:'+yBg+';color:'+yTxt+'">'+(yPos?'+':'')+yPct.toFixed(1)+'%</span>';
+      } else { yoyCell+='\u2014'; }
+      yoyCell+='</td>';
+      return '<tr>'
+        +'<td style="color:#5f5e5a;font-size:11px;width:24px">'+(i+1)+'</td>'
+        +'<td style="font-weight:500">'+c+'</td>'
+        +'<td style="text-align:right">'+cd.units.toLocaleString()+compUnits+'</td>'
+        +'<td style="padding:6px 10px;width:90px"><div style="background:#2c2c2a;border-radius:2px;height:4px;overflow:hidden"><div style="height:100%;width:'+bw+'%;background:#94A3B8;border-radius:2px"></div></div></td>'
+        +'<td style="text-align:right;color:#888780">'+cd.lots+compLots+'</td>'
+        +'<td style="text-align:right;color:#888780">'+avg2.toLocaleString()+compAvg+'</td>'
+        +'<td style="text-align:right;color:#888780">'+sp+'%'+compSp+'</td>'
+        +yoyCell
+        +'</tr>';
+    }).join('');
 
-    var yoyCell='<td style="text-align:right">';
-    if(cd25&&cd25.units){
-      var yPos=(cd.units-cd25.units)>=0;
-      var yPct=((cd.units-cd25.units)/cd25.units*100);
-      var yBg=yPos?'#085041':'#791F1F', yTxt=yPos?'#9FE1CB':'#F09595';
-      yoyCell+='<span style="display:inline-block;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:500;background:'+yBg+';color:'+yTxt+'">'+(yPos?'+':'')+yPct.toFixed(1)+'%</span>';
-    } else {
-      yoyCell+='\u2014';
+    if(showSummary) {
+      // Totals across ALL customers (not just visible slice)
+      var sumUnits=allCustSorted.reduce(function(s,e){return s+e[1].units;},0);
+      var sumLots=allCustSorted.reduce(function(s,e){return s+e[1].lots;},0);
+      var sumAvg=sumLots?Math.round(sumUnits/sumLots):0;
+      var sum25units=Object.values(byCust25).reduce(function(s,v){return s+v.units;},0);
+      var sum25lots=Object.values(byCust25).reduce(function(s,v){return s+v.lots;},0);
+      var sum25avg=sum25lots?Math.round(sum25units/sum25lots):0;
+      var sumYoyCell='<td style="text-align:right">';
+      if(sum25units){
+        var sPos=(sumUnits-sum25units)>=0, sPct=((sumUnits-sum25units)/sum25units*100);
+        var sBg=sPos?'#085041':'#791F1F', sTxt2=sPos?'#9FE1CB':'#F09595';
+        sumYoyCell+='<span style="display:inline-block;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:500;background:'+sBg+';color:'+sTxt2+'">'+(sPos?'+':'')+sPct.toFixed(1)+'%</span>';
+      } else { sumYoyCell+='\u2014'; }
+      sumYoyCell+='</td>';
+      var comp25UnitsStr = sum25units ? '<span style="color:#5f5e5a;font-weight:400"> ('+sum25units.toLocaleString()+')</span>' : '';
+      var comp25LotsStr  = sum25lots  ? '<span style="color:#5f5e5a;font-weight:400"> ('+sum25lots+')</span>' : '';
+      var comp25AvgStr   = sum25avg   ? '<span style="color:#5f5e5a;font-weight:400"> ('+sum25avg.toLocaleString()+')</span>' : '';
+      rows += '<tr style="border-top:1.5px solid #444441;background:#1a1d1f;">'
+        +'<td style="color:#5f5e5a;font-size:11px;width:24px"></td>'
+        +'<td style="font-weight:600;color:#e8e6e0;font-size:12px;">All '+allCustSorted.length+' customers</td>'
+        +'<td style="text-align:right;font-weight:500">'+sumUnits.toLocaleString()+comp25UnitsStr+'</td>'
+        +'<td style="padding:6px 10px;width:90px"></td>'
+        +'<td style="text-align:right;color:#888780;font-weight:500">'+sumLots+comp25LotsStr+'</td>'
+        +'<td style="text-align:right;color:#888780;font-weight:500">'+sumAvg.toLocaleString()+comp25AvgStr+'</td>'
+        +'<td style="text-align:right;color:#888780;font-weight:500">100%</td>'
+        +sumYoyCell
+        +'</tr>';
     }
-    yoyCell+='</td>';
-    return '<tr>'
-      +'<td style="color:#5f5e5a;font-size:11px;width:24px">'+(i+1)+'</td>'
-      +'<td style="font-weight:500">'+c+'</td>'
-      +'<td style="text-align:right">'+cd.units.toLocaleString()+compUnits+'</td>'
-      +'<td style="padding:6px 10px;width:90px"><div style="background:#2c2c2a;border-radius:2px;height:4px;overflow:hidden"><div style="height:100%;width:'+bw+'%;background:#94A3B8;border-radius:2px"></div></div></td>'
-      +'<td style="text-align:right;color:#888780">'+cd.lots+compLots+'</td>'
-      +'<td style="text-align:right;color:#888780">'+avg2.toLocaleString()+compAvg+'</td>'
-      +'<td style="text-align:right;color:#888780">'+sp+'%'+compSp+'</td>'
-      +yoyCell
-      +'</tr>';
-  }).join('');
+    return rows;
+  }
+
+  var visibleCusts = custLimit === 0 ? allCustSorted : allCustSorted.slice(0, custLimit);
+  var showSummaryRow = custLimit === 0;
+  var custHTML = buildCustTableHTML(visibleCusts, showSummaryRow);
 
   document.getElementById('content').innerHTML=
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;padding:.625rem 1rem;background:#1e2124;border:0.5px solid #2c2c2a;border-radius:10px;">'
@@ -1754,7 +1789,14 @@ function renderPerformance() {
     +'</tr></thead><tbody>'+linesHTML+'</tbody></table></div>'
     +'<div class="chart-card"><h3>Powder product mix \u2014 units by jar size</h3><div style="display:flex;align-items:center;gap:12px"><div style="position:relative;height:200px;min-width:200px;flex-shrink:0"><canvas id="cJar"></canvas></div><div id="jar-legend" style="flex:1;overflow-y:auto"></div></div></div></div>'
     +'<div class="full-card"><h3>Units produced by month vs. target</h3><div class="tbl-wrap"><table><thead><tr><th>Month</th><th style="text-align:right">Actual <span style="color:#5f5e5a;font-weight:400">('+compYearLabel+' actual)</span></th><th style="text-align:right">Target</th><th style="text-align:right">% of target</th><th></th><th style="text-align:right">YoY</th></tr></thead><tbody>'+monthHTML+'</tbody></table>'+asterisk+'</div></div>'
-    +'<div class="full-card"><h3>Top 10 customers by units produced</h3><div class="tbl-wrap"><table><thead><tr>'
+    +'<div class="full-card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;flex-wrap:wrap;gap:8px;">'
+    +'<h3 style="margin:0;">Customers by units produced <span style="color:#5f5e5a;font-weight:400;font-size:10px;">('+allCustSorted.length+' total)</span></h3>'
+    +'<div style="display:flex;gap:2px;padding:3px;background:#141618;border:0.5px solid #2c2c2a;border-radius:8px;">'
+    +'<button onclick="setCustLimit(10)" id="custBtn10" style="padding:4px 12px;border-radius:6px;border:'+(custLimit===10?'1.5px solid #378ADD':'1.5px solid transparent')+';background:'+(custLimit===10?'#0C447C':'transparent')+';color:'+(custLimit===10?'#85B7EB':'#888780')+';font-size:11px;font-weight:'+(custLimit===10?'500':'400')+';cursor:pointer;font-family:system-ui;">Top 10</button>'
+    +'<button onclick="setCustLimit(25)" id="custBtn25" style="padding:4px 12px;border-radius:6px;border:'+(custLimit===25?'1.5px solid #378ADD':'1.5px solid transparent')+';background:'+(custLimit===25?'#0C447C':'transparent')+';color:'+(custLimit===25?'#85B7EB':'#888780')+';font-size:11px;font-weight:'+(custLimit===25?'500':'400')+';cursor:pointer;font-family:system-ui;">Top 25</button>'
+    +'<button onclick="setCustLimit(0)" id="custBtn0" style="padding:4px 12px;border-radius:6px;border:'+(custLimit===0?'1.5px solid #378ADD':'1.5px solid transparent')+';background:'+(custLimit===0?'#0C447C':'transparent')+';color:'+(custLimit===0?'#85B7EB':'#888780')+';font-size:11px;font-weight:'+(custLimit===0?'500':'400')+';cursor:pointer;font-family:system-ui;">All</button>'
+    +'</div></div>'
+    +'<div class="tbl-wrap"><table><thead><tr>'
     +'<th style="width:24px">#</th>'
     +'<th>Customer</th>'
     +'<th style="text-align:right">Units produced *</th>'
@@ -1769,6 +1811,11 @@ function renderPerformance() {
 
   document.getElementById('jar-legend').innerHTML='<table style="width:100%;border-collapse:collapse;font-size:11px"><tbody>'+jarLegHTML+'</tbody></table>';
   charts.jar=new Chart(document.getElementById('cJar'),{type:'doughnut',data:{labels:jarEntries.map(function(e){return e[0];}),datasets:[{data:jarEntries.map(function(e){return e[1];}),backgroundColor:JAR_COLORS,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){var v=ctx.raw,p=jarTotal?((v/jarTotal)*100).toFixed(1):0;return v.toLocaleString()+' units ('+p+'%)';}}}}}});
+}
+
+function setCustLimit(n) {
+  custLimit = n;
+  renderPerformance();
 }
 
 function toggleExportPopover(e) {
