@@ -100,7 +100,6 @@
       <div style="display:flex;gap:2px;padding:3px;background:#1e2124;border:0.5px solid #2c2c2a;border-radius:8px;">
         <button onclick="setTop('summary')" id="btn-summary" style="padding:5px 16px;border-radius:6px;border:1.5px solid #378ADD;background:#0C447C;color:#85B7EB;font-weight:500;font-size:12px;cursor:pointer;font-family:system-ui;transition:all .15s;">Summary</button>
         <button onclick="setTop('detail')" id="btn-detail" style="padding:5px 16px;border-radius:6px;border:1.5px solid transparent;background:transparent;color:#888780;font-size:12px;cursor:pointer;font-family:system-ui;transition:all .15s;">Detail</button>
-        <button onclick="setTop('health')" id="btn-health" style="padding:5px 16px;border-radius:6px;border:1.5px solid transparent;background:transparent;color:#888780;font-size:12px;cursor:pointer;font-family:system-ui;transition:all .15s;">Customers</button>
       </div>
       <div style="width:0.5px;height:28px;background:#2c2c2a;flex-shrink:0;" id="sub-nav-divider"></div>
       <div style="display:flex;gap:2px;padding:3px;background:#1e2124;border:0.5px solid #2c2c2a;border-radius:8px;" id="sub-nav">
@@ -344,7 +343,6 @@ function exportDetailExcel() {
 
 function resetDashboard() {
   closeMsPanel();
-  closeHealthPanel();
   topView = 'summary'; subView = 'today';
   selectedDayIdx = productionDays.length - 1;
   selectedWeekMon = null; selectedDetailRange = null; selectedPerfRange = null;
@@ -353,11 +351,6 @@ function resetDashboard() {
   ['customer','product','status','bottle','jar'].forEach(function(id){ filterState[id] = []; });
   document.getElementById('btn-summary').style.cssText = navBtnStyle(true);
   document.getElementById('btn-detail').style.cssText = navBtnStyle(false);
-  document.getElementById('btn-health').style.cssText = navBtnStyle(false);
-  var subNav = document.getElementById('sub-nav');
-  var subDiv = document.getElementById('sub-nav-divider');
-  if(subNav) subNav.style.display = '';
-  if(subDiv) subDiv.style.display = '';
   ['today','weekly','performance'].forEach(function(k){
     var b = document.getElementById('btn-' + k);
     if (b) b.style.cssText = navBtnStyle(k === 'today');
@@ -628,16 +621,9 @@ function navBtnStyle(isActive) {
 
 function setTop(v) {
   closeMsPanel();
-  closeHealthPanel();
   topView = v;
   document.getElementById('btn-summary').style.cssText = navBtnStyle(v==='summary');
   document.getElementById('btn-detail').style.cssText = navBtnStyle(v==='detail');
-  document.getElementById('btn-health').style.cssText = navBtnStyle(v==='health');
-  var subNav = document.getElementById('sub-nav');
-  var subDiv = document.getElementById('sub-nav-divider');
-  var showSub = (v === 'summary');
-  if(subNav) subNav.style.display = showSub ? '' : 'none';
-  if(subDiv) subDiv.style.display = showSub ? '' : 'none';
   render();
 }
 
@@ -1021,8 +1007,7 @@ function render() {
   Object.values(charts).forEach(function(c){ try{c.destroy();}catch(e){} });
   charts = {};
   try {
-    if (topView==='health') renderHealth();
-    else if (topView==='detail') renderDetail();
+    if (topView==='detail') renderDetail();
     else if (subView==='today') renderToday();
     else if (subView==='weekly') renderWeekly();
     else renderPerformance();
@@ -1996,368 +1981,6 @@ function renderPerformance() {
 
   document.getElementById('jar-legend').innerHTML='<table style="width:100%;border-collapse:collapse;font-size:11px"><tbody>'+jarLegHTML+'</tbody></table>';
   charts.jar=new Chart(document.getElementById('cJar'),{type:'doughnut',data:{labels:jarEntries.map(function(e){return e[0];}),datasets:[{data:jarEntries.map(function(e){return e[1];}),backgroundColor:JAR_COLORS,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){var v=ctx.raw,p=jarTotal?((v/jarTotal)*100).toFixed(1):0;return v.toLocaleString()+' units ('+p+'%)';}}}}}});
-}
-
-function closeHealthPanel() {
-  var p = document.getElementById('health-panel');
-  var o = document.getElementById('health-overlay');
-  if(p) p.remove();
-  if(o) o.remove();
-}
-
-function openHealthPanel(custName) {
-  closeHealthPanel();
-  var now = new Date();
-  var win90start = new Date(now); win90start.setDate(win90start.getDate()-90); win90start.setHours(0,0,0,0);
-  var allRowsBoth = allRows.concat(allRows25);
-
-  // Get all rows for this customer in the 90-day window
-  var custRows = allRowsBoth.filter(function(r){
-    var dt = new Date(r['Date']); if(isNaN(dt)) return false;
-    if(dt < win90start || dt > now) return false;
-    var c = (r['Product']||'').split('-')[0].trim();
-    return c.toLowerCase() === custName.toLowerCase();
-  });
-
-  // Build lot map for this customer
-  var custLotMap = buildLotMap(custRows);
-  var custLots = Object.values(custLotMap).filter(Boolean).sort(function(a,b){ return new Date(b.date)-new Date(a.date); });
-  var totalUnits = custLots.reduce(function(s,l){return s+l.finalUnits;},0);
-  var totalLots = custLots.length;
-  var devs = custLots.map(function(l){return lotDev(l);}).filter(function(d){return d!==null;});
-  var avgDev = devs.length ? devs.reduce(function(s,d){return s+d;},0)/devs.length : null;
-
-  // Weekly units for bar chart (last 13 weeks)
-  var weeklyUnits = {};
-  var weekLabels = [];
-  for(var wi=12;wi>=0;wi--){
-    var wMon = new Date(now); wMon.setDate(now.getDate() - now.getDay() - (wi*7) + (now.getDay()===0?-6:1));
-    wMon.setHours(0,0,0,0);
-    var wFri = new Date(wMon); wFri.setDate(wMon.getDate()+6); wFri.setHours(23,59,59,999);
-    var wKey = getWeekNum(wMon)+'/'+wMon.getFullYear();
-    weeklyUnits[wKey] = 0;
-    weekLabels.push({key:wKey, mon:new Date(wMon), fri:new Date(wFri)});
-  }
-  custRows.forEach(function(r){
-    var dt = new Date(r['Date']); if(isNaN(dt)) return;
-    var wMon2 = new Date(dt); wMon2.setHours(0,0,0,0);
-    var dow = wMon2.getDay();
-    wMon2.setDate(wMon2.getDate()-(dow===0?6:dow-1));
-    var wKey2 = getWeekNum(wMon2)+'/'+wMon2.getFullYear();
-    if(weeklyUnits[wKey2] !== undefined) weeklyUnits[wKey2] += num(r['Final Units']);
-  });
-  var weekVals = weekLabels.map(function(w){ return weeklyUnits[w.key]||0; });
-  var maxWkVal = Math.max.apply(null, weekVals) || 1;
-
-  // Run frequency timeline — unique run dates
-  var runDates = Array.from(new Set(custLots.map(function(l){return l.date;}))).sort(function(a,b){return new Date(a)-new Date(b);});
-
-  // Score for this customer
-  var scoreData = window._healthScores && window._healthScores[custName.toLowerCase()];
-  var score = scoreData ? scoreData.score : null;
-  var status = scoreData ? scoreData.status : null;
-  var volTrend = scoreData ? scoreData.volTrend : null;
-  var freqScore = scoreData ? scoreData.freqScore : null;
-
-  var statusColors = {Healthy:{bg:'#085041',txt:'#9FE1CB'},Stable:{bg:'#0C447C',txt:'#85B7EB'},Watch:{bg:'#633806',txt:'#FAC775'},'At risk':{bg:'#791F1F',txt:'#F09595'}};
-  var sc = status && statusColors[status] ? statusColors[status] : {bg:'#2c2c2a',txt:'#888780'};
-
-  // Lot rows HTML
-  var lotRowsHTML = custLots.map(function(l){
-    var dev = lotDev(l);
-    var devStr = dev!==null?(dev>0?'+':'')+dev.toFixed(1)+'%':'—';
-    var devBg = dev===null?'':Math.abs(dev)<=3?'#2c2c2a':dev<0?'#791F1F':'#0F6E56';
-    var devTxt = dev===null?'#888780':Math.abs(dev)<=3?'#888780':dev<0?'#F09595':'#9FE1CB';
-    var k2 = lk(l.line||''); var lineBg=LINE_BG[k2]||'#2c2c2a'; var lineTxt2=LINE_TXT[k2]||'#e8e6e0';
-    var isPartial = l.status.toLowerCase().includes('partial');
-    var prod = (l.product||'').split('-').slice(1).join('-').trim()||(l.product||'');
-    return '<tr style="border-bottom:0.5px solid #2c2c2a;">'
-      +'<td style="padding:6px 8px;color:#888780;font-size:11px;white-space:nowrap;">'+l.date+'</td>'
-      +'<td style="padding:6px 8px;font-weight:500;font-size:11px;">'+l.lot+'</td>'
-      +'<td style="padding:6px 8px;font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+prod+'</td>'
-      +'<td style="padding:6px 8px;"><span style="font-size:10px;font-weight:500;padding:2px 6px;border-radius:5px;background:'+lineBg+';color:'+lineTxt2+';">'+(l.line||'—')+'</span></td>'
-      +'<td style="padding:6px 8px;text-align:right;color:#888780;font-size:11px;">'+(l.projected?l.projected.toLocaleString():'—')+'</td>'
-      +'<td style="padding:6px 8px;text-align:right;font-size:11px;">'+(l.finalUnits?l.finalUnits.toLocaleString():'—')+'</td>'
-      +'<td style="padding:6px 8px;text-align:right;"><span style="font-size:10px;font-weight:500;padding:2px 6px;border-radius:5px;background:'+devBg+';color:'+devTxt+';">'+devStr+'</span></td>'
-      +'<td style="padding:6px 8px;"><span style="font-size:10px;padding:2px 6px;border-radius:5px;background:'+(isPartial?'#633806':'#0F6E56')+';color:'+(isPartial?'#FAC775':'#9FE1CB')+';">'+(isPartial?'Partial':'Complete')+'</span></td>'
-      +'</tr>';
-  }).join('');
-
-  // Weekly bar chart HTML (inline CSS bars)
-  var barChartHTML = '<div style="display:flex;align-items:flex-end;gap:3px;height:80px;padding-bottom:4px;">'
-    +weekVals.map(function(v,i){
-      var h = Math.round((v/maxWkVal)*72);
-      var isRecent = i >= 10;
-      return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px;">'
-        +'<div style="width:100%;height:'+h+'px;background:'+(isRecent?'#378ADD':'#2c2c2a')+';border-radius:2px 2px 0 0;min-height:'+(v>0?2:0)+'px;" title="'+v.toLocaleString()+' units"></div>'
-        +'</div>';
-    }).join('')
-    +'</div>'
-    +'<div style="display:flex;gap:3px;padding-top:2px;">'
-    +weekLabels.map(function(w,i){
-      var label = i%3===0 ? w.mon.toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
-      return '<div style="flex:1;font-size:9px;color:#5f5e5a;text-align:center;overflow:hidden;white-space:nowrap;">'+label+'</div>';
-    }).join('')
-    +'</div>';
-
-  // Run timeline HTML
-  var timelineHTML = (function(){
-    if(!runDates.length) return '<div style="font-size:11px;color:#5f5e5a;font-style:italic;">No runs in this window</div>';
-    var totalMs = now - win90start;
-    return '<div style="position:relative;height:24px;background:#1e2124;border-radius:4px;overflow:visible;">'
-      +'<div style="position:absolute;top:10px;left:0;right:0;height:2px;background:#2c2c2a;border-radius:1px;"></div>'
-      +runDates.map(function(d){
-        var dt = new Date(d); if(isNaN(dt)) return '';
-        var pct = Math.min(Math.max(((dt-win90start)/totalMs)*100,0),100);
-        return '<div style="position:absolute;top:4px;left:'+pct.toFixed(1)+'%;transform:translateX(-50%);width:8px;height:16px;background:#378ADD;border-radius:2px;" title="'+d+'"></div>';
-      }).join('')
-      +'</div>'
-      +'<div style="display:flex;justify-content:space-between;margin-top:4px;font-size:10px;color:#5f5e5a;">'
-      +'<span>90 days ago</span><span>Today</span></div>';
-  })();
-
-  var devDisplay = avgDev !== null ? (avgDev>0?'+':'')+avgDev.toFixed(1)+'% avg deviation across '+devs.length+' lots · informational only' : 'No deviation data';
-  var devColor2 = avgDev === null ? '#5f5e5a' : Math.abs(avgDev) <= 3 ? '#888780' : avgDev < 0 ? '#EF9F27' : '#1D9E75';
-
-  var panel = document.createElement('div');
-  panel.id = 'health-panel';
-  panel.style.cssText = 'position:fixed;top:0;right:0;width:520px;max-width:95vw;height:100vh;background:#1a1d1f;border-left:0.5px solid #2c2c2a;z-index:10000;overflow-y:auto;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s cubic-bezier(.4,0,.2,1);';
-
-  panel.innerHTML =
-    // Header
-    '<div style="position:sticky;top:0;background:#1a1d1f;border-bottom:0.5px solid #2c2c2a;padding:1rem 1.25rem;z-index:1;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">'
-    +'<div style="flex:1;min-width:0;">'
-    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">'
-    +'<div style="width:40px;height:40px;border-radius:50%;background:#252829;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;color:#e8e6e0;flex-shrink:0;">'+custName.substring(0,2).toUpperCase()+'</div>'
-    +'<div>'
-    +'<div style="font-size:16px;font-weight:500;color:#e8e6e0;">'+custName+'</div>'
-    +'<div style="font-size:11px;color:#888780;margin-top:1px;">90-day window · '+runDates.length+' runs · '+totalUnits.toLocaleString()+' units</div>'
-    +'</div></div>'
-    +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
-    +(score!==null?'<div style="width:36px;height:36px;border-radius:50%;background:'+sc.bg+';display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;color:'+sc.txt+';">'+score+'</div>':'')
-    +(status?'<span style="font-size:11px;font-weight:500;padding:3px 10px;border-radius:10px;background:'+sc.bg+';color:'+sc.txt+';">'+status+'</span>':'')
-    +'</div></div>'
-    +'<button onclick="closeHealthPanel()" style="background:transparent;border:none;color:#888780;cursor:pointer;font-size:20px;line-height:1;padding:4px;flex-shrink:0;">&#x2715;</button>'
-    +'</div>'
-
-    // Body
-    +'<div style="padding:1.25rem;flex:1;">'
-
-    // Score breakdown
-    +(scoreData?
-      '<div style="background:#141618;border:0.5px solid #2c2c2a;border-radius:10px;padding:.875rem 1rem;margin-bottom:1rem;">'
-      +'<div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.6rem;">Score breakdown</div>'
-      +'<div style="display:flex;gap:10px;">'
-      +'<div style="flex:1;text-align:center;">'
-      +'<div style="font-size:10px;color:#888780;margin-bottom:3px;">Volume trend</div>'
-      +'<div style="font-size:18px;font-weight:500;color:'+(volTrend>=0?'#1D9E75':'#E24B4A')+';">'+(volTrend!==null?(volTrend>=0?'+':'')+Math.round(volTrend)+'%':'—')+'</div>'
-      +'<div style="font-size:10px;color:#5f5e5a;">vs prior 90d</div></div>'
-      +'<div style="width:0.5px;background:#2c2c2a;"></div>'
-      +'<div style="flex:1;text-align:center;">'
-      +'<div style="font-size:10px;color:#888780;margin-bottom:3px;">Run frequency</div>'
-      +'<div style="font-size:18px;font-weight:500;color:'+(freqScore>=50?'#1D9E75':freqScore>=25?'#EF9F27':'#E24B4A')+';">'+Math.round(freqScore||0)+'<span style="font-size:12px;">/100</span></div>'
-      +'<div style="font-size:10px;color:#5f5e5a;">vs historical avg</div></div>'
-      +'</div></div>'
-    :'')
-
-    // Weekly chart
-    +'<div style="background:#141618;border:0.5px solid #2c2c2a;border-radius:10px;padding:.875rem 1rem;margin-bottom:1rem;">'
-    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem;">'
-    +'<div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;">Weekly units — last 13 weeks</div>'
-    +'<div style="font-size:11px;color:#5f5e5a;">max: '+Math.max.apply(null,weekVals).toLocaleString()+'</div>'
-    +'</div>'
-    +barChartHTML
-    +'</div>'
-
-    // Run timeline
-    +'<div style="background:#141618;border:0.5px solid #2c2c2a;border-radius:10px;padding:.875rem 1rem;margin-bottom:1rem;">'
-    +'<div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.6rem;">Run timeline — each bar is one run</div>'
-    +timelineHTML
-    +'</div>'
-
-    // Deviation note
-    +'<div style="background:#141618;border:0.5px solid #2c2c2a;border-radius:10px;padding:.875rem 1rem;margin-bottom:1rem;">'
-    +'<div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Execution</div>'
-    +'<div style="font-size:12px;color:'+devColor2+';">'+devDisplay+'</div>'
-    +'</div>'
-
-    // Lot table
-    +'<div style="background:#141618;border:0.5px solid #2c2c2a;border-radius:10px;overflow:hidden;">'
-    +'<div style="padding:8px 10px;border-bottom:0.5px solid #2c2c2a;font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;">All lots in window ('+custLots.length+')</div>'
-    +(custLots.length ? '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;"><thead><tr>'
-    +'<th style="padding:6px 8px;text-align:left;color:#888780;font-weight:500;border-bottom:0.5px solid #2c2c2a;white-space:nowrap;">Date</th>'
-    +'<th style="padding:6px 8px;text-align:left;color:#888780;font-weight:500;border-bottom:0.5px solid #2c2c2a;">Lot #</th>'
-    +'<th style="padding:6px 8px;text-align:left;color:#888780;font-weight:500;border-bottom:0.5px solid #2c2c2a;">Product</th>'
-    +'<th style="padding:6px 8px;text-align:left;color:#888780;font-weight:500;border-bottom:0.5px solid #2c2c2a;">Line</th>'
-    +'<th style="padding:6px 8px;text-align:right;color:#888780;font-weight:500;border-bottom:0.5px solid #2c2c2a;">Proj</th>'
-    +'<th style="padding:6px 8px;text-align:right;color:#888780;font-weight:500;border-bottom:0.5px solid #2c2c2a;">Final</th>'
-    +'<th style="padding:6px 8px;text-align:right;color:#888780;font-weight:500;border-bottom:0.5px solid #2c2c2a;">Dev</th>'
-    +'<th style="padding:6px 8px;color:#888780;font-weight:500;border-bottom:0.5px solid #2c2c2a;">Status</th>'
-    +'</tr></thead><tbody>'+lotRowsHTML+'</tbody></table></div>'
-    : '<div style="padding:1rem;font-size:11px;color:#5f5e5a;font-style:italic;">No completed lots in this 90-day window</div>')
-    +'</div>'
-
-    +'</div>'; // end body
-
-  // Overlay
-  var overlay = document.createElement('div');
-  overlay.id = 'health-overlay';
-  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:9999;';
-  overlay.addEventListener('click', closeHealthPanel);
-
-  document.body.appendChild(overlay);
-  document.body.appendChild(panel);
-  requestAnimationFrame(function(){ panel.style.transform = 'translateX(0)'; });
-}
-
-function computeHealthScores() {
-  var now = new Date();
-  var win90start  = new Date(now); win90start.setDate(win90start.getDate()-90);   win90start.setHours(0,0,0,0);
-  var win90mid    = new Date(now); win90mid.setDate(win90mid.getDate()-90);        // alias
-  var prior90end  = new Date(win90start); prior90end.setMilliseconds(-1);
-  var prior90start= new Date(prior90end); prior90start.setDate(prior90start.getDate()-90); prior90start.setHours(0,0,0,0);
-
-  var allRowsBoth = allRows.concat(allRows25);
-
-  // Build per-customer units for current and prior windows
-  var curr = {}, prior = {}, allTime = {};
-  allRowsBoth.forEach(function(r){
-    var dt = new Date(r['Date']); if(isNaN(dt)) return;
-    var c = (r['Product']||'').split('-')[0].trim().toLowerCase(); if(!c) return;
-    var u = num(r['Final Units']);
-    if(!allTime[c]) allTime[c]={units:0,runDates:new Set()};
-    allTime[c].units += u;
-    allTime[c].runDates.add(r['Date']);
-    if(dt >= win90start && dt <= now) {
-      if(!curr[c]) curr[c]={units:0,runDates:new Set()};
-      curr[c].units += u;
-      curr[c].runDates.add(r['Date']);
-    }
-    if(dt >= prior90start && dt <= prior90end) {
-      if(!prior[c]) prior[c]={units:0,runDates:new Set()};
-      prior[c].units += u;
-      prior[c].runDates.add(r['Date']);
-    }
-  });
-
-  // Historical avg runs per 90 days (from all data)
-  var allCusts = Object.keys(allTime);
-  var scores = {};
-  allCusts.forEach(function(c){
-    var currU = curr[c] ? curr[c].units : 0;
-    var priorU = prior[c] ? prior[c].units : null;
-    var currRuns = curr[c] ? curr[c].runDates.size : 0;
-
-    // Estimate historical avg runs per 90d from all-time data
-    var totalDates = allTime[c].runDates.size;
-    var allDates = Array.from(allTime[c].runDates).map(function(d){return new Date(d);}).filter(function(d){return !isNaN(d);}).sort(function(a,b){return a-b;});
-    var spanDays = allDates.length > 1 ? Math.max(1,(allDates[allDates.length-1]-allDates[0])/86400000) : 90;
-    var avgRuns90 = Math.max(1, (totalDates / spanDays) * 90);
-
-    // Volume score (0-100): based on % change vs prior 90d
-    var volScore, volTrend;
-    if(priorU && priorU > 0) {
-      volTrend = ((currU - priorU) / priorU) * 100;
-      volScore = Math.min(100, Math.max(0, 50 + volTrend)); // +50 baseline, each % point moves it
-    } else if(currU > 0) {
-      volScore = 65; volTrend = null; // active but no prior comparison
-    } else {
-      volScore = 0; volTrend = null;
-    }
-
-    // Frequency score (0-100): currRuns vs avgRuns90
-    var freqScore = Math.min(100, Math.max(0, Math.round((currRuns / avgRuns90) * 100)));
-
-    // Combined score 50/50
-    var score = Math.round((volScore * 0.5) + (freqScore * 0.5));
-
-    var status = score >= 75 ? 'Healthy' : score >= 50 ? 'Stable' : score >= 25 ? 'Watch' : 'At risk';
-
-    scores[c] = {score:score, status:status, volTrend:volTrend, freqScore:freqScore, currUnits:currU, priorUnits:priorU, currRuns:currRuns, avgRuns90:avgRuns90};
-  });
-  return scores;
-}
-
-function renderHealth() {
-  var now = new Date();
-  var win90start = new Date(now); win90start.setDate(win90start.getDate()-90); win90start.setHours(0,0,0,0);
-  var allRowsBoth = allRows.concat(allRows25);
-
-  var scores = computeHealthScores();
-  window._healthScores = scores;
-
-  // Build display list — customers with activity in last 90d
-  var custList = Object.keys(scores)
-    .filter(function(c){ return scores[c].currUnits > 0; })
-    .sort(function(a,b){ return scores[b].score - scores[a].score; });
-
-  var counts = {Healthy:0,Stable:0,Watch:0,'At risk':0};
-  custList.forEach(function(c){ var s=scores[c].status; if(counts[s]!==undefined) counts[s]++; });
-
-  var statusColors = {
-    Healthy:{bg:'#085041',txt:'#9FE1CB'},
-    Stable:{bg:'#0C447C',txt:'#85B7EB'},
-    Watch:{bg:'#633806',txt:'#FAC775'},
-    'At risk':{bg:'#791F1F',txt:'#F09595'}
-  };
-
-  // Summary cards
-  var summaryHTML = '<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:10px;">'
-    +['Healthy','Stable','Watch','At risk'].map(function(s){
-      var sc2=statusColors[s];
-      return '<div style="background:#1e2124;border:0.5px solid #2c2c2a;border-radius:10px;padding:.875rem 1rem;">'
-        +'<div style="font-size:11px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">'+s+'</div>'
-        +'<div style="font-size:24px;font-weight:500;color:'+sc2.txt+';">'+counts[s]+'</div>'
-        +'<div style="font-size:11px;color:#5f5e5a;margin-top:3px;">customers</div>'
-        +'</div>';
-    }).join('')
-    +'</div>';
-
-  // Table rows
-  var tableRows = custList.map(function(c, i){
-    var s = scores[c];
-    var sc2 = statusColors[s.status]||{bg:'#2c2c2a',txt:'#888780'};
-    var displayName = c.charAt(0).toUpperCase()+c.slice(1);
-    var volStr = s.volTrend !== null ? (s.volTrend>=0?'<span style="color:#1D9E75;">+'+Math.round(s.volTrend)+'%</span>':'<span style="color:#E24B4A;">'+Math.round(s.volTrend)+'%</span>') : '<span style="color:#5f5e5a;">—</span>';
-    var freqStr = s.currRuns + ' <span style="color:#5f5e5a;font-size:10px;">/ ~'+Math.round(s.avgRuns90)+' avg</span>';
-    var avgGapDays = s.currRuns > 1 ? Math.round(90/s.currRuns) : null;
-    var gapStr = avgGapDays ? avgGapDays+'d' : '—';
-    return '<tr style="border-bottom:0.5px solid #2c2c2a;cursor:pointer;" onclick="openHealthPanel(\''+displayName+'\')" onmouseover="this.style.background=\'#252829\'" onmouseout="this.style.background=\'transparent\'">'
-      +'<td style="padding:8px 10px;color:#5f5e5a;font-size:11px;width:28px;">'+(i+1)+'</td>'
-      +'<td style="padding:8px 10px;font-weight:500;">'+displayName+'</td>'
-      +'<td style="padding:8px 10px;text-align:center;">'
-        +'<div style="width:34px;height:34px;border-radius:50%;background:'+sc2.bg+';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;color:'+sc2.txt+';margin:0 auto;">'+s.score+'</div>'
-      +'</td>'
-      +'<td style="padding:8px 10px;"><span style="font-size:11px;font-weight:500;padding:2px 9px;border-radius:10px;background:'+sc2.bg+';color:'+sc2.txt+';">'+s.status+'</span></td>'
-      +'<td style="padding:8px 10px;text-align:right;">'+s.currUnits.toLocaleString()+'</td>'
-      +'<td style="padding:8px 10px;text-align:right;">'+volStr+'</td>'
-      +'<td style="padding:8px 10px;text-align:center;">'+freqStr+'</td>'
-      +'<td style="padding:8px 10px;text-align:center;color:#888780;">'+gapStr+'</td>'
-      +'<td style="padding:8px 10px;text-align:right;color:#5f5e5a;font-size:11px;">&#x276F;</td>'
-      +'</tr>';
-  }).join('');
-
-  document.getElementById('content').innerHTML =
-    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;padding:.625rem 1.25rem;background:#1e2124;border:0.5px solid #2c2c2a;border-radius:10px;">'
-    +'<div><div style="font-size:13px;font-weight:500;color:#e8e6e0;">Customer health</div><div style="font-size:11px;color:#5f5e5a;margin-top:2px;">90-day rolling window &middot; '+custList.length+' active customers &middot; updated on load</div></div>'
-    +'<div style="font-size:10px;color:#5f5e5a;">Score = 50% volume trend &middot; 50% run frequency &middot; Deviation informational only</div>'
-    +'</div>'
-    +summaryHTML
-    +'<div style="background:#1e2124;border:0.5px solid #2c2c2a;border-radius:12px;overflow:hidden;">'
-    +'<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;">'
-    +'<thead><tr>'
-    +'<th style="padding:6px 10px;text-align:left;color:#888780;font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.03em;border-bottom:0.5px solid #2c2c2a;width:28px;">#</th>'
-    +'<th style="padding:6px 10px;text-align:left;color:#888780;font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.03em;border-bottom:0.5px solid #2c2c2a;">Customer</th>'
-    +'<th style="padding:6px 10px;text-align:center;color:#888780;font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.03em;border-bottom:0.5px solid #2c2c2a;">Score</th>'
-    +'<th style="padding:6px 10px;text-align:left;color:#888780;font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.03em;border-bottom:0.5px solid #2c2c2a;">Status</th>'
-    +'<th style="padding:6px 10px;text-align:right;color:#888780;font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.03em;border-bottom:0.5px solid #2c2c2a;">Units (90d)</th>'
-    +'<th style="padding:6px 10px;text-align:right;color:#888780;font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.03em;border-bottom:0.5px solid #2c2c2a;">vs prior 90d</th>'
-    +'<th style="padding:6px 10px;text-align:center;color:#888780;font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.03em;border-bottom:0.5px solid #2c2c2a;">Runs (90d)</th>'
-    +'<th style="padding:6px 10px;text-align:center;color:#888780;font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.03em;border-bottom:0.5px solid #2c2c2a;">Avg gap</th>'
-    +'<th style="border-bottom:0.5px solid #2c2c2a;width:20px;"></th>'
-    +'</tr></thead>'
-    +'<tbody>'+tableRows+'</tbody>'
-    +'</table></div></div>';
 }
 
 function toggleRecords() {
