@@ -395,6 +395,10 @@ function isValid(r) {
   var d=(r['Date']||'').trim(), l=(r['Lot Number']||'').trim(), p=(r['Product']||'').trim();
   if (!d||!l||!p) return false;
   if (p.startsWith('#')||l.startsWith('#')||d.startsWith('#')) return false;
+  var suspect = /loading|#error|#ref|#n\/a|#value|#name|#div/i;
+  if (suspect.test(p) || suspect.test(l) || suspect.test(d)) return false;
+  var dt = new Date(d); if (isNaN(dt)) return false;
+  var yr = dt.getFullYear(); if (yr < 2020 || yr > 2035) return false;
   return true;
 }
 
@@ -466,14 +470,21 @@ function parseTargets(text) {
 }
 
 function fetchWithRetry(url, retries, delay) {
-  retries = retries || 3; delay = delay || 1500;
+  retries = retries || 5; delay = delay || 2000;
   return fetch(url).then(function(r){
     if (!r.ok) throw new Error('HTTP ' + r.status);
     return r.text();
+  }).then(function(text) {
+    if (!text || text.trim().length < 50) throw new Error('Response too short');
+    if (text.trim().startsWith('<!')) throw new Error('Received HTML instead of CSV');
+    var firstLine = (text.trim().split('\n')[0]||'').toLowerCase();
+    if (firstLine.indexOf('date') === -1 && firstLine.indexOf('lot') === -1)
+      throw new Error('CSV headers missing or invalid');
+    return text;
   }).catch(function(e){
     if (retries <= 1) throw e;
     return new Promise(function(res){ setTimeout(res, delay); })
-      .then(function(){ return fetchWithRetry(url, retries-1, delay*1.5); });
+      .then(function(){ return fetchWithRetry(url, retries-1, Math.round(delay*1.5)); });
   });
 }
 
@@ -489,9 +500,16 @@ function applyFreshData(res) {
   var newRows = parseCSV(res[0]).filter(isValid);
   var newRows25 = parseCSV(res[1]).filter(isValid);
   var newTargets = parseTargets(res[2]);
-  if (newRows.length < 3) { console.warn('Refresh aborted'); return false; }
+  // Require meaningful data — reject if suspiciously sparse vs what we already have
+  var minRows = Math.max(10, Math.round(allRows.length * 0.5));
+  if (allRows.length > 0 && newRows.length < minRows) {
+    console.warn('Refresh aborted: ' + newRows.length + ' rows vs expected ~' + allRows.length);
+    return false;
+  }
+  if (newRows.length < 3) { console.warn('Refresh aborted: too few rows'); return false; }
   allRows = newRows; allRows25 = newRows25; dailyTargets = newTargets;
-  lotMap = buildLotMap(allRows);
+  // Build lotMap from both years so daily view lookups never fall back to raw row data
+  lotMap = buildLotMap(allRows.concat(allRows25));
   buildProductionDays(true);
   return true;
 }
@@ -518,11 +536,20 @@ function buildProductionDays(preserveSelection) {
 }
 
 function loadDashboard() {
+  document.getElementById('loading').textContent = 'Loading production data...';
+  document.getElementById('loading').style.display = 'block';
   fetchData().then(function(results) {
-    allRows = parseCSV(results[0]).filter(isValid);
-    allRows25 = parseCSV(results[1]).filter(isValid);
+    var rows = parseCSV(results[0]).filter(isValid);
+    var rows25 = parseCSV(results[1]).filter(isValid);
+    if (rows.length < 3) {
+      document.getElementById('loading').textContent = 'Data appears incomplete — retrying...';
+      setTimeout(loadDashboard, 4000);
+      return;
+    }
+    allRows = rows; allRows25 = rows25;
     dailyTargets = parseTargets(results[2]);
-    lotMap = buildLotMap(allRows);
+    // Build lotMap from both years so daily view never falls back to raw row data
+    lotMap = buildLotMap(allRows.concat(allRows25));
     buildProductionDays(false);
     lastRefreshTime = Date.now();
     document.getElementById('loading').style.display = 'none';
@@ -530,8 +557,9 @@ function loadDashboard() {
     render();
     startRefreshTimers();
   }).catch(function(e){
-    document.getElementById('loading').textContent = 'Failed to load: '+e.message;
-    setTimeout(loadDashboard, 8000);
+    console.error('Load failed:', e);
+    document.getElementById('loading').textContent = 'Connection issue — retrying in 10 seconds...';
+    setTimeout(loadDashboard, 10000);
   });
 }
 
