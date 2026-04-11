@@ -85,6 +85,7 @@
   .ms-count { font-size:11px;color:#5f5e5a; }
   .ms-clear { font-size:11px;color:#378ADD;cursor:pointer;background:none;border:none;padding:0; }
   @keyframes dtfPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
+  @keyframes spin { to{transform:rotate(360deg)} }
   @media (max-width: 700px) { .charts-row { grid-template-columns: 1fr; } }
 </style>
 </head>
@@ -2103,12 +2104,65 @@ function quarterLabel(key) {
 
 var _chExpanded = {};
 
+var _chSynopsis = {}; // cache generated synopses
+
 function toggleCH(safeId) {
   _chExpanded[safeId] = !_chExpanded[safeId];
   var body = document.getElementById('ch-body-' + safeId);
   var chev = document.getElementById('ch-chev-' + safeId);
   if (body) body.style.display = _chExpanded[safeId] ? 'block' : 'none';
   if (chev) chev.style.transform = _chExpanded[safeId] ? 'rotate(180deg)' : '';
+  if (_chExpanded[safeId]) generateSynopsis(safeId);
+}
+
+function generateSynopsis(safeId) {
+  var el = document.getElementById('ch-synopsis-' + safeId);
+  if (!el) return;
+  if (_chSynopsis[safeId]) { el.innerHTML = _chSynopsis[safeId]; return; }
+  var dataEl = document.getElementById('ch-data-' + safeId);
+  if (!dataEl) return;
+  var custData = JSON.parse(dataEl.textContent);
+
+  el.innerHTML = '<div style="display:flex;align-items:center;gap:8px;color:#888780;font-size:12px;">'
+    +'<div style="width:16px;height:16px;border:1.5px solid #444441;border-top-color:#888780;border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0;"></div>'
+    +'Generating summary…</div>';
+
+  var qtrsText = custData.qtrs.filter(function(q){return q.units>0;}).map(function(q){
+    return q.label+': '+q.units.toLocaleString()+' units, '+q.lots+' lots, avg run '+q.avgRun.toLocaleString()+(q.pctOfProd?' ('+q.pctOfProd+'% of total production)':'');
+  }).join('\n');
+
+  var prompt = 'You are a production analyst summarizing customer data for a supplement contract manufacturer. '
+    +'Write 2-3 concise sentences summarizing this customer\'s production relationship with us. '
+    +'Use "our" and "we" — you\'re part of the team. Be specific about the numbers. '
+    +'Note meaningful trends: are runs getting bigger or smaller? Are they ordering more or less frequently? '
+    +'Is their share of our production growing or shrinking? Focus on what\'s actually interesting or worth flagging.\n\n'
+    +'Customer: '+custData.name+'\n'
+    +'Tag: '+custData.tag+'\n'
+    +'2025 YTD: '+custData.ytd25.toLocaleString()+' units, '+custData.ytdLots25+' lots'+(custData.ytdPct25?' ('+custData.ytdPct25+'% of production)':'')+'\n'
+    +'2026 YTD: '+custData.ytd.toLocaleString()+' units, '+custData.ytdLots+' lots'+(custData.ytdPct?' ('+custData.ytdPct+'% of production)':'')+'\n'
+    +'Quarterly breakdown:\n'+qtrsText+'\n\n'
+    +'Write only the summary sentences, no headings or bullet points.';
+
+  fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1000,
+      messages: [{role: 'user', content: prompt}]
+    })
+  }).then(function(r){ return r.json(); }).then(function(data) {
+    var text = (data.content && data.content[0] && data.content[0].text) ? data.content[0].text.trim() : '';
+    if (!text) { el.style.display = 'none'; return; }
+    var html = '<div style="display:flex;align-items:flex-start;gap:10px;">'
+      +'<div style="width:20px;height:20px;border-radius:50%;background:#0C447C;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">'
+        +'<svg width="10" height="10" viewBox="0 0 10 10" fill="none"><circle cx="5" cy="5" r="4" stroke="#85B7EB" stroke-width="1.2"/><line x1="5" y1="3" x2="5" y2="5.5" stroke="#85B7EB" stroke-width="1.2" stroke-linecap="round"/><circle cx="5" cy="7" r=".6" fill="#85B7EB"/></svg>'
+      +'</div>'
+      +'<p style="font-size:12px;color:#e8e6e0;line-height:1.65;margin:0;">'+text+'</p>'
+    +'</div>';
+    _chSynopsis[safeId] = html;
+    el.innerHTML = html;
+  }).catch(function() { el.style.display = 'none'; });
 }
 
 function safeid(s) {
@@ -2380,7 +2434,20 @@ function renderCustomerOverview(healthData) {
       +'</tr>';
     }).join('');
 
+    var custDataObj = {
+      name: cd.cust,
+      tag: cd.tag,
+      ytd: cd.ytd, ytd25: cd.ytd25,
+      ytdLots: cd.ytdLots, ytdLots25: cd.ytdLots25,
+      ytdPct: cd.ytdPct, ytdPct25: cd.ytdPct25,
+      qtrs: cd.qtrs.filter(function(q){return q.units>0;}).map(function(q){
+        return {label:quarterLabel(q.key), units:q.units, lots:q.lots, avgRun:q.avgRun, pctOfProd:q.pctOfProd};
+      })
+    };
+
     var detailTable = '<div id="ch-body-'+sid+'" style="display:'+(expanded?'block':'none')+';border-top:0.5px solid #2c2c2a;">'
+      +'<script type="application/json" id="ch-data-'+sid+'">'+JSON.stringify(custDataObj)+'<\/script>'
+      +'<div id="ch-synopsis-'+sid+'" style="padding:12px 14px;border-bottom:0.5px solid #2c2c2a;background:#141618;min-height:44px;"></div>'
       +'<table style="width:100%;border-collapse:collapse;">'
       +'<thead><tr>'
         +'<th style="'+thSL+'padding-left:14px;width:90px;">Quarter</th>'
@@ -2423,6 +2490,12 @@ function renderCustomerOverview(healthData) {
     +'</div>'
     +rows
   +'</div>';
+}
+
+function _triggerExpandedSynopses() {
+  Object.keys(_chExpanded).forEach(function(sid) {
+    if (_chExpanded[sid]) generateSynopsis(sid);
+  });
 }
 
 function renderCustomers() {
@@ -2531,6 +2604,7 @@ function renderCustomers() {
   }
 
   document.getElementById('content').innerHTML = renderCustomerOverview(healthData);
+  _triggerExpandedSynopses();
 }
 
 function toggleExportPopover(e) {
