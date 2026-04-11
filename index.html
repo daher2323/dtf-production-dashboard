@@ -2168,14 +2168,16 @@ function computeCustomerData() {
       if (!d || d.lots.size === 0) return {key:qk, units:0, lots:0, avgRun:0, freqDays:null};
       var lotCount = d.lots.size;
       var avgRun = Math.round(d.units / lotCount);
-      // Frequency: avg days between first appearances of lots in this quarter
-      var lotDateArr = Object.values(d.lotDates).sort();
-      var freqDays = null;
-      if (lotDateArr.length >= 2) {
-        var gaps = [];
-        for (var i=1; i<lotDateArr.length; i++) gaps.push((lotDateArr[i]-lotDateArr[i-1])/86400000);
-        freqDays = parseFloat((gaps.reduce(function(s,v){return s+v;},0)/gaps.length).toFixed(1));
-      }
+      // Frequency: quarter length in days ÷ number of lots
+      var qYear = parseInt(qk.split('-')[0]), qNum = parseInt(qk.split('Q')[1]);
+      var qStart = new Date(qYear, (qNum-1)*3, 1);
+      var qEnd   = new Date(qYear, qNum*3, 1);
+      var isCurQ = qk === curQk;
+      // For current partial quarter use days elapsed so far
+      var qDays = isCurQ
+        ? Math.max(1, Math.round((now - qStart) / 86400000))
+        : Math.round((qEnd - qStart) / 86400000);
+      var freqDays = parseFloat((qDays / lotCount).toFixed(1));
       return {key:qk, units:d.units, lots:lotCount, avgRun:avgRun, freqDays:freqDays};
     });
 
