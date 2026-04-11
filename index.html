@@ -2125,6 +2125,9 @@ function computeCustomerData() {
   // Build per-customer per-quarter data from Q1 2025 onward
   var cutoff = new Date(2025, 0, 1);
   var custQtr = {};
+  var totalQtr = {};   // total units across all customers per quarter
+  var totalYtd = 0;    // total units across all customers YTD this year
+  var totalYtd25 = 0;  // same window last year
   allRowsCombined.forEach(function(r) {
     var prod = (r['Product']||'').trim(); if (!prod) return;
     var cust = prod.split('-')[0].trim(); if (!cust) return;
@@ -2139,6 +2142,8 @@ function computeCustomerData() {
       if (!custQtr[cust][qk].lotDates[lot]) custQtr[cust][qk].lotDates[lot] = dt.getTime();
       else custQtr[cust][qk].lotDates[lot] = Math.min(custQtr[cust][qk].lotDates[lot], dt.getTime());
     }
+    if (!totalQtr[qk]) totalQtr[qk] = 0;
+    totalQtr[qk] += num(r['Final Units']);
   });
 
   // All quarters from Q1 2025 to current
@@ -2148,6 +2153,17 @@ function computeCustomerData() {
     displayQtrs.push(getQuarterKey(dq));
     dq.setMonth(dq.getMonth() + 3);
   }
+
+  // Total YTD across all customers (for % of production)
+  var ytd25cutoffAll = new Date(nowYr-1, now.getMonth(), now.getDate(), 23, 59, 59);
+  var ytd25startAll  = new Date(nowYr-1, 0, 1);
+  var ytdStartAll    = new Date(nowYr, 0, 1);
+  allRowsCombined.forEach(function(r) {
+    var dt = new Date(r['Date']); if (isNaN(dt)) return;
+    var u = num(r['Final Units']);
+    if (dt >= ytdStartAll && dt <= now) totalYtd += u;
+    if (dt >= ytd25startAll && dt <= ytd25cutoffAll) totalYtd25 += u;
+  });
 
   // Build annual totals per customer
   var custAnnual = {};
@@ -2178,7 +2194,8 @@ function computeCustomerData() {
         ? Math.max(1, Math.round((now - qStart) / 86400000))
         : Math.round((qEnd - qStart) / 86400000);
       var freqDays = parseFloat((qDays / lotCount).toFixed(1));
-      return {key:qk, units:d.units, lots:lotCount, avgRun:avgRun, freqDays:freqDays};
+      var pctOfProd = totalQtr[qk] ? parseFloat(((d.units / totalQtr[qk]) * 100).toFixed(1)) : null;
+      return {key:qk, units:d.units, lots:lotCount, avgRun:avgRun, freqDays:freqDays, pctOfProd:pctOfProd};
     });
 
     var withData = qtrs.filter(function(q){return q.units>0;});
@@ -2212,7 +2229,9 @@ function computeCustomerData() {
     }
 
     var annuals = custAnnual[cust] || {};
-    results.push({cust:cust, qtrs:qtrs, tag:tag, ytd:ytd, ytd25:ytd25, ytdLots:ytdLots, ytdLots25:ytdLots25, annuals:annuals, withData:withData});
+    var ytdPct   = totalYtd   > 0 ? parseFloat(((ytd   / totalYtd)   * 100).toFixed(1)) : null;
+    var ytdPct25 = totalYtd25 > 0 ? parseFloat(((ytd25 / totalYtd25) * 100).toFixed(1)) : null;
+    results.push({cust:cust, qtrs:qtrs, tag:tag, ytd:ytd, ytd25:ytd25, ytdLots:ytdLots, ytdLots25:ytdLots25, ytdPct:ytdPct, ytdPct25:ytdPct25, annuals:annuals, withData:withData});
   });
 
   // Sort by YTD units descending
@@ -2300,6 +2319,12 @@ function renderCustomerOverview(healthData) {
             +pctBadge(ytdAvgRun, ytdAvgRun25, true)
           +'</div>'
         +'</div>'
+        +'<div style="text-align:right;border-left:0.5px solid #2c2c2a;padding-left:16px;">'
+          +'<div style="font-size:10px;color:#888780;margin-bottom:2px;">% of production</div>'
+          +'<div style="font-size:14px;font-weight:500;color:#e8e6e0;">'+(cd.ytdPct!==null?cd.ytdPct+'%':'&#x2014;')
+            +(cd.ytdPct!==null&&cd.ytdPct25!==null?pctBadge(cd.ytdPct, cd.ytdPct25, true):'')
+          +'</div>'
+        +'</div>'
       +'</div>'
       +'<div style="display:flex;align-items:flex-end;gap:2px;height:28px;flex-shrink:0;margin-left:16px;">'+sparkBars+'</div>'
       +'<svg id="ch-chev-'+sid+'" width="12" height="12" viewBox="0 0 12 12" fill="none" style="flex-shrink:0;margin-left:8px;transition:transform .15s;transform:'+(expanded?'rotate(180deg)':'')+'"><polyline points="2,4 6,8 10,4" stroke="#5f5e5a" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -2327,6 +2352,10 @@ function renderCustomerOverview(healthData) {
       for (var ri=idx-1; ri>=0; ri--) { if (cd.qtrs[ri].avgRun>0){prevRun=cd.qtrs[ri].avgRun;break;} }
       var runDelta = prevRun && q.avgRun ? pctBadge(q.avgRun, prevRun, true) : '';
 
+      var prevPct = null;
+      for (var ci=idx-1; ci>=0; ci--) { if (cd.qtrs[ci].pctOfProd!==null){prevPct=cd.qtrs[ci].pctOfProd;break;} }
+      var pctDelta = prevPct!==null && q.pctOfProd!==null ? pctBadge(q.pctOfProd, prevPct, true) : '';
+
       var bW = q.units ? Math.round((q.units/maxUnits)*88) : 0;
       var bCol = isCur ? '#378ADD' : '#4A6580';
 
@@ -2340,6 +2369,8 @@ function renderCustomerOverview(healthData) {
         +'<td style="'+tdB+rBg+'text-align:right;color:#888780;">'+(q.lots||'&#x2014;')+'</td>'
         +'<td style="'+tdB+rBg+'text-align:right;color:#e8e6e0;">'+(q.avgRun?q.avgRun.toLocaleString():'&#x2014;')+'</td>'
         +'<td style="'+tdB+rBg+'text-align:right;">'+runDelta+'</td>'
+        +'<td style="'+tdB+rBg+'text-align:right;color:#888780;">'+(q.pctOfProd!==null?q.pctOfProd+'%':'&#x2014;')+'</td>'
+        +'<td style="'+tdB+rBg+'text-align:right;">'+pctDelta+'</td>'
         +'<td style="'+tdB+rBg+'padding-right:14px;width:110px;">'
           +'<div style="height:4px;background:#2c2c2a;border-radius:2px;overflow:hidden;">'
             +'<div style="height:100%;width:'+bW+'%;background:'+bCol+';border-radius:2px;"></div>'
@@ -2356,6 +2387,8 @@ function renderCustomerOverview(healthData) {
         +'<th style="'+thS+'width:70px;">vs prev</th>'
         +'<th style="'+thS+'">Lots</th>'
         +'<th style="'+thS+'">Avg run</th>'
+        +'<th style="'+thS+'width:70px;">vs prev</th>'
+        +'<th style="'+thS+'">% of prod</th>'
         +'<th style="'+thS+'width:70px;">vs prev</th>'
         +'<th style="'+thS+'padding-right:14px;width:110px;">Volume</th>'
       +'</tr></thead>'
@@ -2481,50 +2514,15 @@ function renderCustomers() {
       +'</tr>';
   }
 
-  // Range picker (reuse perf range picker)
-  var rangePickerBtn = '<div style="position:relative;" id="perf-range-anchor">'
-    +'<div onclick="openPerfRangePicker()" style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;padding:5px 12px;border-radius:8px;border:0.5px solid #444441;background:transparent;" onmouseover="this.style.background=\'#252829\'" onmouseout="this.style.background=\'transparent\'">'
-    +'<svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1" y="2" width="11" height="10" rx="2" stroke="#888780" stroke-width="1.2"/><line x1="4" y1="1" x2="4" y2="4" stroke="#888780" stroke-width="1.2" stroke-linecap="round"/><line x1="9" y1="1" x2="9" y2="4" stroke="#888780" stroke-width="1.2" stroke-linecap="round"/><line x1="1" y1="6" x2="12" y2="6" stroke="#888780" stroke-width="1.2"/></svg>'
-    +'<span style="font-size:13px;font-weight:500;color:#e8e6e0;white-space:nowrap;">'+range.label+' &#x25BE;</span>'
-    +'</div></div>';
-
-  // ── Customer overview (collapsible cards) ──
+  // ── Customer overview ──
   var healthData = computeCustomerData();
 
   if (selectedCustomer) {
-    // No more drilldown — clear it and re-render normally
     selectedCustomer = null;
     renderSubBar();
   }
 
-  // Fleet overview + existing table
-  var healthHTML = renderCustomerOverview(healthData);
-
-  document.getElementById('content').innerHTML =
-    healthHTML
-    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;padding:.625rem 1rem;background:#1e2124;border:0.5px solid #2c2c2a;border-radius:10px;">'
-    +  rangePickerBtn
-    +  '<div style="font-size:11px;color:#5f5e5a;">Comparing to same period in '+compYearLabel+'</div>'
-    +'</div>'
-    +'<div class="full-card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;flex-wrap:wrap;gap:8px;">'
-    +'<h3 style="margin:0;">Customers by units produced <span style="color:#5f5e5a;font-weight:400;font-size:10px;">('+allCustSorted.length+' total)</span></h3>'
-    +'<div style="display:flex;gap:2px;padding:3px;background:#141618;border:0.5px solid #2c2c2a;border-radius:8px;">'
-    +'<button onclick="setCustLimit(10)" style="'+navBtnStyle(custLimit===10)+'">Top 10</button>'
-    +'<button onclick="setCustLimit(25)" style="'+navBtnStyle(custLimit===25)+'">Top 25</button>'
-    +'<button onclick="setCustLimit(0)" style="'+navBtnStyle(custLimit===0)+'">All</button>'
-    +'</div></div>'
-    +'<div class="tbl-wrap"><table><thead><tr>'
-    +'<th style="width:24px">#</th>'
-    +'<th>Customer</th>'
-    +'<th style="text-align:right">Units produced *</th>'
-    +'<th style="width:90px"></th>'
-    +'<th style="text-align:right">vs '+compYearLabel+'</th>'
-    +'<th style="text-align:right">Lots *</th>'
-    +'<th style="text-align:right">Avg run size *</th>'
-    +'<th style="text-align:right">% of production *</th>'
-    +'</tr></thead><tbody>'+custHTML+'</tbody></table>'
-    +'<div style="font-size:10px;color:#5f5e5a;margin-top:10px;padding-top:8px;border-top:0.5px solid #2c2c2a;">* Values in parentheses show '+compYearLabel+' actuals for the same period. A dash (\u2014) means no production activity for that customer during the same date window in '+compYearLabel+'.</div>'
-    +'</div></div>';
+  document.getElementById('content').innerHTML = renderCustomerOverview(healthData);
 }
 
 function toggleExportPopover(e) {
