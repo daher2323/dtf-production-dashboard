@@ -2115,6 +2115,81 @@ function toggleCH(safeId) {
   if (_chExpanded[safeId]) generateSynopsis(safeId);
 }
 
+function fmt(n) { return n.toLocaleString(); }
+function pctStr(a, b) { if (!b) return null; var p = (a-b)/b*100; return (p>=0?'+':'')+p.toFixed(1)+'%'; }
+
+function buildSynopsis(cd) {
+  var sentences = [];
+  var qtrs = cd.qtrs || [];
+  var completedQtrs = qtrs.filter(function(q){ return q.units > 0; });
+  var hasYoy = cd.ytd25 > 0;
+  var ytdChg = hasYoy ? (cd.ytd - cd.ytd25) / cd.ytd25 * 100 : null;
+  var ytdAvgRun   = cd.ytdLots   > 0 ? Math.round(cd.ytd   / cd.ytdLots)   : 0;
+  var ytdAvgRun25 = cd.ytdLots25 > 0 ? Math.round(cd.ytd25 / cd.ytdLots25) : 0;
+  var runChg = ytdAvgRun25 > 0 ? (ytdAvgRun - ytdAvgRun25) / ytdAvgRun25 * 100 : null;
+  var lotChg = cd.ytdLots25 > 0 ? (cd.ytdLots - cd.ytdLots25) / cd.ytdLots25 * 100 : null;
+  var pctChg = cd.ytdPct25 > 0 ? (cd.ytdPct - cd.ytdPct25) : null;
+
+  // Sentence 1: top-line YTD narrative
+  if (cd.tag === 'new') {
+    sentences.push(cd.name + ' is a new customer this year — we\'ve run ' + fmt(cd.ytd) + ' units across ' + cd.ytdLots + ' lot' + (cd.ytdLots!==1?'s':'') + ' so far'
+      + (cd.ytdPct ? ', representing ' + cd.ytdPct + '% of our total production YTD' : '') + '.');
+  } else if (ytdChg !== null) {
+    var dir = ytdChg >= 0 ? 'up' : 'down';
+    var mag = Math.abs(ytdChg);
+    var tone = mag > 30 ? (ytdChg>0?'strongly':'sharply') : mag > 10 ? (ytdChg>0?'solidly':'notably') : '';
+    sentences.push(cd.name + ' is ' + (tone?tone+' ':'') + dir + ' ' + Math.abs(ytdChg).toFixed(1) + '% YTD vs. the same period last year'
+      + ' (' + fmt(cd.ytd25) + ' → ' + fmt(cd.ytd) + ' units)'
+      + (cd.ytdPct ? ', now accounting for ' + cd.ytdPct + '% of our production' : '') + '.');
+  }
+
+  // Sentence 2: run size vs lot count dynamic
+  if (runChg !== null && lotChg !== null && Math.abs(runChg) > 3) {
+    var runDir = runChg > 0 ? 'larger' : 'smaller';
+    var lotDir = lotChg > 0 ? 'more' : 'fewer';
+    if (Math.sign(runChg) !== Math.sign(lotChg)) {
+      // Interesting divergence — fewer lots but bigger runs, or more lots but smaller runs
+      sentences.push('They\'re running ' + lotDir + ' lots (' + cd.ytdLots25 + ' → ' + cd.ytdLots + ') but each run is ' + runDir
+        + ' (' + fmt(ytdAvgRun25) + ' → ' + fmt(ytdAvgRun) + ' avg units), suggesting '
+        + (runChg > 0 ? 'consolidated, larger orders' : 'smaller, more fragmented orders') + '.');
+    } else {
+      // Both moving same direction
+      sentences.push('Both lot count and run size are ' + (runChg>0?'up':'down')
+        + ' — ' + cd.ytdLots25 + ' → ' + cd.ytdLots + ' lots and '
+        + fmt(ytdAvgRun25) + ' → ' + fmt(ytdAvgRun) + ' avg units per run.');
+    }
+  } else if (runChg !== null && Math.abs(runChg) > 5) {
+    sentences.push('Average run size has ' + (runChg>0?'grown':'shrunk') + ' from '
+      + fmt(ytdAvgRun25) + ' to ' + fmt(ytdAvgRun) + ' units (' + (runChg>0?'+':'') + runChg.toFixed(1) + '%).');
+  }
+
+  // Sentence 3: production share trend or quarterly trajectory
+  if (pctChg !== null && Math.abs(pctChg) >= 0.5) {
+    var shareDir = pctChg > 0 ? 'grown' : 'shrunk';
+    sentences.push('Their share of our production has ' + shareDir + ' from ' + cd.ytdPct25 + '% to ' + cd.ytdPct + '%'
+      + (Math.abs(pctChg) >= 2 ? ' — a meaningful shift in our production mix' : '') + '.');
+  } else if (completedQtrs.length >= 3) {
+    // Look at recent quarterly trajectory
+    var last3 = completedQtrs.slice(-3);
+    var allUp = last3[2].units > last3[1].units && last3[1].units > last3[0].units;
+    var allDn = last3[2].units < last3[1].units && last3[1].units < last3[0].units;
+    if (allUp) sentences.push('The quarterly trend has been consistently upward for the last three quarters.');
+    else if (allDn) sentences.push('Volume has declined in each of the last three quarters.');
+    else if (completedQtrs.length >= 2) {
+      var prev = completedQtrs[completedQtrs.length-2];
+      var last = completedQtrs[completedQtrs.length-1];
+      var qChg = (last.units - prev.units) / prev.units * 100;
+      if (Math.abs(qChg) > 10) {
+        sentences.push('The most recent completed quarter was ' + (qChg>0?'up':'down') + ' '
+          + Math.abs(qChg).toFixed(1) + '% vs. the prior quarter ('
+          + fmt(prev.units) + ' → ' + fmt(last.units) + ' units).');
+      }
+    }
+  }
+
+  return sentences.join(' ');
+}
+
 function generateSynopsis(safeId) {
   var el = document.getElementById('ch-synopsis-' + safeId);
   if (!el) return;
@@ -2127,33 +2202,10 @@ function generateSynopsis(safeId) {
     +'<div style="width:16px;height:16px;border:1.5px solid #444441;border-top-color:#888780;border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0;"></div>'
     +'Generating summary…</div>';
 
-  var qtrsText = custData.qtrs.filter(function(q){return q.units>0;}).map(function(q){
-    return q.label+': '+q.units.toLocaleString()+' units, '+q.lots+' lots, avg run '+q.avgRun.toLocaleString()+(q.pctOfProd?' ('+q.pctOfProd+'% of total production)':'');
-  }).join('\n');
-
-  var prompt = 'You are a production analyst summarizing customer data for a supplement contract manufacturer. '
-    +'Write 2-3 concise sentences summarizing this customer\'s production relationship with us. '
-    +'Use "our" and "we" — you\'re part of the team. Be specific about the numbers. '
-    +'Note meaningful trends: are runs getting bigger or smaller? Are they ordering more or less frequently? '
-    +'Is their share of our production growing or shrinking? Focus on what\'s actually interesting or worth flagging.\n\n'
-    +'Customer: '+custData.name+'\n'
-    +'Tag: '+custData.tag+'\n'
-    +'2025 YTD: '+custData.ytd25.toLocaleString()+' units, '+custData.ytdLots25+' lots'+(custData.ytdPct25?' ('+custData.ytdPct25+'% of production)':'')+'\n'
-    +'2026 YTD: '+custData.ytd.toLocaleString()+' units, '+custData.ytdLots+' lots'+(custData.ytdPct?' ('+custData.ytdPct+'% of production)':'')+'\n'
-    +'Quarterly breakdown:\n'+qtrsText+'\n\n'
-    +'Write only the summary sentences, no headings or bullet points.';
-
-  fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1000,
-      messages: [{role: 'user', content: prompt}]
-    })
-  }).then(function(r){ return r.json(); }).then(function(data) {
-    var text = (data.content && data.content[0] && data.content[0].text) ? data.content[0].text.trim() : '';
-    if (!text) { el.style.display = 'none'; return; }
+  // Generate synopsis from data directly — no API needed
+  setTimeout(function() {
+    var text = buildSynopsis(custData);
+    if (!text) { el.innerHTML = ''; return; }
     var html = '<div style="display:flex;align-items:flex-start;gap:10px;">'
       +'<div style="width:20px;height:20px;border-radius:50%;background:#0C447C;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">'
         +'<svg width="10" height="10" viewBox="0 0 10 10" fill="none"><circle cx="5" cy="5" r="4" stroke="#85B7EB" stroke-width="1.2"/><line x1="5" y1="3" x2="5" y2="5.5" stroke="#85B7EB" stroke-width="1.2" stroke-linecap="round"/><circle cx="5" cy="7" r=".6" fill="#85B7EB"/></svg>'
@@ -2162,7 +2214,7 @@ function generateSynopsis(safeId) {
     +'</div>';
     _chSynopsis[safeId] = html;
     el.innerHTML = html;
-  }).catch(function() { el.style.display = 'none'; });
+  }, 0);
 }
 
 function safeid(s) {
