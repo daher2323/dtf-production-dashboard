@@ -11,8 +11,7 @@
   body { font-family: system-ui, sans-serif; background: #141618; color: #e8e6e0; font-size: 14px; min-height: 100vh; }
   .shell { max-width: 1400px; margin: 0 auto; padding: 1.5rem; }
 
-  /* ── App bar ── */
-  .app-bar { display: flex; align-items: stretch; background: #141618; border-bottom: 0.5px solid #2c2c2a; padding: 0 1.5rem; min-height: 56px; position: sticky; top: 0; z-index: 100; }
+  .app-bar { display: flex; align-items: stretch; background: #141618; border-bottom: 0.5px solid #2c2c2a; padding: 0; min-height: 56px; position: sticky; top: 0; z-index: 100; }
   .brand-wrap { display: flex; align-items: center; gap: 10px; padding: 8px 20px 8px 0; margin-right: 8px; border-right: 0.5px solid #2c2c2a; flex-shrink: 0; cursor: pointer; }
   .brand-wrap:hover { opacity: .85; }
   .brand-name { font-size: 17px; font-weight: 500; color: #e8e6e0; line-height: 1.2; }
@@ -29,9 +28,8 @@
   .main-tab.on .main-tab-name { color: #e8e6e0; }
   .main-tab:not(.on) .main-tab-name { color: #5f5e5a; }
   .app-bar-right { display: flex; align-items: center; gap: 8px; padding-left: 16px; border-left: 0.5px solid #2c2c2a; margin-left: auto; flex-shrink: 0; }
-
-  /* ── Sub-bar ── */
-  .sub-bar { display: flex; align-items: center; justify-content: flex-start; gap: 8px; padding: .5rem 1.5rem; background: #0d1118; border-bottom: 0.5px solid #1a2030; position: sticky; top: 56px; z-index: 99; }
+  /* Sub-bar outer handles bg/border; inner div handles max-width + padding */
+  .sub-bar-outer { background: #0d1118; border-bottom: 0.5px solid #1a2030; position: sticky; top: 56px; z-index: 99; }
   .sub-divider { width: 0.5px; height: 20px; background: #2c2c2a; flex-shrink: 0; }
 
   .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 1.25rem; }
@@ -108,32 +106,32 @@
 
 <!-- App bar -->
 <div class="app-bar">
-  <div class="brand-wrap" onclick="resetDashboard()" title="Return to home">
-    <svg width="38" height="38" viewBox="0 0 54 54" style="flex-shrink:0"><rect x="2" y="2" width="50" height="50" rx="10" fill="#0C447C" stroke="#378ADD" stroke-width="1.5"/><text x="27" y="35" text-anchor="middle" font-size="20" font-weight="700" fill="#85B7EB" font-family="system-ui,sans-serif" letter-spacing="-1">DTF</text></svg>
-    <div><div class="brand-name">Dynamic Technical Formulations</div><div class="brand-sub">Production Hub</div></div>
-  </div>
-  <div class="main-tabs">
-    <div class="main-tab on" id="mtab-production" onclick="setMainSection('production')">
-      <div class="main-tab-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#85B7EB" stroke-width="1.4" stroke-linecap="round"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg></div>
-      <span class="main-tab-name">Production</span>
+  <div style="max-width:1400px;margin:0 auto;width:100%;display:flex;align-items:stretch;">
+    <div class="brand-wrap" onclick="resetDashboard()" title="Return to home">
+      <svg width="38" height="38" viewBox="0 0 54 54" style="flex-shrink:0"><rect x="2" y="2" width="50" height="50" rx="10" fill="#0C447C" stroke="#378ADD" stroke-width="1.5"/><text x="27" y="35" text-anchor="middle" font-size="20" font-weight="700" fill="#85B7EB" font-family="system-ui,sans-serif" letter-spacing="-1">DTF</text></svg>
+      <div><div class="brand-name">Dynamic Technical Formulations</div><div class="brand-sub">Production Hub</div></div>
     </div>
-    <div class="main-tab" id="mtab-customers" onclick="setMainSection('customers')">
-      <div class="main-tab-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#444441" stroke-width="1.4" stroke-linecap="round"><circle cx="6" cy="5" r="2.2"/><circle cx="11" cy="5" r="2.2"/><path d="M1 13c0-2 1.8-3.5 5-3.5"/><path d="M15 13c0-2-1.8-3.5-4-3.5"/></svg></div>
-      <span class="main-tab-name">Customers</span>
+    <div class="main-tabs">
+      <div class="main-tab on" id="mtab-production" onclick="setMainSection('production')">
+        <div class="main-tab-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#85B7EB" stroke-width="1.4" stroke-linecap="round"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg></div>
+        <span class="main-tab-name">Production</span>
+      </div>
+      <div class="main-tab" id="mtab-customers" onclick="setMainSection('customers')">
+        <div class="main-tab-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#444441" stroke-width="1.4" stroke-linecap="round"><circle cx="6" cy="5" r="2.2"/><circle cx="11" cy="5" r="2.2"/><path d="M1 13c0-2 1.8-3.5 5-3.5"/><path d="M15 13c0-2-1.8-3.5-4-3.5"/></svg></div>
+        <span class="main-tab-name">Customers</span>
+      </div>
+      <div class="main-tab" id="mtab-procurement" onclick="setMainSection('procurement')">
+        <div class="main-tab-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#444441" stroke-width="1.4" stroke-linecap="round"><path d="M3 13V8m3 5V5m3 8V7m3 6V3"/></svg></div>
+        <span class="main-tab-name">Procurement</span>
+      </div>
     </div>
-    <div class="main-tab" id="mtab-procurement" onclick="setMainSection('procurement')">
-      <div class="main-tab-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#444441" stroke-width="1.4" stroke-linecap="round"><path d="M3 13V8m3 5V5m3 8V7m3 6V3"/></svg></div>
-      <span class="main-tab-name">Procurement</span>
-    </div>
-  </div>
-  <div class="app-bar-right" id="app-bar-right">
-    <!-- sub-nav injected here by renderSubBar() -->
+    <div class="app-bar-right" id="app-bar-right"></div>
   </div>
 </div>
 
 <!-- Sub-bar -->
-<div class="sub-bar" id="sub-bar">
-  <!-- injected by renderSubBar() -->
+<div class="sub-bar-outer">
+  <div id="sub-bar" style="max-width:1400px;margin:0 auto;width:100%;display:flex;align-items:center;gap:8px;padding:.5rem 1.5rem;"></div>
 </div>
 
 <div class="shell">
