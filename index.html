@@ -158,6 +158,7 @@ var LINE_TYPE  = {'line#1':'Powder','line#2':'Capsules','line#4':'Powder'};
 var allRows = [], allRows25 = [], lotMap = {}, dailyTargets = {};
 var mainSection = 'production'; // 'production' | 'customers' | 'procurement'
 var topView = 'summary', subView = 'today';
+var selectedCustomer = null;
 var sortCol = 'date', sortDir = -1, page = 1, PAGE_SIZE = 50;
 var custLimit = 10;
 var charts = {}, todayTimer = null, refreshTimer = null;
@@ -373,6 +374,7 @@ function resetDashboard() {
   topView = 'summary'; subView = 'today';
   selectedDayIdx = productionDays.length - 1;
   selectedWeekMon = null; selectedDetailRange = null; selectedPerfRange = null;
+  selectedCustomer = null;
   sortCol = 'date'; sortDir = -1; page = 1;
   custLimit = 10;
   ['customer','product','status','bottle','jar'].forEach(function(id){ filterState[id] = []; });
@@ -705,7 +707,17 @@ function renderSubBar() {
       + '<button onclick="setSub(\'performance\')" id="btn-performance" style="'+navBtnStyle(subView==='performance')+'">Trend</button>'
       + '</div>';
   } else if (mainSection === 'customers') {
-    sb.innerHTML = '';
+    if (selectedCustomer) {
+      sb.innerHTML =
+        '<button onclick="selectCustomer(null)" style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:6px;border:0.5px solid #444441;background:transparent;cursor:pointer;color:#888780;font-size:12px;font-family:system-ui;" onmouseover="this.style.background=\'#1a1d20\'" onmouseout="this.style.background=\'transparent\'">'
+        + '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><polyline points="7,2 3,6 7,10" stroke="#888780" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+        + 'All customers</button>'
+        + '<svg width="10" height="10" viewBox="0 0 10 10" fill="none"><polyline points="3,2 7,5 3,8" stroke="#444441" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+        + '<span style="font-size:12px;font-weight:500;color:#e8e6e0;">'+selectedCustomer+'</span>';
+    } else {
+      sb.innerHTML = '';
+    }
+  }
   } else if (mainSection === 'procurement') {
     sb.innerHTML = '<div style="font-size:11px;color:#5f5e5a;font-style:italic;">Coming soon</div>';
   }
@@ -2063,6 +2075,13 @@ function toggleRecords() {
   var open = body.style.display === 'none';
   body.style.display = open ? 'block' : 'none';
   if (chev) chev.style.transform = open ? 'rotate(180deg)' : '';
+}
+
+function selectCustomer(name) {
+  selectedCustomer = name;
+  renderSubBar();
+  renderCustomers();
+  window.scrollTo(0, 0);
 }
 
 function setCustLimit(n) {
