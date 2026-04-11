@@ -133,7 +133,7 @@ var LINE_TYPE  = {'line#1':'Powder','line#2':'Capsules','line#4':'Powder'};
 var allRows = [], allRows25 = [], lotMap = {}, dailyTargets = {};
 var topView = 'summary', subView = 'today';
 var sortCol = 'date', sortDir = -1, page = 1, PAGE_SIZE = 50;
-var custLimit = 10; // 10 | 25 | 0 (all)
+var custLimit = 10;
 var charts = {}, todayTimer = null, refreshTimer = null;
 var productionDays = [], selectedDayIdx = -1;
 var selectedWeekMon = null;
@@ -501,15 +501,11 @@ function applyFreshData(res) {
   var newRows25 = parseCSV(res[1]).filter(isValid);
   var newTargets = parseTargets(res[2]);
   if (newRows.length < 3) { console.warn('Refresh aborted: too few rows'); return false; }
-  // Never let a background refresh silently drop rows that are already displayed.
-  // Only accept if new data has at least as many rows as what is currently loaded,
-  // OR if the current data is empty (initial load).
   if (allRows.length > 0 && newRows.length < allRows.length) {
     console.warn('Refresh aborted: new data (' + newRows.length + ' rows) has fewer rows than current (' + allRows.length + '). Keeping existing data.');
     return false;
   }
   allRows = newRows; allRows25 = newRows25; dailyTargets = newTargets;
-  // Build lotMap from both years so daily view lookups never fall back to raw row data
   lotMap = buildLotMap(allRows.concat(allRows25));
   buildProductionDays(true);
   return true;
@@ -549,7 +545,6 @@ function loadDashboard() {
     }
     allRows = rows; allRows25 = rows25;
     dailyTargets = parseTargets(results[2]);
-    // Build lotMap from both years so daily view never falls back to raw row data
     lotMap = buildLotMap(allRows.concat(allRows25));
     buildProductionDays(false);
     lastRefreshTime = Date.now();
@@ -566,11 +561,8 @@ function loadDashboard() {
 
 function isViewingLive() { return selectedDayIdx === productionDays.length - 1; }
 
-// ── Record computation ────────────────────────────────────────────────────
 function computeRecords() {
   var allRowsBoth = allRows.concat(allRows25);
-
-  // Build daily totals: { dateStr -> { total, byLine: {line -> units} } }
   var dailyMap = {};
   allRowsBoth.forEach(function(r) {
     var dt = new Date(r['Date']); if(isNaN(dt)) return;
@@ -581,8 +573,6 @@ function computeRecords() {
     dailyMap[dk].total += units;
     if(line) dailyMap[dk].byLine[line] = (dailyMap[dk].byLine[line]||0) + units;
   });
-
-  // Build weekly totals: { weekKey -> { mon, units } }
   var weeklyMap = {};
   allRowsBoth.forEach(function(r) {
     var dt = new Date(r['Date']); if(isNaN(dt)) return;
@@ -593,14 +583,9 @@ function computeRecords() {
     if(!weeklyMap[wk]) weeklyMap[wk] = {mon:mon, units:0};
     weeklyMap[wk].units += num(r['Final Units']);
   });
-
   var days = Object.values(dailyMap);
   var weeks = Object.values(weeklyMap);
-
-  // Top 5 days overall
   var top5days = days.slice().sort(function(a,b){return b.total-a.total;}).slice(0,5);
-
-  // Top 5 days per line
   var top5byLine = {};
   ALL_LINES.forEach(function(line) {
     top5byLine[line] = days
@@ -609,10 +594,7 @@ function computeRecords() {
       .slice(0,5)
       .map(function(d){ return {date:d.date, units:d.byLine[line]}; });
   });
-
-  // Top 5 weeks overall
   var top5weeks = weeks.slice().sort(function(a,b){return b.units-a.units;}).slice(0,5);
-
   return { dailyMap:dailyMap, top5days:top5days, top5byLine:top5byLine, top5weeks:top5weeks };
 }
 
@@ -1228,14 +1210,12 @@ function renderToday() {
   var statusColor=isLive&&!dayComplete?'#888780':(todayPct>=100?'#1D9E75':'#EF9F27');
   var barColor=isLive&&!dayComplete?'#5f5e5a':(todayPct>=100?'#1D9E75':'#EF9F27');
 
-  // ── Records ───────────────────────────────────────────────────────────────
   var recs = computeRecords();
   var recTotalRank = recs.top5days.findIndex(function(d){ return d.date===viewStr; });
   var recLineRank = {};
   ALL_LINES.forEach(function(line){
     recLineRank[line] = (recs.top5byLine[line]||[]).findIndex(function(d){ return d.date===viewStr; });
   });
-
 
   var ytdRows=allRows.filter(function(r){ var dt=new Date(r['Date']); return !isNaN(dt)&&dt<=viewDateObj; });
   var ytdUnits=Object.values(buildLotMap(ytdRows)).filter(Boolean).reduce(function(s,l){return s+l.finalUnits;},0);
@@ -1282,10 +1262,9 @@ function renderToday() {
     var pillStyle=goal.isTarget?'background:'+lineBg+';border:0.5px solid '+lineClr+';color:'+lineTxt+';':'background:#1a1f12;border:0.5px solid #3B5010;color:#C0DD97;';
     var pillDotStyle=goal.isTarget?'background:'+lineClr+';':'background:#639922;';
     var pillLabel=goal.isTarget?'Target: '+goal.value.toLocaleString()+' units':'Avg: '+(lineAvg[line]||0).toLocaleString()+' units/day';
-    // Record badge — trophy only if this day is #1 all-time for this line
     var lineRank = recLineRank[line];
     var recBadgeHTML = (lineRank === 0)
-      ? '<div style="position:absolute;top:7px;left:8px;font-size:11px;padding:2px 7px;border-radius:7px;background:#2D1F00;border:0.5px solid #B8860B;color:#FFD700;font-weight:500;white-space:nowrap;">🏆 Record</div>'
+      ? '<div style="position:absolute;top:7px;left:8px;font-size:11px;padding:2px 7px;border-radius:7px;background:#2D1F00;border:0.5px solid #B8860B;color:#FFD700;font-weight:500;white-space:nowrap;">\uD83C\uDFC6 Record</div>'
       : '';
     return '<div id="gcard_'+i+'" style="flex:1;background:#141618;border:0.5px solid #2c2c2a;border-radius:10px;padding:1rem;text-align:center;position:relative;transition:border .3s,box-shadow .3s;">'
       +recBadgeHTML
@@ -1358,7 +1337,7 @@ function renderToday() {
     +'<div style="display:flex;gap:12px;margin-bottom:10px">'+gaugesHTML+'</div>'
     +'<div id="today-banner" style="background:#141618;border:0.5px solid #2c2c2a;border-radius:10px;padding:.875rem 1.25rem;margin-bottom:1rem">'
     +'<div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:8px;">'
-    +'<div style="flex:1;text-align:center"><div id="banner-lbl-total" style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">'+(isLive?'Total units today':'Total units')+'</div><div style="display:flex;align-items:center;justify-content:center;gap:6px;"><span id="banner-total" style="font-size:26px;font-weight:500;color:#e8e6e0;line-height:1">0</span><span id="banner-bullseye" style="display:none;font-size:22px;line-height:1">&#127919;</span>'+(recTotalRank===0?'<span style="font-size:10px;font-weight:500;padding:2px 8px;border-radius:7px;background:#2D1F00;border:0.5px solid #B8860B;color:#FFD700;">🏆 Record</span>':'')+'</div></div>'
+    +'<div style="flex:1;text-align:center"><div id="banner-lbl-total" style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">'+(isLive?'Total units today':'Total units')+'</div><div style="display:flex;align-items:center;justify-content:center;gap:6px;"><span id="banner-total" style="font-size:26px;font-weight:500;color:#e8e6e0;line-height:1">0</span><span id="banner-bullseye" style="display:none;font-size:22px;line-height:1">&#127919;</span>'+(recTotalRank===0?'<span style="font-size:10px;font-weight:500;padding:2px 8px;border-radius:7px;background:#2D1F00;border:0.5px solid #B8860B;color:#FFD700;">\uD83C\uDFC6 Record</span>':'')+'</div></div>'
     +'<div id="banner-div1" style="width:0.5px;background:#2c2c2a;height:36px;flex-shrink:0;align-self:center"></div>'
     +'<div style="flex:1;text-align:center"><div id="banner-lbl-goal" style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">'+(allLinesHaveTarget?'Daily target (all lines)':'Daily avg (all lines)')+'</div><div style="font-size:18px;font-weight:500;color:#e8e6e0;line-height:1.2">'+totalGoal.toLocaleString()+'</div></div>'
     +'<div id="banner-div2" style="width:0.5px;background:#2c2c2a;height:36px;flex-shrink:0;align-self:center"></div>'
@@ -1495,7 +1474,7 @@ function renderWeekly() {
     +'<div style="background:#1e2124;border:0.5px solid #2c2c2a;border-radius:12px;padding:1rem;margin-bottom:10px;"><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.05em;font-weight:500;margin-bottom:10px;">Weekly output by line</div><div style="display:flex;gap:10px;flex-wrap:wrap;">'
     +ALL_LINES.map(function(line){ var k2=lk(line),color=LINE_COLOR[k2]||'#888780',txt=LINE_TXT[k2]||'#e8e6e0',type=LINE_TYPE[k2]||''; var u=weekByLine[line]||0; var lineShare=totalAvgPerDay?(lineAvg[line]||0)/totalAvgPerDay:0; var lineWeeklyShare=Math.round(weeklyTarget*lineShare); var p=lineWeeklyShare?Math.min(Math.round((u/lineWeeklyShare)*100),100):0; return '<div style="flex:1;min-width:140px;background:#141618;border:0.5px solid #2c2c2a;border-radius:8px;padding:.75rem 1rem;"><div style="font-size:10px;color:'+txt+';text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">'+line+' \u2014 '+type+'</div><div style="font-size:18px;font-weight:500;color:'+color+';">'+u.toLocaleString()+'</div><div style="font-size:10px;color:#5f5e5a;margin-bottom:6px;">of ~'+lineWeeklyShare.toLocaleString()+' weekly share</div><div style="height:5px;background:#2c2c2a;border-radius:3px;overflow:hidden;"><div style="height:100%;width:'+p+'%;background:'+color+';border-radius:3px;"></div></div></div>'; }).join('')
     +'</div></div>'
-    +'<div style="background:#1e2124;border:0.5px solid #2c2c2a;border-radius:12px;padding:1rem;margin-bottom:10px;"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;"><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.05em;font-weight:500;">Weekly units \u2014 last 8 weeks</div><div style="font-size:11px;color:#888780;display:flex;align-items:center;gap:6px;"><span style="display:inline-block;width:16px;border-top:2px dashed #1D9E75;"></span>Target: '+weeklyTarget.toLocaleString()+'</div></div><div style="position:relative;height:200px;"><canvas id="cWeeklyW"></canvas></div></div>'
+    +'<div style="background:#1e2124;border:0.5px solid #2c2c2a;border-radius:12px;padding:1rem;margin-bottom:10px;"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;"><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.05em;font-weight:500;">Weekly units \u2014 last 8 weeks</div><div style="display:flex;align-items:center;gap:14px;font-size:11px;color:#888780;"><div style="display:flex;align-items:center;gap:5px;"><span style="display:inline-block;width:16px;border-top:2px dashed #1D9E75;"></span>Target: '+chartStaticTarget.toLocaleString()+'</div><div style="display:flex;align-items:center;gap:5px;"><span style="display:inline-block;width:16px;border-top:2px dashed #EF9F27;"></span>8-wk avg: '+week8Avg.toLocaleString()+'</div></div></div><div style="position:relative;height:200px;"><canvas id="cWeeklyW"></canvas></div></div>'
     +'<div style="background:#1e2124;border:0.5px solid #2c2c2a;border-radius:12px;padding:1rem;">'
     +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">'
     +'<div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.05em;font-weight:500;">Lots this week</div>'
@@ -1507,10 +1486,17 @@ function renderWeekly() {
   var weekLabels=weeks8.map(function(w){return w.mon.toDateString()===wkMon.toDateString()?'Wk '+w.num+' (this)':'Wk '+w.num;});
   var weekData=weeks8.map(function(w){return w.units;});
   var weekColors=weeks8.map(function(w){return w.mon.toDateString()===wkMon.toDateString()?'rgba(55,138,221,0.35)':'#378ADD';});
+  var chartStaticTarget = viewYear<=2025 ? WEEKLY_TARGET_2025 : WEEKLY_TARGET;
+  var week8NonZero=weekData.filter(function(v){return v>0;});
+  var week8Avg=week8NonZero.length?Math.round(week8NonZero.reduce(function(s,v){return s+v;},0)/week8NonZero.length):0;
   charts.weeklyW=new Chart(document.getElementById('cWeeklyW'),{
     type:'bar',
-    data:{labels:weekLabels,datasets:[{type:'bar',label:'Units',data:weekData,backgroundColor:weekColors,borderRadius:4,order:2},{type:'line',label:'Weekly target',data:weeks8.map(function(){return weeklyTarget;}),borderColor:'#1D9E75',borderWidth:2,borderDash:[6,4],pointRadius:0,fill:false,tension:0,order:1}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return ctx.dataset.label==='Weekly target'?'Target: '+weeklyTarget.toLocaleString():'Units: '+ctx.raw.toLocaleString();}}}},scales:{x:{ticks:{color:'#888780',font:{size:10},maxRotation:20},grid:{color:'#2c2c2a'}},y:{ticks:{color:'#888780',callback:function(v){return(v/1000).toFixed(0)+'k';}},grid:{color:'#2c2c2a'}}}},
+    data:{labels:weekLabels,datasets:[
+      {type:'bar',label:'Units',data:weekData,backgroundColor:weekColors,borderRadius:4,order:3},
+      {type:'line',label:'Weekly target',data:weeks8.map(function(){return chartStaticTarget;}),borderColor:'#1D9E75',borderWidth:2,borderDash:[6,4],pointRadius:0,fill:false,tension:0,order:1},
+      {type:'line',label:'8-week avg',data:weeks8.map(function(){return week8Avg;}),borderColor:'#EF9F27',borderWidth:1.5,borderDash:[3,3],pointRadius:0,fill:false,tension:0,order:2}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){if(ctx.dataset.label==='Weekly target') return 'Target: '+chartStaticTarget.toLocaleString(); if(ctx.dataset.label==='8-week avg') return '8-wk avg: '+week8Avg.toLocaleString(); return 'Units: '+ctx.raw.toLocaleString();}}}},scales:{x:{ticks:{color:'#888780',font:{size:10},maxRotation:20},grid:{color:'#2c2c2a'}},y:{ticks:{color:'#888780',callback:function(v){return(v/1000).toFixed(0)+'k';}},grid:{color:'#2c2c2a'}}}},
     plugins:[{id:'wkLabels',afterDatasetsDraw:function(chart){var ctx2=chart.ctx,meta=chart.getDatasetMeta(0);ctx2.save();ctx2.font='500 10px system-ui,sans-serif';ctx2.textAlign='center';ctx2.textBaseline='bottom';meta.data.forEach(function(bar,i){ctx2.fillStyle=weeks8[i].mon.toDateString()===wkMon.toDateString()?'rgba(133,183,235,0.7)':'#85B7EB';ctx2.fillText(weekData[i].toLocaleString(),bar.x,bar.y-4);});ctx2.restore();}}]
   });
 }
@@ -1657,12 +1643,11 @@ function renderPerformance() {
   var allRowsCombined = allRows.concat(allRows25);
   var rangeRows = allRowsCombined.filter(function(r){ var dt=new Date(r['Date']); return !isNaN(dt)&&dt>=range.start&&dt<=range.end; });
 
-  // Prior-year comparison: shift back one year, but if range is in 2025 shift forward to 2026 instead
   var rangeYear = range.start.getFullYear();
   var compShift = (rangeYear === 2025) ? 1 : -1;
   var compLabel = (rangeYear === 2025) ? 'vs. same period in 2026' : 'vs. same period in prior year';
-  var compStart = new Date(range.start); compStart.setFullYear(compStart.getFullYear() + compShift);
-  var compEnd   = new Date(range.end);   compEnd.setFullYear(compEnd.getFullYear() + compShift);
+  var compStart = new Date(range.start.getTime()); compStart.setFullYear(rangeYear + compShift);
+  var compEnd   = new Date(range.end.getTime());   compEnd.setFullYear(range.end.getFullYear() + compShift);
   var rangeRows25 = allRowsCombined.filter(function(r){ var dt=new Date(r['Date']); return !isNaN(dt)&&dt>=compStart&&dt<=compEnd; });
 
   var rangeLotMap = buildLotMap(rangeRows);
@@ -1753,7 +1738,7 @@ function renderPerformance() {
   var jarTotal=jarEntries.reduce(function(s,e){return s+e[1];},0);
   var JAR_COLORS=['#378ADD','#1D9E75','#EF9F27','#D4537E','#7F77DD','#D85A30','#639922','#E24B4A','#85B7EB','#5DCAA5'];
 
-  // ── Customer table: build directly from raw rows for both years ──────────
+  // ── Customer table: build directly from raw rows ──────────────────────────
   var byCust={};
   rangeRows.forEach(function(r){
     var prod=(r['Product']||'').trim(); if(!prod) return;
@@ -1766,10 +1751,11 @@ function renderPerformance() {
   var allCustSorted=Object.entries(byCust).sort(function(a,b){return b[1].units-a[1].units;});
   var maxCU=allCustSorted[0]?allCustSorted[0][1].units:1;
 
-  // Build per-customer totals directly from comparison-year raw rows
-  // (bypasses buildLotMap to avoid lot-number key collisions between years)
+  // Build comparison-year customer totals directly from raw rows (bypasses buildLotMap)
   var byCust25raw={};
-  rangeRows25.forEach(function(r){
+  allRowsCombined.filter(function(r){
+    var dt=new Date(r['Date']); return !isNaN(dt)&&dt>=compStart&&dt<=compEnd;
+  }).forEach(function(r){
     var prod=(r['Product']||'').trim(); if(!prod) return;
     var c=prod.split('-')[0].trim(); if(!c) return;
     var ck=c.toLowerCase();
@@ -1777,11 +1763,8 @@ function renderPerformance() {
     byCust25raw[ck].units+=num(r['Final Units']);
     var lot=(r['Lot Number']||'').trim(); if(lot) byCust25raw[ck].lots.add(lot);
   });
-  // Convert lot Sets to counts
   Object.keys(byCust25raw).forEach(function(k){ byCust25raw[k].lots=byCust25raw[k].lots.size; });
-  var byCust25={};
-  Object.keys(byCust25raw).forEach(function(ck){ byCust25[ck]=byCust25raw[ck]; });
-  function getCust25(name){ return byCust25[(name||'').toLowerCase()]||null; }
+  function getCust25(name){ return byCust25raw[(name||'').toLowerCase()]||null; }
 
   var metricsHTML=
     '<div class="metric info"><div class="label">Units produced</div><div class="value">'+totalUnits.toLocaleString()+'</div><div class="sub">vs '+totalProj.toLocaleString()+' projected</div><div class="yoy">'+deltaTag(totalUnits,total25,true,'pct',total25.toLocaleString(),compYearLabel)+'</div></div>'
@@ -1829,7 +1812,6 @@ function renderPerformance() {
   var asterisk=curMo?'<div style="font-size:10px;color:#5f5e5a;margin-top:10px;padding-top:8px;border-top:0.5px solid #2c2c2a"><sup style="color:#9FE1CB">*</sup> '+curMo.label+' target adjusted for month-to-date ('+curMo.daysSoFar+'/'+curMo.daysInMonth+' days). Full month target: '+curMo.fullMonthTarget.toLocaleString()+'. '+compYearLabel+' figure shown is also MTD for comparison.</div>':'';
   var jarLegHTML=jarEntries.map(function(e,i){ var j=e[0],v=e[1],p=jarTotal?((v/jarTotal)*100).toFixed(1):0; return '<tr style="border-bottom:0.5px solid #2c2c2a"><td style="padding:3px 6px;width:16px"><div style="width:10px;height:10px;border-radius:2px;background:'+JAR_COLORS[i]+'"></div></td><td style="padding:3px 6px;font-weight:500">'+j+'</td><td style="padding:3px 6px;text-align:right;white-space:nowrap">'+v.toLocaleString()+'</td><td style="padding:3px 6px;text-align:right;color:#888780;width:40px">'+p+'%</td></tr>'; }).join('');
 
-  // ── Customer rows: comparison values for all columns + YoY badge ─────────
   var total25units = lots25.reduce(function(s,l){return s+l.finalUnits;},0);
 
   function buildCustTableHTML(limitedEntries, showSummary) {
@@ -1866,7 +1848,6 @@ function renderPerformance() {
     }).join('');
 
     if(showSummary) {
-      // Totals across ALL customers (not just visible slice)
       var sumUnits=allCustSorted.reduce(function(s,e){return s+e[1].units;},0);
       var sumLots=allCustSorted.reduce(function(s,e){return s+e[1].lots;},0);
       var sumAvg=sumLots?Math.round(sumUnits/sumLots):0;
@@ -1901,9 +1882,8 @@ function renderPerformance() {
   var showSummaryRow = custLimit === 0;
   var custHTML = buildCustTableHTML(visibleCusts, showSummaryRow);
 
-  // ── Records card HTML (collapsible, top 3) ───────────────────────────────
   var recs2 = computeRecords();
-  var medals2 = ['🥇','🥈','🥉'];
+  var medals2 = ['\uD83E\uDD47','\uD83E\uDD48','\uD83E\uDD49'];
   var todayStr2 = (now.getMonth()+1)+'/'+now.getDate()+'/'+now.getFullYear();
   function fmtRecDate(str){ var d=new Date(str); return isNaN(d)?str:d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
 
@@ -1926,11 +1906,11 @@ function renderPerformance() {
   var top3WeeksRows = recs2.top5weeks.slice(0,3).map(function(w,i){
     var wn=getWeekNum(w.mon), fri=new Date(w.mon); fri.setDate(w.mon.getDate()+4);
     var label='Wk '+wn+' \u00b7 '+w.mon.toLocaleDateString('en-US',{month:'short',day:'numeric'})+'\u2013'+fri.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-    var isToday = w.mon <= now && now <= fri;
+    var isThisWeek = w.mon <= now && now <= fri;
     return '<div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-bottom:0.5px solid #2c2c2a;'+(i===0?'background:#1c1a0a;':'')+'">'
       +'<span style="font-size:13px;width:18px;flex-shrink:0;text-align:center;">'+medals2[i]+'</span>'
       +'<span style="font-size:12px;font-weight:500;color:#e8e6e0;min-width:72px;">'+w.units.toLocaleString()+'</span>'
-      +'<span style="font-size:11px;color:#888780;flex:1;">'+label+(isToday?' <span style="color:#1D9E75;font-weight:500;">(this week)</span>':'')+'</span>'
+      +'<span style="font-size:11px;color:#888780;flex:1;">'+label+(isThisWeek?' <span style="color:#1D9E75;font-weight:500;">(this week)</span>':'')+'</span>'
       +'</div>';
   }).join('');
 
@@ -1946,7 +1926,6 @@ function renderPerformance() {
 
   var recordsCardHTML =
     '<div style="background:#1e2124;border:0.5px solid #2c2c2a;border-radius:12px;margin-bottom:10px;overflow:hidden;">'
-    // ── collapsed trigger ──
     +'<div onclick="toggleRecords()" style="display:flex;align-items:center;justify-content:space-between;padding:.75rem 1.25rem;cursor:pointer;" onmouseover="this.style.background=\'#252829\'" onmouseout="this.style.background=\'transparent\'">'
     +'<div style="display:flex;align-items:center;gap:8px;">'
     +'<svg width="13" height="13" viewBox="0 0 14 14" fill="none" style="flex-shrink:0"><path d="M7 1l1.5 3.5 3.5.5-2.5 2.5.5 3.5L7 9.5 4 11l.5-3.5L2 5l3.5-.5L7 1z" stroke="#888780" stroke-width="1.3" stroke-linejoin="round"/></svg>'
@@ -1955,11 +1934,10 @@ function renderPerformance() {
     +'</div>'
     +'<svg id="rec-chevron" width="13" height="13" viewBox="0 0 13 13" fill="none" style="transition:transform .2s;flex-shrink:0;"><polyline points="2,4 6.5,9 11,4" stroke="#5f5e5a" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>'
     +'</div>'
-    // ── expandable body ──
     +'<div id="rec-body" style="display:none;border-top:0.5px solid #2c2c2a;padding:1rem 1.25rem;">'
     +'<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:1rem;">'
-    +recBlockHTML('Best days — all lines', top3DaysRows)
-    +recBlockHTML('Best weeks — all lines', top3WeeksRows)
+    +recBlockHTML('Best days \u2014 all lines', top3DaysRows)
+    +recBlockHTML('Best weeks \u2014 all lines', top3WeeksRows)
     +'</div>'
     +'<div style="font-size:10px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.6rem;">Best days by line</div>'
     +'<div style="display:flex;gap:10px;flex-wrap:wrap;">'+lineBlocksHTML+'</div>'
@@ -1991,9 +1969,9 @@ function renderPerformance() {
     +'<div class="full-card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;flex-wrap:wrap;gap:8px;">'
     +'<h3 style="margin:0;">Customers by units produced <span style="color:#5f5e5a;font-weight:400;font-size:10px;">('+allCustSorted.length+' total)</span></h3>'
     +'<div style="display:flex;gap:2px;padding:3px;background:#141618;border:0.5px solid #2c2c2a;border-radius:8px;">'
-    +'<button onclick="setCustLimit(10)" id="custBtn10" style="padding:4px 12px;border-radius:6px;border:'+(custLimit===10?'1.5px solid #378ADD':'1.5px solid transparent')+';background:'+(custLimit===10?'#0C447C':'transparent')+';color:'+(custLimit===10?'#85B7EB':'#888780')+';font-size:11px;font-weight:'+(custLimit===10?'500':'400')+';cursor:pointer;font-family:system-ui;">Top 10</button>'
-    +'<button onclick="setCustLimit(25)" id="custBtn25" style="padding:4px 12px;border-radius:6px;border:'+(custLimit===25?'1.5px solid #378ADD':'1.5px solid transparent')+';background:'+(custLimit===25?'#0C447C':'transparent')+';color:'+(custLimit===25?'#85B7EB':'#888780')+';font-size:11px;font-weight:'+(custLimit===25?'500':'400')+';cursor:pointer;font-family:system-ui;">Top 25</button>'
-    +'<button onclick="setCustLimit(0)" id="custBtn0" style="padding:4px 12px;border-radius:6px;border:'+(custLimit===0?'1.5px solid #378ADD':'1.5px solid transparent')+';background:'+(custLimit===0?'#0C447C':'transparent')+';color:'+(custLimit===0?'#85B7EB':'#888780')+';font-size:11px;font-weight:'+(custLimit===0?'500':'400')+';cursor:pointer;font-family:system-ui;">All</button>'
+    +'<button onclick="setCustLimit(10)" style="padding:4px 12px;border-radius:6px;border:'+(custLimit===10?'1.5px solid #378ADD':'1.5px solid transparent')+';background:'+(custLimit===10?'#0C447C':'transparent')+';color:'+(custLimit===10?'#85B7EB':'#888780')+';font-size:11px;font-weight:'+(custLimit===10?'500':'400')+';cursor:pointer;font-family:system-ui;">Top 10</button>'
+    +'<button onclick="setCustLimit(25)" style="padding:4px 12px;border-radius:6px;border:'+(custLimit===25?'1.5px solid #378ADD':'1.5px solid transparent')+';background:'+(custLimit===25?'#0C447C':'transparent')+';color:'+(custLimit===25?'#85B7EB':'#888780')+';font-size:11px;font-weight:'+(custLimit===25?'500':'400')+';cursor:pointer;font-family:system-ui;">Top 25</button>'
+    +'<button onclick="setCustLimit(0)" style="padding:4px 12px;border-radius:6px;border:'+(custLimit===0?'1.5px solid #378ADD':'1.5px solid transparent')+';background:'+(custLimit===0?'#0C447C':'transparent')+';color:'+(custLimit===0?'#85B7EB':'#888780')+';font-size:11px;font-weight:'+(custLimit===0?'500':'400')+';cursor:pointer;font-family:system-ui;">All</button>'
     +'</div></div>'
     +'<div class="tbl-wrap"><table><thead><tr>'
     +'<th style="width:24px">#</th>'
@@ -2005,7 +1983,7 @@ function renderPerformance() {
     +'<th style="text-align:right">Avg run size *</th>'
     +'<th style="text-align:right">% of production *</th>'
     +'</tr></thead><tbody>'+custHTML+'</tbody></table>'
-    +'<div style="font-size:10px;color:#5f5e5a;margin-top:10px;padding-top:8px;border-top:0.5px solid #2c2c2a;">* Values in parentheses show '+compYearLabel+' actuals for the same period. A dash (—) means no production activity for that customer during the same date window in '+compYearLabel+'.</div>'
+    +'<div style="font-size:10px;color:#5f5e5a;margin-top:10px;padding-top:8px;border-top:0.5px solid #2c2c2a;">* Values in parentheses show '+compYearLabel+' actuals for the same period. A dash (\u2014) means no production activity for that customer during the same date window in '+compYearLabel+'.</div>'
     +'</div></div>';
 
   document.getElementById('jar-legend').innerHTML='<table style="width:100%;border-collapse:collapse;font-size:11px"><tbody>'+jarLegHTML+'</tbody></table>';
