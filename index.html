@@ -2245,17 +2245,38 @@ function renderCustomerOverview(healthData) {
 
     // Apples-to-apples: both years same date range
     var prevYr = nowYr - 1;
-    var ytdDeltaPct = cd.ytd25 > 0 ? ((cd.ytd - cd.ytd25) / cd.ytd25 * 100) : null;
-    var deltaPos = ytdDeltaPct !== null && ytdDeltaPct >= 0;
-    var deltaBadge = ytdDeltaPct !== null
-      ? ' <span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:500;background:'+(deltaPos?'#085041':'#791F1F')+';color:'+(deltaPos?'#9FE1CB':'#F09595')+'">'+(deltaPos?'+':'')+ytdDeltaPct.toFixed(1)+'%</span>'
-      : '';
     var ytdLabel = now.toLocaleDateString('en-US',{month:'short',day:'numeric'});
-    var annualPills = (cd.ytd25 > 0 ? '<span style="font-size:11px;color:#888780;white-space:nowrap;">'+prevYr+' YTD: <strong style="font-weight:500;color:#888780;">'+cd.ytd25.toLocaleString()+'</strong></span>'
-      + '<span style="color:#2c2c2a;margin:0 6px;">·</span>' : '')
-      + '<span style="font-size:11px;color:#378ADD;white-space:nowrap;">'+nowYr+' YTD: <strong style="font-weight:500;color:#e8e6e0;">'+cd.ytd.toLocaleString()+'</strong></span>'
-      + deltaBadge
-      + '<span style="font-size:10px;color:#5f5e5a;margin-left:4px;">thru '+ytdLabel+'</span>';
+
+    function deltaBadge(cur, prev) {
+      if (!prev) return '';
+      var pct = (cur - prev) / prev * 100;
+      var pos = pct >= 0;
+      return '<span style="display:inline-block;padding:1px 5px;border-radius:4px;font-size:10px;font-weight:500;background:'+(pos?'#085041':'#791F1F')+';color:'+(pos?'#9FE1CB':'#F09595')+';margin-left:4px;">'+(pos?'+':'')+pct.toFixed(1)+'%</span>';
+    }
+
+    var ytdAvgRun  = cd.ytdLots  > 0 ? Math.round(cd.ytd  / cd.ytdLots)  : 0;
+    var ytdAvgRun25 = cd.ytdLots25 > 0 ? Math.round(cd.ytd25 / cd.ytdLots25) : 0;
+
+    var sep = '<span style="color:#2c2c2a;margin:0 8px;font-size:11px;">/</span>';
+    var col25 = cd.ytd25 > 0
+      ? '<span style="font-size:11px;color:#888780;white-space:nowrap;">'
+          +'<span style="color:#5f5e5a;">'+prevYr+' YTD</span>'
+          +'<span style="margin:0 6px;color:#2c2c2a;">|</span>'
+          +cd.ytd25.toLocaleString()+sep+cd.ytdLots25+' lots'+sep+(ytdAvgRun25?ytdAvgRun25.toLocaleString()+' avg':'—')
+        +'</span>'
+        +'<span style="color:#2c2c2a;margin:0 8px;">→</span>'
+      : '';
+    var col26 = '<span style="font-size:11px;white-space:nowrap;">'
+        +'<span style="color:#378ADD;">'+nowYr+' YTD</span>'
+        +'<span style="margin:0 6px;color:#2c2c2a;">|</span>'
+        +'<strong style="font-weight:500;color:#e8e6e0;">'+cd.ytd.toLocaleString()+'</strong>'+deltaBadge(cd.ytd, cd.ytd25)
+        +sep
+        +'<strong style="font-weight:500;color:#e8e6e0;">'+cd.ytdLots+' lots</strong>'+deltaBadge(cd.ytdLots, cd.ytdLots25)
+        +sep
+        +(ytdAvgRun ? '<strong style="font-weight:500;color:#e8e6e0;">'+ytdAvgRun.toLocaleString()+' avg</strong>'+deltaBadge(ytdAvgRun, ytdAvgRun25) : '—')
+      +'</span>';
+    var thruLabel = '<span style="font-size:10px;color:#5f5e5a;margin-left:6px;">thru '+ytdLabel+'</span>';
+    var annualPills = col25 + col26 + thruLabel;
 
     // Header row (always visible)
     var header = '<div onclick="toggleCH(\''+sid+'\')" style="display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;background:#1e2124;border-radius:10px;" onmouseover="this.style.background=\'#252829\'" onmouseout="this.style.background=\'#1e2124\'">'
@@ -2263,13 +2284,7 @@ function renderCustomerOverview(healthData) {
       +'<span style="font-size:13px;font-weight:500;color:#e8e6e0;flex-shrink:0;">'+cd.cust+'</span>'
       +tagEl
       +'<span style="font-size:11px;color:#5f5e5a;margin-left:4px;">'+annualPills+'</span>'
-      +'<div style="margin-left:auto;display:flex;align-items:center;gap:14px;flex-shrink:0;">'
-        +'<span style="font-size:11px;color:#888780;white-space:nowrap;">'
-          +(cd.ytdLots25 > 0 ? cd.ytdLots25+' → ' : '')
-          +'<strong style="font-weight:500;color:#e8e6e0;">'+cd.ytdLots+'</strong>'
-          +' lots YTD'
-        +'</span>'
-      +'</div>'
+    +'</div>';
     +'</div>';
 
     // Detail table (collapsible)
@@ -2303,16 +2318,6 @@ function renderCustomerOverview(healthData) {
         runDelta = ' <span style="display:inline-block;padding:1px 5px;border-radius:4px;font-size:10px;font-weight:500;background:'+(rPos?'#085041':'#791F1F')+';color:'+(rPos?'#9FE1CB':'#F09595')+'">'+(rPos?'+':'')+rd.toFixed(1)+'%</span>';
       }
 
-      // Frequency delta (lower = more frequent = better)
-      var prevFreq = null;
-      for (var fi = idx-1; fi >= 0; fi--) { if (cd.qtrs[fi].freqDays !== null) { prevFreq = cd.qtrs[fi].freqDays; break; } }
-      var freqDelta = '';
-      if (prevFreq !== null && q.freqDays !== null) {
-        var fd = ((q.freqDays-prevFreq)/prevFreq*100);
-        var fPos = fd <= 0; // lower interval = more frequent = good
-        freqDelta = ' <span style="display:inline-block;padding:1px 5px;border-radius:4px;font-size:10px;font-weight:500;background:'+(fPos?'#085041':'#791F1F')+';color:'+(fPos?'#9FE1CB':'#F09595')+'">'+(fd>0?'+':'')+fd.toFixed(1)+'%</span>';
-      }
-
       var barW = q.units ? Math.round((q.units/maxUnits)*88) : 0;
       var barColor = isCur ? '#378ADD' : '#4A6580';
 
@@ -2326,8 +2331,6 @@ function renderCustomerOverview(healthData) {
         +'<td style="'+tdBase+rowBg+'text-align:right;color:#888780;">'+(q.lots||'—')+'</td>'
         +'<td style="'+tdBase+rowBg+'text-align:right;color:#e8e6e0;">'+(q.avgRun?q.avgRun.toLocaleString():'—')+'</td>'
         +'<td style="'+tdBase+rowBg+'text-align:right;">'+runDelta+'</td>'
-        +'<td style="'+tdBase+rowBg+'text-align:right;color:#888780;">'+(q.freqDays!==null?'every '+q.freqDays+'d':'—')+'</td>'
-        +'<td style="'+tdBase+rowBg+'text-align:right;">'+freqDelta+'</td>'
         +'<td style="'+tdBase+rowBg+'padding-right:14px;width:120px;">'
           +'<div style="display:flex;align-items:center;gap:6px;">'
             +'<div style="flex:1;height:4px;background:#2c2c2a;border-radius:2px;overflow:hidden;">'
@@ -2346,8 +2349,6 @@ function renderCustomerOverview(healthData) {
         +'<th style="'+thStyle+'width:70px;">vs prev</th>'
         +'<th style="'+thStyle+'">Lots</th>'
         +'<th style="'+thStyle+'">Avg run</th>'
-        +'<th style="'+thStyle+'width:70px;">vs prev</th>'
-        +'<th style="'+thStyle+'">Frequency</th>'
         +'<th style="'+thStyle+'width:70px;">vs prev</th>'
         +'<th style="'+thStyle+'padding-right:14px;width:120px;">Volume</th>'
       +'</tr></thead>'
