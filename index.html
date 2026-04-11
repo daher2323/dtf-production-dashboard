@@ -1109,7 +1109,7 @@ function render() {
   // Update live pill — always visible in app bar, clickable to force refresh
   var abr = document.getElementById('app-bar-right');
   if (abr) {
-    var live = isViewingLive();
+    var live = (typeof isViewingLive === 'function' && productionDays.length > 0) ? isViewingLive() : false;
     abr.innerHTML = '<button onclick="hardRefresh()" style="font-size:11px;font-weight:500;padding:4px 12px;border-radius:10px;background:#085041;border:0.5px solid #1D9E75;color:#1D9E75;cursor:pointer;font-family:system-ui;display:inline-flex;align-items:center;gap:5px;transition:opacity .15s;" onmouseover="this.style.opacity=\'.75\'" onmouseout="this.style.opacity=\'1\'" title="Click to refresh data">&#8635; <span>'+(live?'Live':'Refresh')+'</span></button>';
   }
   try {
