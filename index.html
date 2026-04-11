@@ -2101,311 +2101,255 @@ function quarterLabel(key) {
   var p = key.split('-'); return p[1] + ' ' + p[0];
 }
 
-function computeCustomerHealth() {
+var _chExpanded = {};
+
+function toggleCH(safeId) {
+  _chExpanded[safeId] = !_chExpanded[safeId];
+  var body = document.getElementById('ch-body-' + safeId);
+  var chev = document.getElementById('ch-chev-' + safeId);
+  if (body) body.style.display = _chExpanded[safeId] ? 'block' : 'none';
+  if (chev) chev.style.transform = _chExpanded[safeId] ? 'rotate(180deg)' : '';
+}
+
+function safeid(s) {
+  return s.replace(/[^a-zA-Z0-9]/g, '_');
+}
+
+function computeCustomerData() {
   var allRowsCombined = allRows.concat(allRows25);
-  // Build per-customer per-quarter data
-  var custQtr = {}; // custQtr[custName][qKey] = {units, lots:Set, dates:[]}
+  var allRowsCombined = allRows.concat(allRows25);
+  var now = new Date();
+  var nowYr = now.getFullYear();
+  var curQk = getQuarterKey(now);
+
+  // Build per-customer per-quarter data from Q1 2025 onward
+  var cutoff = new Date(2025, 0, 1);
+  var custQtr = {};
   allRowsCombined.forEach(function(r) {
     var prod = (r['Product']||'').trim(); if (!prod) return;
     var cust = prod.split('-')[0].trim(); if (!cust) return;
-    var dt = new Date(r['Date']); if (isNaN(dt)) return;
+    var dt = new Date(r['Date']); if (isNaN(dt) || dt < cutoff) return;
     var qk = getQuarterKey(dt);
     if (!custQtr[cust]) custQtr[cust] = {};
-    if (!custQtr[cust][qk]) custQtr[cust][qk] = {units:0, lots:new Set(), dates:[]};
+    if (!custQtr[cust][qk]) custQtr[cust][qk] = {units:0, lots:new Set(), lotDates:{}};
     custQtr[cust][qk].units += num(r['Final Units']);
-    var lot = (r['Lot Number']||'').trim(); if (lot) custQtr[cust][qk].lots.add(lot);
-    custQtr[cust][qk].dates.push(dt.getTime());
+    var lot = (r['Lot Number']||'').trim();
+    if (lot) {
+      custQtr[cust][qk].lots.add(lot);
+      if (!custQtr[cust][qk].lotDates[lot]) custQtr[cust][qk].lotDates[lot] = dt.getTime();
+      else custQtr[cust][qk].lotDates[lot] = Math.min(custQtr[cust][qk].lotDates[lot], dt.getTime());
+    }
   });
 
-  // Determine which quarters to show (last 6 completed + current partial)
-  var now = new Date();
-  var allQtrs = new Set();
-  Object.values(custQtr).forEach(function(qmap) { Object.keys(qmap).forEach(function(k){ allQtrs.add(k); }); });
-  var sortedQtrs = Array.from(allQtrs).sort();
-  // Always show last 6 quarters
-  var displayQtrs = sortedQtrs.slice(-6);
+  // All quarters from Q1 2025 to current
+  var displayQtrs = [];
+  var dq = new Date(2025, 0, 1);
+  while (getQuarterKey(dq) <= curQk) {
+    displayQtrs.push(getQuarterKey(dq));
+    dq.setMonth(dq.getMonth() + 3);
+  }
+
+  // Build annual totals per customer
+  var custAnnual = {};
+  allRowsCombined.forEach(function(r) {
+    var prod = (r['Product']||'').trim(); if (!prod) return;
+    var cust = prod.split('-')[0].trim(); if (!cust) return;
+    var dt = new Date(r['Date']); if (isNaN(dt) || dt < cutoff) return;
+    var yr = dt.getFullYear();
+    if (!custAnnual[cust]) custAnnual[cust] = {};
+    custAnnual[cust][yr] = (custAnnual[cust][yr]||0) + num(r['Final Units']);
+  });
 
   var results = [];
   Object.keys(custQtr).forEach(function(cust) {
     var qmap = custQtr[cust];
     var qtrs = displayQtrs.map(function(qk) {
       var d = qmap[qk];
-      if (!d) return {key:qk, units:0, lots:0, avgRun:0, freqDays:null};
+      if (!d || d.lots.size === 0) return {key:qk, units:0, lots:0, avgRun:0, freqDays:null};
       var lotCount = d.lots.size;
-      var avgRun = lotCount ? Math.round(d.units / lotCount) : 0;
-      // Frequency: avg days between lots
-      var dates = d.dates.slice().sort();
+      var avgRun = Math.round(d.units / lotCount);
+      // Frequency: avg days between first appearances of lots in this quarter
+      var lotDateArr = Object.values(d.lotDates).sort();
       var freqDays = null;
-      if (dates.length >= 2) {
+      if (lotDateArr.length >= 2) {
         var gaps = [];
-        for (var i=1; i<dates.length; i++) gaps.push((dates[i]-dates[i-1])/86400000);
-        freqDays = gaps.reduce(function(s,v){return s+v;},0) / gaps.length;
+        for (var i=1; i<lotDateArr.length; i++) gaps.push((lotDateArr[i]-lotDateArr[i-1])/86400000);
+        freqDays = parseFloat((gaps.reduce(function(s,v){return s+v;},0)/gaps.length).toFixed(1));
       }
       return {key:qk, units:d.units, lots:lotCount, avgRun:avgRun, freqDays:freqDays};
     });
 
-    // Score: use last 4 quarters with data for trend calculation
     var withData = qtrs.filter(function(q){return q.units>0;});
-    if (withData.length < 2) {
-      results.push({cust:cust, qtrs:qtrs, score:null, tag:'new', ytd:0, totalLots:0});
-      return;
+    var ytd = custAnnual[cust] ? (custAnnual[cust][nowYr]||0) : 0;
+    var ytdLots = 0;
+    qtrs.forEach(function(q){ if (q.key.startsWith(nowYr+'-')) ytdLots += q.lots; });
+
+    // Tag: compare last full quarter to prev full quarter (skip current partial)
+    var completedWithData = withData.filter(function(q){return q.key !== curQk;});
+    var tag = 'new';
+    if (completedWithData.length >= 2) {
+      var prev = completedWithData[completedWithData.length-2].units;
+      var last = completedWithData[completedWithData.length-1].units;
+      var chg = prev ? (last-prev)/prev : 0;
+      tag = chg > 0.05 ? 'growing' : chg < -0.05 ? 'declining' : 'flat';
+    } else if (completedWithData.length === 1) {
+      tag = 'flat';
     }
 
-    // Compute trends over last 4 (or available) quarters
-    var recent = withData.slice(-4);
-    function linSlope(arr) {
-      var n = arr.length;
-      if (n < 2) return 0;
-      var sx=0,sy=0,sxy=0,sxx=0;
-      arr.forEach(function(v,i){sx+=i;sy+=v;sxy+=i*v;sxx+=i*i;});
-      var denom=n*sxx-sx*sx; if(!denom) return 0;
-      return (n*sxy-sx*sy)/denom;
-    }
-
-    var volSlope = linSlope(recent.map(function(q){return q.units;}));
-    var volMean  = recent.reduce(function(s,q){return s+q.units;},0)/recent.length;
-    var volScore = volMean ? Math.max(0, Math.min(100, 50 + (volSlope/volMean)*150)) : 50;
-
-    var freqArr = recent.map(function(q){return q.freqDays;}).filter(function(v){return v!==null;});
-    var freqScore = 50;
-    if (freqArr.length >= 2) {
-      // Lower freq days = better (more frequent); negative slope = improving
-      var freqSlope = linSlope(freqArr);
-      var freqMean  = freqArr.reduce(function(s,v){return s+v;},0)/freqArr.length;
-      freqScore = freqMean ? Math.max(0, Math.min(100, 50 - (freqSlope/freqMean)*100)) : 50;
-    }
-
-    var runArr = recent.map(function(q){return q.avgRun;}).filter(function(v){return v>0;});
-    var runScore = 50;
-    if (runArr.length >= 2) {
-      var runSlope = linSlope(runArr);
-      var runMean  = runArr.reduce(function(s,v){return s+v;},0)/runArr.length;
-      runScore = runMean ? Math.max(0, Math.min(100, 50 + (runSlope/runMean)*120)) : 50;
-    }
-
-    // Weights: volume 50%, frequency 30%, run size 20%
-    var score = Math.round(volScore*0.50 + freqScore*0.30 + runScore*0.20);
-    score = Math.max(1, Math.min(99, score));
-
-    // Tag based on recent trajectory (last 2 vs prev 2)
-    var tag = 'flat';
-    if (withData.length >= 4) {
-      var prev2 = withData.slice(-4,-2).reduce(function(s,q){return s+q.units;},0)/2;
-      var last2 = withData.slice(-2).reduce(function(s,q){return s+q.units;},0)/2;
-      var chg = prev2 ? (last2-prev2)/prev2 : 0;
-      if (chg > 0.05) tag = 'growing';
-      else if (chg < -0.05) tag = 'declining';
-    } else if (withData.length >= 2) {
-      var oldU = withData[0].units, newU = withData[withData.length-1].units;
-      var chg2 = oldU ? (newU-oldU)/oldU : 0;
-      if (chg2 > 0.05) tag = 'growing';
-      else if (chg2 < -0.05) tag = 'declining';
-    }
-
-    var nowYr = now.getFullYear();
-    var ytd = 0;
-    Object.keys(qmap).forEach(function(qk) {
-      if (qk.startsWith(nowYr+'-')) ytd += qmap[qk].units;
-    });
-    var totalLots = withData.reduce(function(s,q){return s+q.lots;},0);
-
-    results.push({cust:cust, qtrs:qtrs, score:score, tag:tag, ytd:ytd, totalLots:totalLots, withData:withData});
+    var annuals = custAnnual[cust] || {};
+    results.push({cust:cust, qtrs:qtrs, tag:tag, ytd:ytd, ytdLots:ytdLots, annuals:annuals, withData:withData});
   });
 
-  results.sort(function(a,b){
-    var sa = a.score===null?-1:a.score, sb = b.score===null?-1:b.score;
-    return sb - sa;
-  });
-  return {customers:results, displayQtrs:displayQtrs};
+  // Sort by YTD units descending
+  results.sort(function(a,b){ return b.ytd - a.ytd; });
+  return {customers:results, displayQtrs:displayQtrs, curQk:curQk};
 }
 
-function renderCustomerHealth(healthData, selectedCustName) {
+function renderCustomerOverview(healthData) {
   var customers = healthData.customers;
   var displayQtrs = healthData.displayQtrs;
+  var curQk = healthData.curQk;
+  var now = new Date();
+  var nowYr = now.getFullYear();
+  var years = [];
+  var yy = 2025;
+  while (yy <= nowYr) { years.push(yy); yy++; }
 
-  // ── Drilldown view ──
-  if (selectedCustName) {
-    var cd = customers.find(function(c){return c.cust===selectedCustName;});
-    if (!cd) { return renderCustomerHealthFleet(healthData); }
+  var thStyle = 'text-align:right;padding:5px 10px;font-size:10px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.04em;border-bottom:0.5px solid #2c2c2a;white-space:nowrap;';
+  var thStyleL = 'text-align:left;padding:5px 10px;font-size:10px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.04em;border-bottom:0.5px solid #2c2c2a;white-space:nowrap;';
 
-    var score = cd.score || 0;
-    var circumference = 2 * Math.PI * 42;
-    var offset = circumference * (1 - score/100);
-    var scoreColor = score >= 70 ? '#1D9E75' : score >= 45 ? '#EF9F27' : '#E05555';
-    var trackColor = score >= 70 ? '#085041' : score >= 45 ? '#4A2E00' : '#4A1515';
-
-    var tagBadge = '';
-    if (cd.tag==='growing')  tagBadge = '<span style="display:inline-block;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:500;background:#085041;color:#9FE1CB;">↑ Growing</span>';
-    else if (cd.tag==='declining') tagBadge = '<span style="display:inline-block;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:500;background:#791F1F;color:#F09595;">↓ Declining</span>';
-    else tagBadge = '<span style="display:inline-block;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:500;background:#2c2c2a;color:#888780;">→ New / Flat</span>';
-
-    var maxUnits = Math.max.apply(null, cd.qtrs.map(function(q){return q.units;})) || 1;
-
-    var qtrCols = cd.qtrs.map(function(q, idx) {
-      var prevQ = cd.qtrs[idx-1];
-      var delta = '';
-      if (prevQ && prevQ.units > 0 && q.units > 0) {
-        var pct = ((q.units - prevQ.units)/prevQ.units*100);
-        var pos = pct >= 0;
-        delta = '<div style="display:inline-block;padding:1px 6px;border-radius:5px;font-size:10px;font-weight:500;background:'+(pos?'#085041':'#791F1F')+';color:'+(pos?'#9FE1CB':'#F09595')+';margin-top:5px;">'+(pos?'+':'')+pct.toFixed(1)+'%</div>';
-      }
-      var isPartial = (idx === cd.qtrs.length-1) && (new Date() < new Date(q.key.replace(/(\d+)-Q(\d)/,function(m,y,q){return y+'-'+(q*3)+'-01';})));
-      var barW = maxUnits ? Math.round((q.units/maxUnits)*100) : 0;
-      var isCurrent = q.key === getQuarterKey(new Date());
-      return '<div style="background:#141618;border:0.5px solid '+(isCurrent?'#1D5A99':'#2c2c2a')+';border-radius:8px;padding:10px;">'
-        +'<div style="font-size:10px;color:'+(isCurrent?'#378ADD':'#5f5e5a')+';text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">'+quarterLabel(q.key)+(isCurrent?' <span style="color:#5f5e5a">(partial)</span>':'')+'</div>'
-        +(q.units ? '<div style="font-size:15px;font-weight:500;color:#e8e6e0;margin-bottom:2px;">'+q.units.toLocaleString()+'</div>' : '<div style="font-size:13px;color:#5f5e5a;margin-bottom:2px;">—</div>')
-        +(q.lots ? '<div style="font-size:10px;color:#5f5e5a;">'+q.lots+' lot'+(q.lots!==1?'s':'')+' · avg '+q.avgRun.toLocaleString()+'</div>' : '')
-        +(q.freqDays ? '<div style="font-size:10px;color:#5f5e5a;margin-top:3px;">every '+q.freqDays.toFixed(1)+' days</div>' : '')
-        +delta
-        +'<div style="height:3px;background:#2c2c2a;border-radius:2px;margin-top:8px;overflow:hidden;"><div style="height:100%;width:'+barW+'%;background:'+(isCurrent?'#378ADD':'#888780')+';border-radius:2px;"></div></div>'
-        +'</div>';
-    }).join('');
-
-    // Signal summary — compute from all data
-    var wd = cd.withData || [];
-    var volTrendColor = '#888780', volTrendText = '—';
-    var freqTrendColor = '#888780', freqTrendText = '—';
-    var runTrendColor = '#888780', runTrendText = '—';
-    if (wd.length >= 2) {
-      var first = wd[0], last = wd[wd.length-1];
-      if (first.units && last.units) {
-        var vPct = ((last.units-first.units)/first.units*100);
-        volTrendColor = vPct>=0?'#1D9E75':'#E05555';
-        volTrendText = (vPct>=0?'+':'')+vPct.toFixed(0)+'% over '+wd.length+' qtrs';
-      }
-      var freqArr = wd.map(function(q){return q.freqDays;}).filter(function(v){return v!==null;});
-      if (freqArr.length >= 2) {
-        freqTrendColor = '#378ADD';
-        freqTrendText = 'Every '+freqArr[0].toFixed(1)+' → '+freqArr[freqArr.length-1].toFixed(1)+' days';
-      }
-      var runArr = wd.filter(function(q){return q.avgRun>0;});
-      if (runArr.length >= 2) {
-        var rPct = ((runArr[runArr.length-1].avgRun - runArr[0].avgRun)/runArr[0].avgRun*100);
-        runTrendColor = rPct>=0?'#1D9E75':'#E05555';
-        runTrendText = runArr[0].avgRun.toLocaleString()+' → '+runArr[runArr.length-1].avgRun.toLocaleString()+' avg units';
-      }
-    }
-
-    return '<div style="background:#1e2124;border:0.5px solid #2c2c2a;border-radius:12px;padding:1.25rem;margin-bottom:10px;">'
-      // Header row
-      +'<div style="display:flex;align-items:center;gap:20px;margin-bottom:1.25rem;flex-wrap:wrap;">'
-        +'<div style="position:relative;width:80px;height:80px;flex-shrink:0;">'
-          +'<svg width="80" height="80" viewBox="0 0 100 100">'
-            +'<circle cx="50" cy="50" r="42" fill="none" stroke="'+trackColor+'" stroke-width="7"/>'
-            +'<circle cx="50" cy="50" r="42" fill="none" stroke="'+scoreColor+'" stroke-width="7" stroke-dasharray="'+circumference.toFixed(2)+'" stroke-dashoffset="'+offset.toFixed(2)+'" transform="rotate(-90 50 50)" stroke-linecap="round"/>'
-          +'</svg>'
-          +'<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;">'
-            +'<div style="font-size:18px;font-weight:500;color:'+scoreColor+';">'+score+'</div>'
-            +'<div style="font-size:9px;color:#5f5e5a;">health</div>'
-          +'</div>'
-        +'</div>'
-        +'<div style="flex:1;">'
-          +'<div style="font-size:17px;font-weight:500;color:#e8e6e0;margin-bottom:6px;">'+selectedCustName+'</div>'
-          +'<div style="display:flex;gap:6px;flex-wrap:wrap;">'+tagBadge
-            +(wd.length >= 3 ? '<span style="display:inline-block;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:500;background:#0C447C;color:#85B7EB;">'+wd.length+' active quarters</span>' : '')
-          +'</div>'
-        +'</div>'
-        +'<div style="text-align:right;flex-shrink:0;">'
-          +'<div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;">YTD Units</div>'
-          +'<div style="font-size:20px;font-weight:500;color:#e8e6e0;">'+cd.ytd.toLocaleString()+'</div>'
-        +'</div>'
-      +'</div>'
-      // Quarter grid
-      +'<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:14px;">'+qtrCols+'</div>'
-      // Signal summary
-      +'<div style="background:#141618;border:0.5px solid #2c2c2a;border-radius:8px;padding:12px;display:flex;gap:20px;flex-wrap:wrap;">'
-        +'<div><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;">Volume trend</div>'
-          +'<div style="font-size:13px;font-weight:500;color:'+volTrendColor+';">'+volTrendText+'</div></div>'
-        +'<div style="width:0.5px;background:#2c2c2a;flex-shrink:0;"></div>'
-        +'<div><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;">Lot frequency</div>'
-          +'<div style="font-size:13px;font-weight:500;color:'+freqTrendColor+';">'+freqTrendText+'</div></div>'
-        +'<div style="width:0.5px;background:#2c2c2a;flex-shrink:0;"></div>'
-        +'<div><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;">Avg run size</div>'
-          +'<div style="font-size:13px;font-weight:500;color:'+runTrendColor+';">'+runTrendText+'</div></div>'
-        +'<div style="width:0.5px;background:#2c2c2a;flex-shrink:0;margin-left:auto;"></div>'
-        +'<div style="margin-left:0;"><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Score inputs</div>'
-          +'<div style="font-size:10px;color:#5f5e5a;line-height:1.6;">Volume growth 50% · Frequency 30% · Run size 20%</div></div>'
-      +'</div>'
-    +'</div>';
-  }
-
-  // ── Fleet overview ──
-  return renderCustomerHealthFleet(healthData);
-}
-
-function renderCustomerHealthFleet(healthData) {
-  var customers = healthData.customers;
-  var displayQtrs = healthData.displayQtrs;
-  var maxYtd = Math.max.apply(null, customers.map(function(c){return c.ytd;})) || 1;
-
-  var headerCols = displayQtrs.map(function(qk){
-    return '<div style="font-size:10px;color:#5f5e5a;flex:1;text-align:right;text-transform:uppercase;letter-spacing:.04em;">'+quarterLabel(qk)+'</div>';
-  }).join('');
-
-  var rows = customers.map(function(cd) {
-    var score = cd.score;
-    var scoreColor = score===null?'#444441':score>=70?'#1D9E75':score>=45?'#EF9F27':'#E05555';
-    var trackColor = score===null?'#222':score>=70?'#085041':score>=45?'#4A2E00':'#4A1515';
-    var circumference = 2 * Math.PI * 14;
-    var offset = score===null ? circumference : circumference*(1-score/100);
+  var cards = customers.map(function(cd) {
+    var sid = safeid(cd.cust);
+    var expanded = !!_chExpanded[sid];
 
     var tagEl = '';
-    if (cd.tag==='growing')   tagEl='<span style="font-size:10px;font-weight:500;padding:2px 8px;border-radius:6px;background:#085041;color:#9FE1CB;flex-shrink:0;white-space:nowrap;">↑ Growing</span>';
-    else if (cd.tag==='declining') tagEl='<span style="font-size:10px;font-weight:500;padding:2px 8px;border-radius:6px;background:#791F1F;color:#F09595;flex-shrink:0;white-space:nowrap;">↓ Declining</span>';
-    else tagEl='<span style="font-size:10px;font-weight:500;padding:2px 8px;border-radius:6px;background:#2c2c2a;color:#888780;flex-shrink:0;white-space:nowrap;">→ New / Flat</span>';
+    if (cd.tag==='growing')   tagEl='<span style="font-size:10px;font-weight:500;padding:2px 8px;border-radius:6px;background:#085041;color:#9FE1CB;">↑ Growing</span>';
+    else if (cd.tag==='declining') tagEl='<span style="font-size:10px;font-weight:500;padding:2px 8px;border-radius:6px;background:#791F1F;color:#F09595;">↓ Declining</span>';
+    else if (cd.tag==='flat') tagEl='<span style="font-size:10px;font-weight:500;padding:2px 8px;border-radius:6px;background:#2c2c2a;color:#888780;">→ Flat</span>';
+    else tagEl='<span style="font-size:10px;font-weight:500;padding:2px 8px;border-radius:6px;background:#0C447C;color:#85B7EB;">New</span>';
 
-    var maxQ = Math.max.apply(null, cd.qtrs.map(function(q){return q.units;})) || 1;
-    var sparkBars = cd.qtrs.map(function(q, idx) {
-      var h = Math.max(3, Math.round((q.units/maxQ)*24));
-      var isCur = q.key === getQuarterKey(new Date());
-      var col = isCur ? '#378ADD' : (q.units > 0 ? '#4A6580' : '#2c2c2a');
-      return '<div style="width:8px;height:'+h+'px;background:'+col+';border-radius:2px 2px 0 0;align-self:flex-end;"></div>';
+    // Annual summary pills
+    var annualPills = years.map(function(yr) {
+      var v = cd.annuals[yr]||0;
+      var isCur = yr === nowYr;
+      if (!v) return '';
+      return '<span style="font-size:11px;color:'+(isCur?'#378ADD':'#888780')+';white-space:nowrap;">'
+        +yr+': <strong style="font-weight:500;color:'+(isCur?'#e8e6e0':'#888780')+'">'+v.toLocaleString()+'</strong>'+(isCur?' YTD':'')+'</span>';
+    }).filter(Boolean).join('<span style="color:#2c2c2a;margin:0 6px;">·</span>');
+
+    // Header row (always visible)
+    var header = '<div onclick="toggleCH(\''+sid+'\')" style="display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;background:#1e2124;border-radius:10px;" onmouseover="this.style.background=\'#252829\'" onmouseout="this.style.background=\'#1e2124\'">'
+      +'<svg id="ch-chev-'+sid+'" width="12" height="12" viewBox="0 0 12 12" fill="none" style="flex-shrink:0;transition:transform .15s;transform:'+(expanded?'rotate(180deg)':'')+'"><polyline points="2,4 6,8 10,4" stroke="#5f5e5a" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+      +'<span style="font-size:13px;font-weight:500;color:#e8e6e0;flex-shrink:0;">'+cd.cust+'</span>'
+      +tagEl
+      +'<span style="font-size:11px;color:#5f5e5a;margin-left:4px;">'+annualPills+'</span>'
+      +'<div style="margin-left:auto;display:flex;align-items:center;gap:14px;flex-shrink:0;">'
+        +'<span style="font-size:11px;color:#888780;">'+cd.ytdLots+' lots YTD</span>'
+        +'<span style="font-size:13px;font-weight:500;color:#e8e6e0;">'+cd.ytd.toLocaleString()+' <span style="font-size:10px;font-weight:400;color:#5f5e5a;">YTD units</span></span>'
+      +'</div>'
+    +'</div>';
+
+    // Detail table (collapsible)
+    var maxUnits = Math.max.apply(null, cd.qtrs.map(function(q){return q.units;})) || 1;
+
+    var tableRows = cd.qtrs.map(function(q, idx) {
+      var isCur = q.key === curQk;
+      var tdBase = 'padding:6px 10px;border-bottom:0.5px solid #2c2c2a;white-space:nowrap;font-size:12px;';
+      var rowBg = isCur ? 'background:#1a2030;' : '';
+
+      // Units delta vs prev quarter with data
+      var prevWithData = null;
+      for (var pi = idx-1; pi >= 0; pi--) { if (cd.qtrs[pi].units > 0) { prevWithData = cd.qtrs[pi]; break; } }
+
+      var unitsDelta = '';
+      if (prevWithData && q.units > 0) {
+        var ud = ((q.units-prevWithData.units)/prevWithData.units*100);
+        var uPos = ud >= 0;
+        unitsDelta = ' <span style="display:inline-block;padding:1px 5px;border-radius:4px;font-size:10px;font-weight:500;background:'+(uPos?'#085041':'#791F1F')+';color:'+(uPos?'#9FE1CB':'#F09595')+'">'+(uPos?'+':'')+ud.toFixed(1)+'%</span>';
+      } else if (!prevWithData && q.units > 0) {
+        unitsDelta = ' <span style="display:inline-block;padding:1px 5px;border-radius:4px;font-size:10px;font-weight:500;background:#0C447C;color:#85B7EB;">new</span>';
+      }
+
+      // Run size delta
+      var prevRun = null;
+      for (var ri = idx-1; ri >= 0; ri--) { if (cd.qtrs[ri].avgRun > 0) { prevRun = cd.qtrs[ri].avgRun; break; } }
+      var runDelta = '';
+      if (prevRun && q.avgRun > 0) {
+        var rd = ((q.avgRun-prevRun)/prevRun*100);
+        var rPos = rd >= 0;
+        runDelta = ' <span style="display:inline-block;padding:1px 5px;border-radius:4px;font-size:10px;font-weight:500;background:'+(rPos?'#085041':'#791F1F')+';color:'+(rPos?'#9FE1CB':'#F09595')+'">'+(rPos?'+':'')+rd.toFixed(1)+'%</span>';
+      }
+
+      // Frequency delta (lower = more frequent = better)
+      var prevFreq = null;
+      for (var fi = idx-1; fi >= 0; fi--) { if (cd.qtrs[fi].freqDays !== null) { prevFreq = cd.qtrs[fi].freqDays; break; } }
+      var freqDelta = '';
+      if (prevFreq !== null && q.freqDays !== null) {
+        var fd = ((q.freqDays-prevFreq)/prevFreq*100);
+        var fPos = fd <= 0; // lower interval = more frequent = good
+        freqDelta = ' <span style="display:inline-block;padding:1px 5px;border-radius:4px;font-size:10px;font-weight:500;background:'+(fPos?'#085041':'#791F1F')+';color:'+(fPos?'#9FE1CB':'#F09595')+'">'+(fd>0?'+':'')+fd.toFixed(1)+'%</span>';
+      }
+
+      var barW = q.units ? Math.round((q.units/maxUnits)*88) : 0;
+      var barColor = isCur ? '#378ADD' : '#4A6580';
+
+      return '<tr>'
+        +'<td style="'+tdBase+rowBg+'color:'+(isCur?'#378ADD':'#888780')+';font-weight:'+(isCur?'500':'400')+';">'
+          +(isCur?'<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#378ADD;margin-right:5px;vertical-align:middle;"></span>':'')
+          +quarterLabel(q.key)+(isCur?' <span style="font-size:10px;color:#5f5e5a;font-weight:400;">partial</span>':'')
+        +'</td>'
+        +'<td style="'+tdBase+rowBg+'text-align:right;color:#e8e6e0;">'+(q.units?q.units.toLocaleString():'—')+'</td>'
+        +'<td style="'+tdBase+rowBg+'text-align:right;">'+unitsDelta+'</td>'
+        +'<td style="'+tdBase+rowBg+'text-align:right;color:#888780;">'+(q.lots||'—')+'</td>'
+        +'<td style="'+tdBase+rowBg+'text-align:right;color:#e8e6e0;">'+(q.avgRun?q.avgRun.toLocaleString():'—')+'</td>'
+        +'<td style="'+tdBase+rowBg+'text-align:right;">'+runDelta+'</td>'
+        +'<td style="'+tdBase+rowBg+'text-align:right;color:#888780;">'+(q.freqDays!==null?'every '+q.freqDays+'d':'—')+'</td>'
+        +'<td style="'+tdBase+rowBg+'text-align:right;">'+freqDelta+'</td>'
+        +'<td style="'+tdBase+rowBg+'padding-right:14px;width:120px;">'
+          +'<div style="display:flex;align-items:center;gap:6px;">'
+            +'<div style="flex:1;height:4px;background:#2c2c2a;border-radius:2px;overflow:hidden;">'
+              +'<div style="height:100%;width:'+barW+'%;background:'+barColor+';border-radius:2px;"></div>'
+            +'</div>'
+          +'</div>'
+        +'</td>'
+      +'</tr>';
     }).join('');
 
-    var ytdW = maxYtd ? Math.round((cd.ytd/maxYtd)*100) : 0;
+    var detailTable = '<div id="ch-body-'+sid+'" style="display:'+(expanded?'block':'none')+';">'
+      +'<table style="width:100%;border-collapse:collapse;">'
+      +'<thead><tr>'
+        +'<th style="'+thStyleL+'padding-left:14px;width:90px;">Quarter</th>'
+        +'<th style="'+thStyle+'">Units</th>'
+        +'<th style="'+thStyle+'width:70px;">vs prev</th>'
+        +'<th style="'+thStyle+'">Lots</th>'
+        +'<th style="'+thStyle+'">Avg run</th>'
+        +'<th style="'+thStyle+'width:70px;">vs prev</th>'
+        +'<th style="'+thStyle+'">Frequency</th>'
+        +'<th style="'+thStyle+'width:70px;">vs prev</th>'
+        +'<th style="'+thStyle+'padding-right:14px;width:120px;">Volume</th>'
+      +'</tr></thead>'
+      +'<tbody>'+tableRows+'</tbody>'
+      +'</table>'
+    +'</div>';
 
-    return '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:0.5px solid #2c2c2a;">'
-      +'<div style="width:150px;flex-shrink:0;font-size:12px;font-weight:500;color:#378ADD;cursor:pointer;" onclick="selectCustomer(\''+cd.cust.replace(/'/g,"\\'")+'\')" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">'+cd.cust+'</div>'
-      +'<div style="width:44px;flex-shrink:0;text-align:center;">'
-        +'<div style="position:relative;width:36px;height:36px;margin:0 auto;">'
-          +'<svg width="36" height="36" viewBox="0 0 36 36">'
-            +'<circle cx="18" cy="18" r="14" fill="none" stroke="'+trackColor+'" stroke-width="3"/>'
-            +'<circle cx="18" cy="18" r="14" fill="none" stroke="'+scoreColor+'" stroke-width="3" stroke-dasharray="87.96" stroke-dashoffset="'+(score===null?87.96:(87.96*(1-score/100))).toFixed(2)+'" transform="rotate(-90 18 18)" stroke-linecap="round"/>'
-          +'</svg>'
-          +'<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:500;color:'+scoreColor+';">'+(score===null?'—':score)+'</div>'
-        +'</div>'
-      +'</div>'
-      +'<div style="flex:1;display:flex;align-items:flex-end;gap:3px;height:28px;">'+sparkBars+'</div>'
-      +'<div style="width:80px;flex-shrink:0;text-align:right;">'
-        +'<div style="font-size:12px;color:#e8e6e0;">'+cd.ytd.toLocaleString()+'</div>'
-        +'<div style="height:3px;background:#2c2c2a;border-radius:2px;margin-top:4px;overflow:hidden;"><div style="height:100%;width:'+ytdW+'%;background:#4A6580;border-radius:2px;"></div></div>'
-      +'</div>'
-      +'<div style="width:40px;flex-shrink:0;text-align:right;font-size:11px;color:#888780;">'+cd.totalLots+'</div>'
-      +'<div style="width:90px;flex-shrink:0;text-align:right;">'+tagEl+'</div>'
+    return '<div style="background:#1e2124;border:0.5px solid #2c2c2a;border-radius:10px;overflow:hidden;margin-bottom:6px;">'
+      +header+detailTable
     +'</div>';
   }).join('');
 
-  return '<div style="background:#1e2124;border:0.5px solid #2c2c2a;border-radius:12px;padding:1rem 1.25rem;margin-bottom:10px;">'
-    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">'
-      +'<div style="font-size:10px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.05em;">Customer Health — Sorted by score</div>'
-      +'<div style="display:flex;gap:6px;align-items:center;">'
-        +'<span style="font-size:10px;color:#5f5e5a;">Score = Vol 50% · Freq 30% · Run size 20%</span>'
-        +'<span style="font-size:10px;font-weight:500;padding:2px 8px;border-radius:10px;background:#085041;color:#9FE1CB;">Growing</span>'
-        +'<span style="font-size:10px;font-weight:500;padding:2px 8px;border-radius:10px;background:#791F1F;color:#F09595;">Declining</span>'
-        +'<span style="font-size:10px;font-weight:500;padding:2px 8px;border-radius:10px;background:#2c2c2a;color:#888780;">New / Flat</span>'
-      +'</div>'
+  var legendHTML = '<div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">'
+    +'<span style="font-size:10px;font-weight:500;padding:2px 8px;border-radius:6px;background:#085041;color:#9FE1CB;">↑ Growing</span>'
+    +'<span style="font-size:10px;font-weight:500;padding:2px 8px;border-radius:6px;background:#791F1F;color:#F09595;">↓ Declining</span>'
+    +'<span style="font-size:10px;font-weight:500;padding:2px 8px;border-radius:6px;background:#2c2c2a;color:#888780;">→ Flat</span>'
+    +'<span style="font-size:10px;font-weight:500;padding:2px 8px;border-radius:6px;background:#0C447C;color:#85B7EB;">New</span>'
+  +'</div>';
+
+  return '<div style="margin-bottom:10px;">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;">'
+      +'<div style="font-size:10px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.05em;">Customer overview — Q1 2025 → present · sorted by YTD units</div>'
+      +legendHTML
     +'</div>'
-    // Column headers
-    +'<div style="display:flex;align-items:center;gap:12px;padding:0 0 6px;border-bottom:0.5px solid #2c2c2a;margin-bottom:4px;">'
-      +'<div style="font-size:10px;color:#5f5e5a;width:150px;flex-shrink:0;text-transform:uppercase;letter-spacing:.04em;">Customer</div>'
-      +'<div style="font-size:10px;color:#5f5e5a;width:44px;flex-shrink:0;text-align:center;text-transform:uppercase;letter-spacing:.04em;">Score</div>'
-      +'<div style="font-size:10px;color:#5f5e5a;flex:1;text-transform:uppercase;letter-spacing:.04em;">Quarterly units ('+displayQtrs.map(quarterLabel).join(' → ')+')</div>'
-      +'<div style="font-size:10px;color:#5f5e5a;width:80px;flex-shrink:0;text-align:right;text-transform:uppercase;letter-spacing:.04em;">YTD Units</div>'
-      +'<div style="font-size:10px;color:#5f5e5a;width:40px;flex-shrink:0;text-align:right;text-transform:uppercase;letter-spacing:.04em;">Lots</div>'
-      +'<div style="font-size:10px;color:#5f5e5a;width:90px;flex-shrink:0;text-align:right;text-transform:uppercase;letter-spacing:.04em;">Trajectory</div>'
-    +'</div>'
-    + rows
+    +cards
   +'</div>';
 }
 
@@ -2513,17 +2457,17 @@ function renderCustomers() {
     +'<span style="font-size:13px;font-weight:500;color:#e8e6e0;white-space:nowrap;">'+range.label+' &#x25BE;</span>'
     +'</div></div>';
 
-  // ── Health section ──
-  var healthData = computeCustomerHealth();
+  // ── Customer overview (collapsible cards) ──
+  var healthData = computeCustomerData();
 
   if (selectedCustomer) {
-    // Full drilldown — replace entire view
-    document.getElementById('content').innerHTML = renderCustomerHealth(healthData, selectedCustomer);
-    return;
+    // No more drilldown — clear it and re-render normally
+    selectedCustomer = null;
+    renderSubBar();
   }
 
   // Fleet overview + existing table
-  var healthHTML = renderCustomerHealth(healthData, null);
+  var healthHTML = renderCustomerOverview(healthData);
 
   document.getElementById('content').innerHTML =
     healthHTML
