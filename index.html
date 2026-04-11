@@ -620,6 +620,15 @@ function computeRecords() {
   return { dailyMap:dailyMap, top5days:top5days, top5byLine:top5byLine, top5weeks:top5weeks };
 }
 
+function hardRefresh() {
+  var btn = document.querySelector('#app-bar-right button');
+  if (btn) { btn.style.opacity = '.5'; btn.querySelector('span').textContent = 'Refreshing…'; }
+  fetchData().then(function(res){
+    if (applyFreshData(res)) { lastRefreshTime = Date.now(); render(); }
+    else { if (btn) { btn.style.opacity = '1'; btn.querySelector('span').textContent = isViewingLive() ? 'Live' : 'Refresh'; } }
+  }).catch(function(){ if (btn) { btn.style.opacity = '1'; btn.querySelector('span').textContent = 'Error'; setTimeout(function(){ render(); }, 1500); } });
+}
+
 function refreshAndRender(forceRender) {
   fetchData().then(function(res){
     if(applyFreshData(res)){
@@ -1085,9 +1094,12 @@ function render() {
   closeMsPanel();
   Object.values(charts).forEach(function(c){ try{c.destroy();}catch(e){} });
   charts = {};
-  // Update live pill on every render
+  // Update live pill — always visible in app bar, clickable to force refresh
   var abr = document.getElementById('app-bar-right');
-  if (abr) abr.innerHTML = (mainSection==='production' && isViewingLive()) ? '<span style="font-size:10px;color:#1D9E75;font-weight:500;padding:3px 10px;border-radius:10px;background:#085041;white-space:nowrap;">&#8635; Live</span>' : '';
+  if (abr) {
+    var live = isViewingLive();
+    abr.innerHTML = '<button onclick="hardRefresh()" style="font-size:11px;font-weight:500;padding:4px 12px;border-radius:10px;background:#085041;border:0.5px solid #1D9E75;color:#1D9E75;cursor:pointer;font-family:system-ui;display:inline-flex;align-items:center;gap:5px;transition:opacity .15s;" onmouseover="this.style.opacity=\'.75\'" onmouseout="this.style.opacity=\'1\'" title="Click to refresh data">&#8635; <span>'+(live?'Live':'Refresh')+'</span></button>';
+  }
   try {
     if (mainSection === 'customers') {
       document.getElementById('content').innerHTML = '<div style="padding:3rem;text-align:center;color:#888780;font-size:13px;">Customer view coming soon</div>';
@@ -1330,9 +1342,7 @@ function renderToday() {
     +'<div style="font-size:10px;color:#5f5e5a;margin-top:2px;height:14px">'+dayLabel+'</div>'
     +'</div>'
     +'<button onclick="navDay(1)" '+(nextDisabled?'disabled':'')+' style="width:28px;height:28px;flex-shrink:0;border-radius:8px;border:0.5px solid #444441;background:transparent;cursor:'+(nextDisabled?'default':'pointer')+';color:'+(nextDisabled?'#444441':'#e8e6e0')+';font-size:16px;display:flex;align-items:center;justify-content:center;font-family:system-ui">&#8250;</button>'
-    +'<div style="width:70px;flex-shrink:0;display:flex;justify-content:flex-start;">'
-    +(isLive?'<span style="font-size:10px;color:#1D9E75;font-weight:500;padding:2px 8px;border-radius:10px;background:#085041;white-space:nowrap">&#8635; Live</span>':'<button onclick="goLive()" style="padding:4px 12px;border-radius:8px;border:0.5px solid #1D9E75;background:transparent;cursor:pointer;color:#1D9E75;font-size:11px;font-weight:500;font-family:system-ui;white-space:nowrap">Live</button>')
-    +'</div></div>';
+    +'</div>';
 
   var gaugesHTML=ALL_LINES.map(function(line,i){
     var k2=lk(line),color=LINE_COLOR[k2]||'#888780',bg=LINE_BG[k2]||'#2c2c2a',txt=LINE_TXT[k2]||'#e8e6e0',type=LINE_TYPE[k2]||'';
@@ -1537,7 +1547,7 @@ function renderWeekly() {
     +'<div style="font-size:10px;color:#5f5e5a;margin-top:2px;height:14px;">'+(isLiveWeek?'(This week)':daysElapsed+' of 5 days')+'</div>'
     +'</div>'
     +'<button onclick="navWeek(1)" '+(isLiveWeek?'disabled':'')+' style="width:28px;height:28px;flex-shrink:0;border-radius:8px;border:0.5px solid #444441;background:transparent;cursor:'+(isLiveWeek?'default':'pointer')+';color:'+(isLiveWeek?'#444441':'#e8e6e0')+';font-size:16px;display:flex;align-items:center;justify-content:center;font-family:system-ui">&#8250;</button>'
-    +'<div style="width:70px;flex-shrink:0;display:flex;justify-content:flex-start;">'+(isLiveWeek?'<span style="font-size:10px;color:#1D9E75;font-weight:500;padding:2px 8px;border-radius:10px;background:#085041;white-space:nowrap;">&#8635; Live</span>':'<button onclick="goWeekLive()" style="padding:4px 12px;border-radius:8px;border:0.5px solid #1D9E75;background:transparent;cursor:pointer;color:#1D9E75;font-size:11px;font-weight:500;font-family:system-ui;white-space:nowrap;">Live</button>')+'</div></div>';
+    +'</div>';
 
   document.getElementById('content').innerHTML=
     '<div style="background:#1e2124;border:0.5px solid #2c2c2a;border-radius:12px;padding:1rem;margin-bottom:10px;">'
@@ -1599,9 +1609,7 @@ function renderDetail() {
       +'<div style="font-size:10px;color:#5f5e5a;margin-top:2px;height:14px;">'+dayLabel+'</div>'
       +'</div>'
       +'<button onclick="navDay(1)" '+(nextDisabled?'disabled':'')+' style="width:28px;height:28px;flex-shrink:0;border-radius:8px;border:0.5px solid #444441;background:transparent;cursor:'+(nextDisabled?'default':'pointer')+';color:'+(nextDisabled?'#444441':'#e8e6e0')+';font-size:16px;display:flex;align-items:center;justify-content:center;font-family:system-ui">&#8250;</button>'
-      +'<div style="width:70px;flex-shrink:0;display:flex;justify-content:flex-start;">'
-      +(isLive?'<span style="font-size:10px;color:#1D9E75;font-weight:500;padding:2px 8px;border-radius:10px;background:#085041;white-space:nowrap;">&#8635; Live</span>':'<button onclick="goLive()" style="padding:4px 12px;border-radius:8px;border:0.5px solid #1D9E75;background:transparent;cursor:pointer;color:#1D9E75;font-size:11px;font-weight:500;font-family:system-ui;white-space:nowrap;">Live</button>')
-      +'</div></div>';
+      +'</div>';
 
   } else if(subView==='weekly') {
     if(!selectedWeekMon) selectedWeekMon=getCurrentWeekMon();
@@ -1619,9 +1627,7 @@ function renderDetail() {
       +'<div style="font-size:10px;color:#5f5e5a;margin-top:2px;height:14px;">'+(isLiveWeek?'(This week)':'')+'</div>'
       +'</div>'
       +'<button onclick="navWeek(1)" '+(isLiveWeek?'disabled':'')+' style="width:28px;height:28px;flex-shrink:0;border-radius:8px;border:0.5px solid #444441;background:transparent;cursor:'+(isLiveWeek?'default':'pointer')+';color:'+(isLiveWeek?'#444441':'#e8e6e0')+';font-size:16px;display:flex;align-items:center;justify-content:center;font-family:system-ui">&#8250;</button>'
-      +'<div style="width:70px;flex-shrink:0;display:flex;justify-content:flex-start;">'
-      +(isLiveWeek?'<span style="font-size:10px;color:#1D9E75;font-weight:500;padding:2px 8px;border-radius:10px;background:#085041;white-space:nowrap;">&#8635; Live</span>':'<button onclick="goWeekLive()" style="padding:4px 12px;border-radius:8px;border:0.5px solid #1D9E75;background:transparent;cursor:pointer;color:#1D9E75;font-size:11px;font-weight:500;font-family:system-ui;white-space:nowrap;">Live</button>')
-      +'</div></div>';
+      +'</div>';
 
   } else {
     if(!selectedDetailRange) selectedDetailRange=getDefaultDetailRange();
