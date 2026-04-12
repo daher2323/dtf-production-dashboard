@@ -3209,10 +3209,10 @@ function renderProcurement() {
               +'Show '+Label.toLowerCase()+'s with zero usage YTD'+(hiddenCount > 0 && !showZeroDes ? ' ('+hiddenCount+')' : '')
             +'</label>'
           : '')
-        +'<button onclick="exportProcurement()" style="display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:6px;border:0.5px solid #2c2c2a;background:#1e2124;color:#888780;font-size:11px;font-weight:500;cursor:pointer;font-family:system-ui;" onmouseover="this.style.background=\'#252829\';this.style.color=\'#e8e6e0\'" onmouseout="this.style.background=\'#1e2124\';this.style.color=\'#888780\'">'
-          +'<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 1v7M3 5l3 3 3-3"/><path d="M1 9v1.5a.5.5 0 00.5.5h9a.5.5 0 00.5-.5V9"/></svg>'
+        +'<div style="position:relative;" id="proc-export-wrap"><button onclick="toggleProcExportPopover(event)" style="font-size:12px;padding:5px 12px;border:1.5px solid #378ADD;border-radius:8px;background:#0C447C;cursor:pointer;color:#85B7EB;font-weight:500;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;font-family:system-ui;">'
+          +'<svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="#85B7EB" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 1v7M3.5 5.5l3 3 3-3M2 11h9"/></svg>'
           +'Export'
-        +'</button>'
+        +'</button></div>'
       +'</div>'
       +'</div>'
       +'<div style="display:flex;gap:6px;">'
@@ -3334,7 +3334,63 @@ function renderCustomers() {
   _triggerExpandedSynopses();
 }
 
-function toggleExportPopover(e) {
+function toggleProcExportPopover(e) {
+  e.stopPropagation();
+  closeProcExportPopover();
+  var wrap = document.getElementById('proc-export-wrap');
+  if (!wrap) return;
+  var labelPl = procView === 'jars' ? 'Jars' : procView === 'bottles' ? 'Bottles' : procView === 'lids' ? 'Lids' : procView === 'desiccants' ? 'Desiccants' : 'Neckbands';
+  var now = new Date();
+  var isDes  = procView === 'desiccants';
+  var cutoff = new Date(2025,0,1);
+  var ytdStart = new Date(now.getFullYear(),0,1);
+  var allRowsCombined = allRows.concat(allRows25);
+  function getSku2(r) {
+    if (procView==='lids') return [r['Lid Size'],r['Lid Color'],r['Lid Profile']].map(function(v){return(v||'').trim();}).filter(Boolean).join(' ');
+    if (isDes)  { var dv=(r['Desiccant']||'').trim(); return /^(none|n\/a)$/i.test(dv)?'':dv; }
+    if (procView==='neckbands') { var nv=(r['Neckband Used']||'').trim(); return /^(none|n\/a)$/i.test(nv)?'':nv; }
+    return (r[procView==='jars'?'Jar Size':'Bottle Size']||'').trim();
+  }
+  function getUnits2(r) { return isDes ? num(r['Number of Desiccants Used']) : num(r['Final Units']); }
+  var skuYtd = {};
+  allRowsCombined.forEach(function(r) {
+    var dt=new Date(r['Date']); if(isNaN(dt)||dt<cutoff) return;
+    var sku=getSku2(r); if(!sku) return;
+    var u=getUnits2(r);
+    if(dt>=ytdStart&&dt<=now) skuYtd[sku]=(skuYtd[sku]||0)+u;
+  });
+  var skuCount = Object.keys(skuYtd).filter(function(s){ return showZeroDes||skuYtd[s]>0; }).length;
+  var lotCount = allRowsCombined.filter(function(r){ var dt=new Date(r['Date']); return !isNaN(dt)&&dt>=cutoff&&!!getSku2(r); }).length;
+  var pop = document.createElement('div');
+  pop.id = 'proc-export-pop';
+  pop.style.cssText = 'position:absolute;top:calc(100% + 6px);right:0;background:#1e2124;border:0.5px solid #2c2c2a;border-radius:10px;padding:12px 14px;z-index:200;min-width:240px;box-shadow:0 4px 16px rgba(0,0,0,.4);';
+  pop.innerHTML =
+    '<div style="font-size:11px;color:#888780;margin-bottom:8px;font-weight:500;text-transform:uppercase;letter-spacing:.04em;">Export '+labelPl+'</div>'
+    +'<div style="font-size:12px;color:#e8e6e0;margin-bottom:12px;line-height:1.5;">'
+      +'<span style="font-weight:500;">'+skuCount+'</span> SKUs &middot; <span style="font-weight:500;">'+lotCount.toLocaleString()+'</span> lots<br>'
+      +'<span style="color:#5f5e5a;font-size:11px;">2 sheets: Quarterly Summary + Lot Detail</span>'
+    +'</div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;">'
+      +'<button onclick="closeProcExportPopover()" style="padding:4px 10px;border-radius:6px;border:0.5px solid #444441;background:transparent;cursor:pointer;color:#888780;font-size:12px;font-family:system-ui;">Cancel</button>'
+      +'<button onclick="closeProcExportPopover();exportProcurement()" style="padding:4px 10px;border-radius:6px;border:1.5px solid #1D9E75;background:#085041;cursor:pointer;color:#9FE1CB;font-size:12px;font-weight:500;font-family:system-ui;display:inline-flex;align-items:center;gap:5px;"><svg width="11" height="11" viewBox="0 0 11 11" fill="none"><polyline points="1.5,5.5 4.5,8.5 9.5,2.5" stroke="#9FE1CB" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Confirm</button>'
+    +'</div>';
+  wrap.appendChild(pop);
+  setTimeout(function() { document.addEventListener('click', closeProcExportPopoverOutside, true); }, 0);
+}
+
+function closeProcExportPopoverOutside(e) {
+  var pop = document.getElementById('proc-export-pop');
+  var wrap = document.getElementById('proc-export-wrap');
+  if (pop && !pop.contains(e.target) && wrap && !wrap.contains(e.target)) closeProcExportPopover();
+}
+
+function closeProcExportPopover() {
+  document.removeEventListener('click', closeProcExportPopoverOutside, true);
+  var pop = document.getElementById('proc-export-pop');
+  if (pop) pop.remove();
+}
+
+
   e.stopPropagation();
   var existing = document.getElementById('export-popover');
   if (existing) { existing.remove(); return; }
