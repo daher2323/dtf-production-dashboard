@@ -3043,10 +3043,10 @@ function renderProcurement() {
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;">'
       +'<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">'
         +'<div style="font-size:10px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.05em;">'+Label+' usage — Q1 2025 &#x2192; present &middot; sorted by YTD &middot; thru '+ytdLabelFull+'</div>'
-        +(isDes && hiddenCount > 0
+        +(isDes && (hiddenCount > 0 || showZeroDes)
           ? '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;color:#5f5e5a;user-select:none;">'
               +'<input type="checkbox" onchange="showZeroDes=this.checked;renderProcurement()" '+(showZeroDes?'checked':'')+' style="accent-color:#378ADD;cursor:pointer;">'
-              +'Show '+hiddenCount+' with zero usage YTD'
+              +'Show desiccants with zero usage YTD'+(hiddenCount > 0 && !showZeroDes ? ' ('+hiddenCount+')' : '')
             +'</label>'
           : '')
       +'</div>'
