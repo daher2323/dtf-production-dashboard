@@ -2711,19 +2711,27 @@ function renderProcurement() {
 
   // Build per-SKU per-quarter data from both years
   var allRowsCombined = allRows.concat(allRows25);
-  var skuQtr = {};   // skuQtr[sku][qk] = {lots:Set, units}
-  var totalQtrUnits = {}; // totalQtrUnits[qk] = total units across all SKUs this view
+  var skuQtr = {};
+  var skuCust = {}; // skuCust[sku][customer] = {units, lots:Set, products:{product:units}}
+  var totalQtrUnits = {};
   allRowsCombined.forEach(function(r) {
     var dt = new Date(r['Date']); if (isNaN(dt) || dt < cutoff) return;
     var lot = (r['Lot Number']||'').trim(); if (!lot) return;
-    var sku = getSku(r);
-    if (!sku) return;
+    var sku = getSku(r); if (!sku) return;
     var qk = getQuarterKey(dt);
     if (!skuQtr[sku]) skuQtr[sku] = {};
     if (!skuQtr[sku][qk]) skuQtr[sku][qk] = {lots:new Set(), units:0};
     skuQtr[sku][qk].lots.add(lot);
     skuQtr[sku][qk].units += num(r['Final Units']);
     totalQtrUnits[qk] = (totalQtrUnits[qk]||0) + num(r['Final Units']);
+    // Customer + product breakdown
+    var prod = (r['Product']||'').trim(); if (!prod) return;
+    var cust = prod.split('-')[0].trim();
+    if (!skuCust[sku]) skuCust[sku] = {};
+    if (!skuCust[sku][cust]) skuCust[sku][cust] = {units:0, lots:new Set(), products:{}};
+    skuCust[sku][cust].units += num(r['Final Units']);
+    skuCust[sku][cust].lots.add(lot);
+    skuCust[sku][cust].products[prod] = (skuCust[sku][cust].products[prod]||0) + num(r['Final Units']);
   });
 
   // Build all quarters Q1 2025 → current
@@ -2785,8 +2793,15 @@ function renderProcurement() {
       ? (ytdChg > 5 ? 'up' : ytdChg < -5 ? 'down' : 'flat')
       : 'new';
 
+    // Customer breakdown
+    var custBreakdown = skuCust[sku] ? Object.entries(skuCust[sku]).map(function(e) {
+      return {cust:e[0], units:e[1].units, lots:e[1].lots.size,
+              products:Object.entries(e[1].products).sort(function(a,b){return b[1]-a[1];}).slice(0,5)};
+    }).sort(function(a,b){return b.units-a.units;}) : [];
+
     return {sku:sku, qtrs:qtrs, tag:tag, ytdLots:ytdLots.size, ytdUnits:ytdUnits,
-            ytd25Lots:ytd25Lots.size, ytd25Units:ytd25Units, ytdPct:ytdPct, ytdPct25:ytdPct25, ytdChg:ytdChg};
+            ytd25Lots:ytd25Lots.size, ytd25Units:ytd25Units, ytdPct:ytdPct, ytdPct25:ytdPct25,
+            ytdChg:ytdChg, custBreakdown:custBreakdown};
   });
 
   // Sort by YTD units descending
@@ -2900,9 +2915,43 @@ function renderProcurement() {
       })
     };
 
+    // Customer + product breakdown HTML
+    var totalCustUnits = cd.custBreakdown.reduce(function(s,c){return s+c.units;},0) || 1;
+    var maxCustUnits = cd.custBreakdown.length ? cd.custBreakdown[0].units : 1;
+    var custRows = cd.custBreakdown.map(function(c) {
+      var barW = Math.round((c.units / maxCustUnits) * 100);
+      var pct = ((c.units / totalCustUnits) * 100).toFixed(1);
+      var prodList = c.products.map(function(p){
+        var prodName = p[0].indexOf('-') !== -1 ? p[0].split('-').slice(1).join('-').trim() : p[0];
+        return '<span style="font-size:10px;color:#5f5e5a;white-space:nowrap;">'+prodName
+          +' <span style="color:#444441;">'+p[1].toLocaleString()+'</span></span>';
+      }).join('<span style="color:#2c2c2a;margin:0 4px;">·</span>');
+      return '<div style="padding:8px 14px;border-bottom:0.5px solid #2c2c2a;">'
+        +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:5px;">'
+          +'<div style="font-size:12px;font-weight:500;color:#e8e6e0;width:140px;flex-shrink:0;">'+c.cust+'</div>'
+          +'<div style="flex:1;height:5px;background:#2c2c2a;border-radius:2px;overflow:hidden;">'
+            +'<div style="height:100%;width:'+barW+'%;background:#378ADD;border-radius:2px;opacity:.7;"></div>'
+          +'</div>'
+          +'<div style="font-size:11px;color:#e8e6e0;font-weight:500;width:80px;text-align:right;flex-shrink:0;">'+c.units.toLocaleString()+'</div>'
+          +'<div style="font-size:10px;color:#888780;width:36px;text-align:right;flex-shrink:0;">'+c.lots+' lot'+(c.lots!==1?'s':'')+'</div>'
+          +'<div style="font-size:10px;font-weight:500;color:#888780;width:36px;text-align:right;flex-shrink:0;">'+pct+'%</div>'
+        +'</div>'
+        +(prodList ? '<div style="padding-left:150px;display:flex;flex-wrap:wrap;gap:4px;">'+prodList+'</div>' : '')
+      +'</div>';
+    }).join('');
+
+    var custSection = '<div style="border-bottom:0.5px solid #2c2c2a;">'
+      +'<div style="padding:6px 14px;background:#1a1d20;">'
+        +'<span style="font-size:10px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.04em;">Usage by customer</span>'
+        +'<span style="font-size:10px;color:#5f5e5a;margin-left:8px;">all time · top products shown per customer</span>'
+      +'</div>'
+      + custRows
+    +'</div>';
+
     var detailTable = '<div id="pb-'+sid+'" style="display:'+(expanded?'block':'none')+';border-top:0.5px solid #2c2c2a;">'
       +'<script type="application/json" id="pdata-'+sid+'">'+JSON.stringify(procDataObj)+'<\/script>'
       +'<div id="psynopsis-'+sid+'" style="padding:12px 14px;border-bottom:0.5px solid #2c2c2a;background:#141618;min-height:44px;"></div>'
+      + custSection
       +'<table style="width:100%;border-collapse:collapse;">'
       +'<thead><tr>'
         +'<th style="'+thSL+'">Quarter</th>'
