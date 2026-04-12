@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DTF - Production Hub</title>
+<title>DTF - Operations Center</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -95,7 +95,7 @@
   <div style="background:#1e2124;border:0.5px solid #2c2c2a;border-radius:16px;padding:2.5rem 2rem;width:100%;max-width:360px;text-align:center">
     <svg width="64" height="64" viewBox="0 0 54 54" style="margin-bottom:1.5rem"><rect x="2" y="2" width="50" height="50" rx="10" fill="#0C447C" stroke="#378ADD" stroke-width="1.5"/><text x="27" y="35" text-anchor="middle" font-size="20" font-weight="700" fill="#85B7EB" font-family="system-ui,sans-serif" letter-spacing="-1">DTF</text></svg>
     <div style="font-size:18px;font-weight:500;color:#e8e6e0;margin-bottom:4px">Dynamic Technical Formulations</div>
-    <div style="font-size:13px;color:#888780;margin-bottom:2rem">Production Hub</div>
+    <div style="font-size:13px;color:#888780;margin-bottom:2rem">Operations Center</div>
     <input id="pw-input" type="password" placeholder="Enter password" onkeydown="if(event.key==='Enter')checkPw()" style="width:100%;padding:10px 14px;border:0.5px solid #444441;border-radius:8px;background:#141618;color:#e8e6e0;font-size:14px;margin-bottom:10px;outline:none;display:block" autofocus>
     <button onclick="checkPw()" style="width:100%;padding:10px;background:#378ADD;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer">Sign in</button>
     <div id="pw-error" style="color:#F09595;font-size:12px;margin-top:10px;display:none">Incorrect password. Please try again.</div>
@@ -109,7 +109,7 @@
   <div style="max-width:1400px;margin:0 auto;width:100%;display:flex;align-items:stretch;padding:0 1.5rem;">
     <div class="brand-wrap" onclick="resetDashboard()" title="Return to home">
       <svg width="44" height="44" viewBox="0 0 54 54" style="flex-shrink:0"><rect x="2" y="2" width="50" height="50" rx="10" fill="#0C447C" stroke="#378ADD" stroke-width="1.5"/><text x="27" y="35" text-anchor="middle" font-size="20" font-weight="700" fill="#85B7EB" font-family="system-ui,sans-serif" letter-spacing="-1">DTF</text></svg>
-      <div><div class="brand-name">Dynamic Technical Formulations</div><div class="brand-sub">Production Hub</div></div>
+      <div><div class="brand-name">Dynamic Technical Formulations</div><div class="brand-sub">Operations Center</div></div>
     </div>
     <div class="main-tabs">
       <div class="main-tab on" id="mtab-production" onclick="setMainSection('production')">
