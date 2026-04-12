@@ -169,6 +169,7 @@ var selectedDetailQuarter = 'ytd';
 var selectedDetailYear = new Date().getFullYear();
 var selectedDetailRange = null;
 var selectedPerfRange = null;
+var procView = 'jars'; // 'jars' | 'bottles'
 var lastRefreshTime = 0;
 var filterState = { customer:[], product:[], status:[], bottle:[], jar:[] };
 
@@ -719,11 +720,23 @@ function renderSubBar() {
       sb.innerHTML = '';
     }
   } else if (mainSection === 'procurement') {
-    sb.innerHTML = '<div style="font-size:11px;color:#5f5e5a;font-style:italic;">Coming soon</div>';
+    var pj = procView==='jars', pb = procView==='bottles';
+    sb.innerHTML =
+      '<div style="display:flex;gap:2px;padding:3px;background:#141618;border:0.5px solid #2c2c2a;border-radius:8px;">'
+      + '<button onclick="setProcView(\'jars\')" style="'+navBtnStyle(pj)+'">Jars</button>'
+      + '<button onclick="setProcView(\'bottles\')" style="'+navBtnStyle(pb)+'">Bottles</button>'
+      + '</div>';
   }
 }
 
-function setTop(v) {
+function setProcView(v) {
+  closeMsPanel();
+  procView = v;
+  renderSubBar();
+  render();
+}
+
+
   closeMsPanel();
   topView = v;
   renderSubBar();
@@ -1118,7 +1131,7 @@ function render() {
       return;
     }
     if (mainSection === 'procurement') {
-      document.getElementById('content').innerHTML = '<div style="padding:3rem;text-align:center;color:#888780;font-size:13px;">Procurement view coming soon</div>';
+      renderProcurement();
       return;
     }
     if (topView==='detail') renderDetail();
@@ -2570,7 +2583,256 @@ function _triggerExpandedSynopses() {
   });
 }
 
-function renderCustomers() {
+function toggleProc(sid) {
+  if (!window._procExpanded) window._procExpanded = {};
+  window._procExpanded[sid] = !window._procExpanded[sid];
+  var body = document.getElementById('pb-' + sid);
+  var chev = document.getElementById('pc-' + sid);
+  if (body) body.style.display = window._procExpanded[sid] ? 'block' : 'none';
+  if (chev) chev.style.transform = window._procExpanded[sid] ? 'rotate(180deg)' : '';
+}
+
+function renderProcurement() {
+  var now = new Date();
+  var curQk = getQuarterKey(now);
+  var cutoff = new Date(2025, 0, 1);
+  var col = procView === 'jars' ? 'jarSize' : 'bottleSize';
+  var label = procView === 'jars' ? 'jar' : 'bottle';
+  var Label = procView === 'jars' ? 'Jar' : 'Bottle';
+
+  // Build per-SKU per-quarter data from both years
+  var allRowsCombined = allRows.concat(allRows25);
+  var skuQtr = {};   // skuQtr[sku][qk] = {lots:Set, units}
+  var totalQtrUnits = {}; // totalQtrUnits[qk] = total units across all SKUs this view
+  allRowsCombined.forEach(function(r) {
+    var dt = new Date(r['Date']); if (isNaN(dt) || dt < cutoff) return;
+    var lot = (r['Lot Number']||'').trim(); if (!lot) return;
+    var sku = (r[col === 'jarSize' ? 'Jar Size' : 'Bottle Size']||'').trim();
+    if (!sku) return;
+    var qk = getQuarterKey(dt);
+    if (!skuQtr[sku]) skuQtr[sku] = {};
+    if (!skuQtr[sku][qk]) skuQtr[sku][qk] = {lots:new Set(), units:0};
+    skuQtr[sku][qk].lots.add(lot);
+    skuQtr[sku][qk].units += num(r['Final Units']);
+    totalQtrUnits[qk] = (totalQtrUnits[qk]||0) + num(r['Final Units']);
+  });
+
+  // Build all quarters Q1 2025 → current
+  var displayQtrs = [];
+  var dq = new Date(2025, 0, 1);
+  while (getQuarterKey(dq) <= curQk) { displayQtrs.push(getQuarterKey(dq)); dq.setMonth(dq.getMonth()+3); }
+
+  // Build SKU results
+  var nowYr = now.getFullYear();
+  var ytd25cutoff = new Date(nowYr-1, now.getMonth(), now.getDate(), 23, 59, 59);
+  var ytd25start  = new Date(nowYr-1, 0, 1);
+  var ytdStart    = new Date(nowYr, 0, 1);
+
+  // Total YTD units for % of usage
+  var totalYtdUnits = 0, totalYtd25Units = 0;
+  allRowsCombined.forEach(function(r) {
+    var dt = new Date(r['Date']); if (isNaN(dt)) return;
+    var sku = (r[col === 'jarSize' ? 'Jar Size' : 'Bottle Size']||'').trim(); if (!sku) return;
+    var u = num(r['Final Units']);
+    if (dt >= ytdStart && dt <= now) totalYtdUnits += u;
+    if (dt >= ytd25start && dt <= ytd25cutoff) totalYtd25Units += u;
+  });
+
+  var results = Object.keys(skuQtr).map(function(sku) {
+    var qmap = skuQtr[sku];
+    var qtrs = displayQtrs.map(function(qk) {
+      var d = qmap[qk];
+      if (!d || d.lots.size === 0) return {key:qk, lots:0, units:0, pctOfTotal:null};
+      var pct = totalQtrUnits[qk] ? parseFloat(((d.units/totalQtrUnits[qk])*100).toFixed(1)) : null;
+      return {key:qk, lots:d.lots.size, units:d.units, pctOfTotal:pct};
+    });
+
+    // YTD this year
+    var ytdLots = new Set(), ytdUnits = 0;
+    allRowsCombined.forEach(function(r) {
+      var dt = new Date(r['Date']); if (isNaN(dt)) return;
+      var s = (r[col === 'jarSize' ? 'Jar Size' : 'Bottle Size']||'').trim(); if (s !== sku) return;
+      var lot = (r['Lot Number']||'').trim();
+      var u = num(r['Final Units']);
+      if (dt >= ytdStart && dt <= now) { if (lot) ytdLots.add(lot); ytdUnits += u; }
+    });
+
+    // YTD last year same window
+    var ytd25Lots = new Set(), ytd25Units = 0;
+    allRowsCombined.forEach(function(r) {
+      var dt = new Date(r['Date']); if (isNaN(dt)) return;
+      var s = (r[col === 'jarSize' ? 'Jar Size' : 'Bottle Size']||'').trim(); if (s !== sku) return;
+      var lot = (r['Lot Number']||'').trim();
+      var u = num(r['Final Units']);
+      if (dt >= ytd25start && dt <= ytd25cutoff) { if (lot) ytd25Lots.add(lot); ytd25Units += u; }
+    });
+
+    var ytdPct   = totalYtdUnits   > 0 ? parseFloat(((ytdUnits   / totalYtdUnits)   * 100).toFixed(1)) : null;
+    var ytdPct25 = totalYtd25Units > 0 ? parseFloat(((ytd25Units / totalYtd25Units) * 100).toFixed(1)) : null;
+    var ytdChg   = ytd25Units > 0 ? (ytdUnits - ytd25Units) / ytd25Units * 100 : null;
+
+    // Tag based on YTD comparison
+    var tag = ytd25Units > 0
+      ? (ytdChg > 5 ? 'up' : ytdChg < -5 ? 'down' : 'flat')
+      : 'new';
+
+    return {sku:sku, qtrs:qtrs, tag:tag, ytdLots:ytdLots.size, ytdUnits:ytdUnits,
+            ytd25Lots:ytd25Lots.size, ytd25Units:ytd25Units, ytdPct:ytdPct, ytdPct25:ytdPct25, ytdChg:ytdChg};
+  });
+
+  // Sort by YTD units descending
+  results.sort(function(a,b){ return b.ytdUnits - a.ytdUnits; });
+
+  var maxYtd = Math.max.apply(null, results.map(function(r){ return Math.max(r.ytdUnits, r.ytd25Units); })) || 1;
+
+  // Expand state
+  if (!window._procExpanded) window._procExpanded = {};
+
+  var thS  = 'text-align:right;padding:5px 10px;font-size:10px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.04em;border-bottom:0.5px solid #2c2c2a;white-space:nowrap;';
+  var thSL = 'text-align:left;padding:5px 10px 5px 14px;font-size:10px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.04em;border-bottom:0.5px solid #2c2c2a;white-space:nowrap;';
+
+  function pctB(cur, prev, ml) {
+    if (!prev) return '';
+    var p = (cur-prev)/prev*100, pos = p>=0;
+    return '<span style="display:inline-block;padding:1px 5px;border-radius:4px;font-size:10px;font-weight:500;'+(ml?'margin-left:5px;':'')+'background:'+(pos?'#085041':'#791F1F')+';color:'+(pos?'#9FE1CB':'#F09595')+'">'+(pos?'+':'')+p.toFixed(1)+'%</span>';
+  }
+
+  var rows = results.map(function(cd) {
+    var sid = 'proc_' + safeid(cd.sku);
+    var expanded = !!window._procExpanded[sid];
+    var borderColor = cd.tag==='up'?'#1D9E75':cd.tag==='down'?'#791F1F':cd.tag==='new'?'#378ADD':'#444441';
+    var bar26Color  = cd.tag==='down'?'#791F1F':'#378ADD';
+    var tagEl = cd.tag==='up'
+      ? '<span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:5px;background:#085041;color:#9FE1CB;flex-shrink:0;">&#x2191; Up</span>'
+      : cd.tag==='down'
+      ? '<span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:5px;background:#791F1F;color:#F09595;flex-shrink:0;">&#x2193; Down</span>'
+      : cd.tag==='flat'
+      ? '<span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:5px;background:#2c2c2a;color:#888780;flex-shrink:0;">&#x2192; Flat</span>'
+      : '<span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:5px;background:#0C447C;color:#85B7EB;flex-shrink:0;">New</span>';
+
+    var w25 = cd.ytd25Units ? Math.round((cd.ytd25Units/maxYtd)*100) : 0;
+    var w26 = cd.ytdUnits   ? Math.round((cd.ytdUnits/maxYtd)*100)   : 0;
+    var prevYr = nowYr - 1;
+    var ytdLabel = now.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+
+    // Sparkline
+    var sparkMax = Math.max.apply(null, cd.qtrs.map(function(q){return q.units;})) || 1;
+    var sparkBars = cd.qtrs.map(function(q) {
+      var h = q.units ? Math.max(3, Math.round((q.units/sparkMax)*28)) : 3;
+      var isCur = q.key === curQk;
+      var col = isCur ? '#378ADD' : (q.units > 0 ? bar26Color : '#2c2c2a');
+      var op  = isCur ? '.6' : (q.units > 0 ? '.75' : '.25');
+      return '<div style="width:7px;height:'+h+'px;background:'+col+';opacity:'+op+';border-radius:1px 1px 0 0;align-self:flex-end;"></div>';
+    }).join('');
+
+    var header = '<div onclick="toggleProc(\''+sid+'\')" '
+      +'style="display:flex;align-items:center;gap:0;padding:11px 14px 11px 12px;cursor:pointer;" onmouseover="this.style.background=\'#252829\'" onmouseout="this.style.background=\'transparent\'">'
+      +'<div style="width:160px;flex-shrink:0;">'
+        +'<div style="font-size:13px;font-weight:500;color:#e8e6e0;margin-bottom:4px;">'+cd.sku+'</div>'
+        +tagEl
+      +'</div>'
+      +'<div style="flex:1;display:flex;flex-direction:column;gap:4px;min-width:0;">'
+        +(cd.ytd25Units ? '<div style="display:flex;align-items:center;gap:7px;"><div style="width:32px;font-size:10px;color:#5f5e5a;flex-shrink:0;">'+prevYr+'</div><div style="flex:1;height:7px;background:#2c2c2a;border-radius:2px;overflow:hidden;"><div style="height:100%;width:'+w25+'%;background:#4A6580;border-radius:2px;"></div></div><div style="font-size:11px;color:#888780;width:68px;text-align:right;flex-shrink:0;">'+cd.ytd25Units.toLocaleString()+'</div></div>' : '')
+        +'<div style="display:flex;align-items:center;gap:7px;"><div style="width:32px;font-size:10px;color:#378ADD;flex-shrink:0;">'+nowYr+'</div><div style="flex:1;height:7px;background:#2c2c2a;border-radius:2px;overflow:hidden;"><div style="height:100%;width:'+w26+'%;background:'+bar26Color+';border-radius:2px;"></div></div><div style="font-size:11px;color:#e8e6e0;font-weight:500;width:68px;text-align:right;flex-shrink:0;">'+cd.ytdUnits.toLocaleString()+'</div>'
+        +pctB(cd.ytdUnits, cd.ytd25Units, true)
+        +'</div>'
+      +'</div>'
+      +'<div style="display:flex;gap:20px;flex-shrink:0;margin-left:16px;">'
+        +'<div style="text-align:right;"><div style="font-size:10px;color:#888780;margin-bottom:2px;">Lots YTD</div>'
+          +'<div style="font-size:12px;font-weight:500;color:#e8e6e0;">'+cd.ytdLots+(cd.ytd25Lots?' <span style="font-size:11px;color:#5f5e5a;font-weight:400;">was '+cd.ytd25Lots+'</span>':'')+'</div></div>'
+        +'<div style="text-align:right;border-left:0.5px solid #2c2c2a;padding-left:16px;"><div style="font-size:10px;color:#888780;margin-bottom:2px;">% of '+label+' usage</div>'
+          +'<div style="font-size:14px;font-weight:500;color:#e8e6e0;">'+(cd.ytdPct!==null?cd.ytdPct+'%':'&#x2014;')
+          +pctB(cd.ytdPct, cd.ytdPct25, true)+'</div></div>'
+      +'</div>'
+      +'<div style="display:flex;align-items:flex-end;gap:2px;height:28px;flex-shrink:0;margin-left:16px;">'+sparkBars+'</div>'
+      +'<svg id="pc-'+sid+'" width="12" height="12" viewBox="0 0 12 12" fill="none" style="flex-shrink:0;margin-left:8px;transition:transform .15s;transform:'+(expanded?'rotate(180deg)':'')+'"><polyline points="2,4 6,8 10,4" stroke="#5f5e5a" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    +'</div>';
+
+    // Detail table
+    var maxUnits = Math.max.apply(null, cd.qtrs.map(function(q){return q.units;})) || 1;
+    var tableRows = cd.qtrs.map(function(q, idx) {
+      var isCur = q.key === curQk;
+      var tdB = 'padding:6px 10px;border-bottom:0.5px solid #2c2c2a;white-space:nowrap;font-size:12px;';
+      var rBg = isCur ? 'background:#1a2030;' : '';
+      var prevWithData = null;
+      for (var pi=idx-1; pi>=0; pi--) { if (cd.qtrs[pi].units>0){prevWithData=cd.qtrs[pi];break;} }
+      var unitsDelta = '';
+      if (prevWithData && q.units>0 && q.key!==curQk) unitsDelta = pctB(q.units, prevWithData.units, true);
+      else if (!prevWithData && q.units>0) unitsDelta = '<span style="display:inline-block;padding:1px 5px;border-radius:4px;font-size:10px;font-weight:500;background:#0C447C;color:#85B7EB;">new</span>';
+      else if (q.key===curQk && q.units>0) unitsDelta = '<span style="font-size:10px;color:#5f5e5a;">in progress</span>';
+      var prevPct = null;
+      for (var ci=idx-1; ci>=0; ci--) { if (cd.qtrs[ci].pctOfTotal!==null){prevPct=cd.qtrs[ci].pctOfTotal;break;} }
+      var pctDelta = prevPct!==null && q.pctOfTotal!==null && q.key!==curQk ? pctB(q.pctOfTotal, prevPct, true) : '';
+      var bW = q.units ? Math.round((q.units/maxUnits)*88) : 0;
+      var bCol = isCur ? '#378ADD' : '#4A6580';
+      return '<tr>'
+        +'<td style="'+tdB+rBg+'padding-left:14px;color:'+(isCur?'#378ADD':'#888780')+';font-weight:'+(isCur?'500':'400')+';">'
+          +(isCur?'<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#378ADD;margin-right:5px;vertical-align:middle;"></span>':'')
+          +quarterLabel(q.key)+(isCur?' <span style="font-size:10px;color:#5f5e5a;font-weight:400;">partial</span>':'')
+        +'</td>'
+        +'<td style="'+tdB+rBg+'text-align:right;color:#e8e6e0;">'+(q.lots||'&#x2014;')+'</td>'
+        +'<td style="'+tdB+rBg+'text-align:right;color:#e8e6e0;">'+(q.units?q.units.toLocaleString():'&#x2014;')+'</td>'
+        +'<td style="'+tdB+rBg+'text-align:right;">'+unitsDelta+'</td>'
+        +'<td style="'+tdB+rBg+'text-align:right;color:#888780;">'+(q.pctOfTotal!==null?q.pctOfTotal+'%':'&#x2014;')+'</td>'
+        +'<td style="'+tdB+rBg+'text-align:right;">'+pctDelta+'</td>'
+        +'<td style="'+tdB+rBg+'padding-right:14px;width:110px;">'
+          +'<div style="height:4px;background:#2c2c2a;border-radius:2px;overflow:hidden;"><div style="height:100%;width:'+bW+'%;background:'+bCol+';border-radius:2px;"></div></div>'
+        +'</td>'
+      +'</tr>';
+    }).join('');
+
+    var detailTable = '<div id="pb-'+sid+'" style="display:'+(expanded?'block':'none')+';border-top:0.5px solid #2c2c2a;">'
+      +'<table style="width:100%;border-collapse:collapse;">'
+      +'<thead><tr>'
+        +'<th style="'+thSL+'">Quarter</th>'
+        +'<th style="'+thS+'">Lots</th>'
+        +'<th style="'+thS+'">Units</th>'
+        +'<th style="'+thS+'width:70px;">vs prev</th>'
+        +'<th style="'+thS+'">% of '+label+'s</th>'
+        +'<th style="'+thS+'width:70px;">vs prev</th>'
+        +'<th style="'+thS+'padding-right:14px;width:110px;">Volume</th>'
+      +'</tr></thead>'
+      +'<tbody>'+tableRows+'</tbody>'
+      +'</table>'
+    +'</div>';
+
+    return '<div style="background:#1e2124;border:0.5px solid #2c2c2a;border-left:3px solid '+borderColor+';border-radius:0 10px 10px 0;overflow:hidden;margin-bottom:5px;">'
+      +header+detailTable
+    +'</div>';
+  }).join('');
+
+  // Summary bar
+  var topSku = results[0];
+  var fastestGrowing = results.filter(function(r){return r.ytdChg!==null;}).sort(function(a,b){return b.ytdChg-a.ytdChg;})[0];
+  var biggestDecline = results.filter(function(r){return r.ytdChg!==null;}).sort(function(a,b){return a.ytdChg-b.ytdChg;})[0];
+  var totalYtdLots   = results.reduce(function(s,r){return s+r.ytdLots;},0);
+
+  var summaryBar = '<div style="padding:10px 14px;background:#141618;border:0.5px solid #2c2c2a;border-radius:8px;display:flex;gap:0;margin-top:8px;flex-wrap:wrap;">'
+    +'<div style="text-align:center;padding:0 16px;"><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;">'+Label+' types</div><div style="font-size:18px;font-weight:500;color:#e8e6e0;">'+results.length+'</div></div>'
+    +'<div style="width:0.5px;background:#2c2c2a;"></div>'
+    +'<div style="text-align:center;padding:0 16px;"><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;">Total lots YTD</div><div style="font-size:18px;font-weight:500;color:#e8e6e0;">'+totalYtdLots+'</div></div>'
+    +'<div style="width:0.5px;background:#2c2c2a;"></div>'
+    +'<div style="text-align:center;padding:0 16px;"><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;">Most used</div><div style="font-size:13px;font-weight:500;color:#378ADD;">'+(topSku?topSku.sku:'&#x2014;')+'</div></div>'
+    +(fastestGrowing && fastestGrowing.ytdChg > 0 ? '<div style="width:0.5px;background:#2c2c2a;"></div><div style="text-align:center;padding:0 16px;"><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;">Fastest growing</div><div style="font-size:13px;font-weight:500;color:#1D9E75;">'+fastestGrowing.sku+' <span style="font-size:11px;font-weight:400;color:#888780;">+'+(fastestGrowing.ytdChg).toFixed(1)+'% YTD</span></div></div>' : '')
+    +(biggestDecline && biggestDecline.ytdChg < 0 ? '<div style="width:0.5px;background:#2c2c2a;"></div><div style="text-align:center;padding:0 16px;"><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;">Biggest decline</div><div style="font-size:13px;font-weight:500;color:#E24B4A;">'+biggestDecline.sku+' <span style="font-size:11px;font-weight:400;color:#888780;">'+(biggestDecline.ytdChg).toFixed(1)+'% YTD</span></div></div>' : '')
+  +'</div>';
+
+  var ytdLabelFull = now.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  document.getElementById('content').innerHTML =
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;">'
+      +'<div style="font-size:10px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.05em;">'+Label+' usage — Q1 2025 &#x2192; present &middot; sorted by YTD units &middot; thru '+ytdLabelFull+'</div>'
+      +'<div style="display:flex;gap:6px;">'
+        +'<span style="font-size:10px;font-weight:500;padding:2px 8px;border-radius:5px;background:#085041;color:#9FE1CB;">&#x2191; Up</span>'
+        +'<span style="font-size:10px;font-weight:500;padding:2px 8px;border-radius:5px;background:#791F1F;color:#F09595;">&#x2193; Down</span>'
+        +'<span style="font-size:10px;font-weight:500;padding:2px 8px;border-radius:5px;background:#2c2c2a;color:#888780;">&#x2192; Flat</span>'
+        +'<span style="font-size:10px;font-weight:500;padding:2px 8px;border-radius:5px;background:#0C447C;color:#85B7EB;">New</span>'
+      +'</div>'
+    +'</div>'
+    + rows
+    + summaryBar;
+}
+
+
   var now = new Date();
   if (!selectedPerfRange) selectedPerfRange = getDefaultPerfRange();
   var range = selectedPerfRange;
