@@ -3324,18 +3324,20 @@ function renderProcurement() {
   document.getElementById('content').innerHTML =
     '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;gap:12px;">'
       +'<div style="display:flex;flex-direction:column;gap:6px;">'
-        +'<div style="font-size:10px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.05em;">'+Label+' usage — Q1 2025 &#x2192; present &middot; sorted by YTD &middot; thru '+ytdLabelFull+'</div>'
+        +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
+          +'<div style="font-size:10px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.05em;">'+Label+' usage — Q1 2025 &#x2192; present &middot; sorted by YTD &middot; thru '+ytdLabelFull+'</div>'
+          +((hiddenCount > 0 || showZeroDes)
+            ? '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;color:#5f5e5a;user-select:none;">'
+                +'<input type="checkbox" onchange="showZeroDes=this.checked;renderProcurement()" '+(showZeroDes?'checked':'')+' style="accent-color:#378ADD;cursor:pointer;">'
+                +'Show '+Label.toLowerCase()+'s with zero usage YTD'+(hiddenCount > 0 && !showZeroDes ? ' ('+hiddenCount+')' : '')
+              +'</label>'
+            : '')
+        +'</div>'
         +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
           +'<span style="font-size:10px;font-weight:500;padding:2px 8px;border-radius:5px;background:#085041;color:#9FE1CB;">&#x2191; Up</span>'
           +'<span style="font-size:10px;font-weight:500;padding:2px 8px;border-radius:5px;background:#791F1F;color:#F09595;">&#x2193; Down</span>'
           +'<span style="font-size:10px;font-weight:500;padding:2px 8px;border-radius:5px;background:#2c2c2a;color:#888780;">&#x2192; Flat</span>'
           +'<span style="font-size:10px;font-weight:500;padding:2px 8px;border-radius:5px;background:#0C447C;color:#85B7EB;">New</span>'
-          +((hiddenCount > 0 || showZeroDes)
-            ? '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;color:#5f5e5a;user-select:none;margin-left:4px;">'
-                +'<input type="checkbox" onchange="showZeroDes=this.checked;renderProcurement()" '+(showZeroDes?'checked':'')+' style="accent-color:#378ADD;cursor:pointer;">'
-                +'Show '+Label.toLowerCase()+'s with zero usage YTD'+(hiddenCount > 0 && !showZeroDes ? ' ('+hiddenCount+')' : '')
-              +'</label>'
-            : '')
         +'</div>'
       +'</div>'
       +'<div style="flex-shrink:0;position:relative;" id="proc-export-wrap">'
