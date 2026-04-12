@@ -2584,6 +2584,105 @@ function _triggerExpandedSynopses() {
   });
 }
 
+var _procSynopsis = {};
+
+function generateProcSynopsis(sid) {
+  var el = document.getElementById('psynopsis-' + sid);
+  if (!el) return;
+  if (_procSynopsis[sid]) { el.innerHTML = _procSynopsis[sid]; return; }
+  var dataEl = document.getElementById('pdata-' + sid);
+  if (!dataEl) return;
+  var cd = JSON.parse(dataEl.textContent);
+  var curQk = getQuarterKey(new Date());
+
+  var completed = cd.qtrs.filter(function(q){ return q.units > 0 && q.key !== curQk; });
+  var hasLY = cd.ytd25Units > 0;
+  var ytdChg = hasLY ? (cd.ytdUnits - cd.ytd25Units) / cd.ytd25Units * 100 : null;
+  var lotChg = cd.ytd25Lots > 0 ? (cd.ytdLots - cd.ytd25Lots) / cd.ytd25Lots * 100 : null;
+  var pctChg = cd.ytdPct25 != null && cd.ytdPct != null ? (cd.ytdPct - cd.ytdPct25) : null;
+  var typeLabel = cd.type; // 'jar', 'bottle', 'lid'
+
+  function n(v) { return Number(v).toLocaleString(); }
+  var sentences = [];
+
+  // Sentence 1: top-line usage
+  if (!hasLY) {
+    var firstQ = cd.qtrs.filter(function(q){return q.units>0;})[0];
+    var when = firstQ ? 'in ' + firstQ.label : 'this year';
+    sentences.push('We started using ' + cd.sku + ' ' + when
+      + ' — ' + n(cd.ytdUnits) + ' units across ' + cd.ytdLots + ' lot' + (cd.ytdLots!==1?'s':'') + ' so far this year'
+      + (cd.ytdPct != null ? ', representing ' + cd.ytdPct + '% of our total ' + typeLabel + ' usage YTD' : '') + '.');
+  } else if (ytdChg !== null) {
+    var mag = Math.abs(ytdChg);
+    var tone = mag > 40 ? (ytdChg>0?'significantly up':'significantly down')
+             : mag > 15 ? (ytdChg>0?'up':'down')
+             :             (ytdChg>0?'slightly up':'slightly down');
+    sentences.push('Usage of ' + cd.sku + ' is ' + tone + ' ' + mag.toFixed(1) + '% YTD vs. the same period last year'
+      + ' (' + n(cd.ytd25Units) + ' → ' + n(cd.ytdUnits) + ' units)'
+      + (cd.ytdPct != null ? ', now ' + cd.ytdPct + '% of our total ' + typeLabel + ' usage' : '') + '.');
+  }
+
+  // Sentence 2: lot count trend
+  if (lotChg !== null && Math.abs(lotChg) > 5) {
+    var lotDir = lotChg > 0 ? 'more' : 'fewer';
+    var avgCur  = cd.ytdLots  > 0 ? Math.round(cd.ytdUnits  / cd.ytdLots)  : 0;
+    var avgPrev = cd.ytd25Lots > 0 ? Math.round(cd.ytd25Units / cd.ytd25Lots) : 0;
+    if (avgPrev > 0 && Math.abs((avgCur-avgPrev)/avgPrev*100) > 5) {
+      var runDir = avgCur > avgPrev ? 'larger' : 'smaller';
+      sentences.push('We\'re running ' + lotDir + ' lots (' + cd.ytd25Lots + ' → ' + cd.ytdLots + ')'
+        + ' with ' + runDir + ' average runs (' + n(avgPrev) + ' → ' + n(avgCur) + ' units per lot).');
+    } else {
+      sentences.push('Lot count has ' + (lotChg>0?'increased':'decreased') + ' from '
+        + cd.ytd25Lots + ' to ' + cd.ytdLots + ' lots YTD, with roughly similar run sizes.');
+    }
+  }
+
+  // Sentence 3: share of production trend or quarterly trajectory
+  if (pctChg !== null && Math.abs(pctChg) >= 0.5) {
+    sentences.push('Its share of our ' + typeLabel + ' usage has ' + (pctChg>0?'grown':'shrunk')
+      + ' from ' + cd.ytdPct25 + '% to ' + cd.ytdPct + '%'
+      + (Math.abs(pctChg) >= 2 ? ', a meaningful shift in our ' + typeLabel + ' mix' : '') + '.');
+  } else if (completed.length >= 3) {
+    var last3 = completed.slice(-3);
+    var allUp = last3[2].units > last3[1].units && last3[1].units > last3[0].units;
+    var allDn = last3[2].units < last3[1].units && last3[1].units < last3[0].units;
+    if (allUp) {
+      sentences.push('Usage has grown in each of the last three completed quarters ('
+        + n(last3[0].units) + ' → ' + n(last3[1].units) + ' → ' + n(last3[2].units) + ' units).');
+    } else if (allDn) {
+      sentences.push('Usage has declined in each of the last three completed quarters ('
+        + n(last3[0].units) + ' → ' + n(last3[1].units) + ' → ' + n(last3[2].units) + ' units).');
+    } else if (completed.length >= 2) {
+      var prev = completed[completed.length-2], last = completed[completed.length-1];
+      var qChg = (last.units - prev.units) / prev.units * 100;
+      if (Math.abs(qChg) > 10) {
+        sentences.push('The most recent completed quarter (' + last.label + ') was '
+          + (qChg>0?'up':'down') + ' ' + Math.abs(qChg).toFixed(1) + '% vs. ' + prev.label
+          + ' (' + n(prev.units) + ' → ' + n(last.units) + ' units).');
+      }
+    }
+  } else if (completed.length === 2) {
+    var p2 = completed[0], l2 = completed[1];
+    var q2 = (l2.units - p2.units) / p2.units * 100;
+    if (Math.abs(q2) > 10) {
+      sentences.push('The most recent completed quarter (' + l2.label + ') was '
+        + (q2>0?'up':'down') + ' ' + Math.abs(q2).toFixed(1) + '% vs. ' + p2.label
+        + ' (' + n(p2.units) + ' → ' + n(l2.units) + ' units).');
+    }
+  }
+
+  var text = sentences.join(' ');
+  if (!text) { el.innerHTML = ''; return; }
+  var html = '<div style="display:flex;align-items:flex-start;gap:10px;">'
+    + '<div style="width:20px;height:20px;border-radius:50%;background:#0C447C;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">'
+      + '<svg width="10" height="10" viewBox="0 0 10 10" fill="none"><circle cx="5" cy="5" r="4" stroke="#85B7EB" stroke-width="1.2"/><line x1="5" y1="3" x2="5" y2="5.5" stroke="#85B7EB" stroke-width="1.2" stroke-linecap="round"/><circle cx="5" cy="7" r=".6" fill="#85B7EB"/></svg>'
+    + '</div>'
+    + '<p style="font-size:12px;color:#e8e6e0;line-height:1.65;margin:0;">' + text + '</p>'
+  + '</div>';
+  _procSynopsis[sid] = html;
+  el.innerHTML = html;
+}
+
 function toggleProc(sid) {
   if (!window._procExpanded) window._procExpanded = {};
   window._procExpanded[sid] = !window._procExpanded[sid];
@@ -2591,6 +2690,7 @@ function toggleProc(sid) {
   var chev = document.getElementById('pc-' + sid);
   if (body) body.style.display = window._procExpanded[sid] ? 'block' : 'none';
   if (chev) chev.style.transform = window._procExpanded[sid] ? 'rotate(180deg)' : '';
+  if (window._procExpanded[sid]) generateProcSynopsis(sid);
 }
 
 function renderProcurement() {
@@ -2790,7 +2890,19 @@ function renderProcurement() {
       +'</tr>';
     }).join('');
 
+    var procDataObj = {
+      sku: cd.sku, type: label,
+      ytdUnits: cd.ytdUnits, ytd25Units: cd.ytd25Units,
+      ytdLots: cd.ytdLots, ytd25Lots: cd.ytd25Lots,
+      ytdPct: cd.ytdPct, ytdPct25: cd.ytdPct25,
+      qtrs: cd.qtrs.filter(function(q){return q.units>0;}).map(function(q){
+        return {key:q.key, label:quarterLabel(q.key), units:q.units, lots:q.lots, pctOfTotal:q.pctOfTotal};
+      })
+    };
+
     var detailTable = '<div id="pb-'+sid+'" style="display:'+(expanded?'block':'none')+';border-top:0.5px solid #2c2c2a;">'
+      +'<script type="application/json" id="pdata-'+sid+'">'+JSON.stringify(procDataObj)+'<\/script>'
+      +'<div id="psynopsis-'+sid+'" style="padding:12px 14px;border-bottom:0.5px solid #2c2c2a;background:#141618;min-height:44px;"></div>'
       +'<table style="width:100%;border-collapse:collapse;">'
       +'<thead><tr>'
         +'<th style="'+thSL+'">Quarter</th>'
