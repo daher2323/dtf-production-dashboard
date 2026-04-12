@@ -2977,12 +2977,12 @@ function renderProcurement() {
       // Inner tab bar
       +'<div style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-bottom:0.5px solid #2c2c2a;background:#1a1d20;">'
         +'<div style="display:flex;gap:2px;padding:3px;background:#141618;border:0.5px solid #2c2c2a;border-radius:8px;">'
-          +'<button id="ptab-cust-'+sid+'" onclick="switchProcTab(\''+sid+'\',\'cust\')" style="'+navS(true)+'">By customer</button>'
-          +'<button id="ptab-qtr-'+sid+'"  onclick="switchProcTab(\''+sid+'\',\'qtr\')"  style="'+navS(false)+'">By quarter</button>'
+          +'<button id="ptab-cust-'+sid+'" onclick="switchProcTab(\''+sid+'\',\'cust\')" style="'+navS(false)+'">By customer</button>'
+          +'<button id="ptab-qtr-'+sid+'"  onclick="switchProcTab(\''+sid+'\',\'qtr\')"  style="'+navS(true)+'">By quarter</button>'
         +'</div>'
       +'</div>'
-      +'<div id="pcust-'+sid+'">'+ custSection +'</div>'
-      +'<div id="pqtr-'+sid+'"  style="display:none;">'+ qtrSection +'</div>'
+      +'<div id="pcust-'+sid+'" style="display:none;">'+ custSection +'</div>'
+      +'<div id="pqtr-'+sid+'">'+ qtrSection +'</div>'
     +'</div>';
 
     return '<div style="background:#1e2124;border:0.5px solid #2c2c2a;border-left:3px solid '+borderColor+';border-radius:0 10px 10px 0;overflow:hidden;margin-bottom:5px;">'
