@@ -720,11 +720,12 @@ function renderSubBar() {
       sb.innerHTML = '';
     }
   } else if (mainSection === 'procurement') {
-    var pj = procView==='jars', pb = procView==='bottles';
+    var pj = procView==='jars', pb = procView==='bottles', pl = procView==='lids';
     sb.innerHTML =
       '<div style="display:flex;gap:2px;padding:3px;background:#141618;border:0.5px solid #2c2c2a;border-radius:8px;margin:6px 0;">'
       + '<button onclick="setProcView(\'jars\')" style="'+navBtnStyle(pj)+'">Jars</button>'
       + '<button onclick="setProcView(\'bottles\')" style="'+navBtnStyle(pb)+'">Bottles</button>'
+      + '<button onclick="setProcView(\'lids\')" style="'+navBtnStyle(pl)+'">Lids</button>'
       + '</div>';
   }
 }
@@ -2596,9 +2597,17 @@ function renderProcurement() {
   var now = new Date();
   var curQk = getQuarterKey(now);
   var cutoff = new Date(2025, 0, 1);
-  var col = procView === 'jars' ? 'jarSize' : 'bottleSize';
-  var label = procView === 'jars' ? 'jar' : 'bottle';
-  var Label = procView === 'jars' ? 'Jar' : 'Bottle';
+  var col = procView === 'jars' ? 'jarSize' : procView === 'bottles' ? 'bottleSize' : 'lidSize';
+  var label = procView === 'jars' ? 'jar' : procView === 'bottles' ? 'bottle' : 'lid';
+  var Label = procView === 'jars' ? 'Jar' : procView === 'bottles' ? 'Bottle' : 'Lid';
+
+  function getSku(r) {
+    if (procView === 'lids') {
+      var parts = [r['Lid Size'], r['Lid Color'], r['Lid Profile']].map(function(v){ return (v||'').trim(); }).filter(Boolean);
+      return parts.join(' ');
+    }
+    return (r[procView === 'jars' ? 'Jar Size' : 'Bottle Size']||'').trim();
+  }
 
   // Build per-SKU per-quarter data from both years
   var allRowsCombined = allRows.concat(allRows25);
@@ -2607,7 +2616,7 @@ function renderProcurement() {
   allRowsCombined.forEach(function(r) {
     var dt = new Date(r['Date']); if (isNaN(dt) || dt < cutoff) return;
     var lot = (r['Lot Number']||'').trim(); if (!lot) return;
-    var sku = (r[col === 'jarSize' ? 'Jar Size' : 'Bottle Size']||'').trim();
+    var sku = getSku(r);
     if (!sku) return;
     var qk = getQuarterKey(dt);
     if (!skuQtr[sku]) skuQtr[sku] = {};
@@ -2632,7 +2641,7 @@ function renderProcurement() {
   var totalYtdUnits = 0, totalYtd25Units = 0;
   allRowsCombined.forEach(function(r) {
     var dt = new Date(r['Date']); if (isNaN(dt)) return;
-    var sku = (r[col === 'jarSize' ? 'Jar Size' : 'Bottle Size']||'').trim(); if (!sku) return;
+    var sku = getSku(r); if (!sku) return;
     var u = num(r['Final Units']);
     if (dt >= ytdStart && dt <= now) totalYtdUnits += u;
     if (dt >= ytd25start && dt <= ytd25cutoff) totalYtd25Units += u;
@@ -2651,7 +2660,7 @@ function renderProcurement() {
     var ytdLots = new Set(), ytdUnits = 0;
     allRowsCombined.forEach(function(r) {
       var dt = new Date(r['Date']); if (isNaN(dt)) return;
-      var s = (r[col === 'jarSize' ? 'Jar Size' : 'Bottle Size']||'').trim(); if (s !== sku) return;
+      var s = getSku(r); if (s !== sku) return;
       var lot = (r['Lot Number']||'').trim();
       var u = num(r['Final Units']);
       if (dt >= ytdStart && dt <= now) { if (lot) ytdLots.add(lot); ytdUnits += u; }
@@ -2661,7 +2670,7 @@ function renderProcurement() {
     var ytd25Lots = new Set(), ytd25Units = 0;
     allRowsCombined.forEach(function(r) {
       var dt = new Date(r['Date']); if (isNaN(dt)) return;
-      var s = (r[col === 'jarSize' ? 'Jar Size' : 'Bottle Size']||'').trim(); if (s !== sku) return;
+      var s = getSku(r); if (s !== sku) return;
       var lot = (r['Lot Number']||'').trim();
       var u = num(r['Final Units']);
       if (dt >= ytd25start && dt <= ytd25cutoff) { if (lot) ytd25Lots.add(lot); ytd25Units += u; }
