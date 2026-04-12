@@ -2716,6 +2716,162 @@ function toggleProc(sid) {
   if (window._procExpanded[sid]) generateProcSynopsis(sid);
 }
 
+function exportProcurement() {
+  if (typeof XLSX === 'undefined') { alert('Export library not loaded yet, please try again.'); return; }
+
+  var now = new Date();
+  var curQk = getQuarterKey(now);
+  var cutoff = new Date(2025, 0, 1);
+  var isDes  = procView === 'desiccants';
+  var isNeck = procView === 'neckbands';
+  var Label  = procView === 'jars' ? 'Jar' : procView === 'bottles' ? 'Bottle' : procView === 'lids' ? 'Lid' : procView === 'desiccants' ? 'Desiccant' : 'Neckband';
+  var dateStr = now.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+
+  function getSku(r) {
+    if (procView === 'lids') return [r['Lid Size'],r['Lid Color'],r['Lid Profile']].map(function(v){return(v||'').trim();}).filter(Boolean).join(' ');
+    if (isDes)  { var dv=(r['Desiccant']||'').trim(); return /^(none|n\/a)$/i.test(dv)?'':dv; }
+    if (isNeck) { var nv=(r['Neckband Used']||'').trim(); return /^(none|n\/a)$/i.test(nv)?'':nv; }
+    return (r[procView==='jars'?'Jar Size':'Bottle Size']||'').trim();
+  }
+  function getUnits(r) { return isDes ? num(r['Number of Desiccants Used']) : num(r['Final Units']); }
+
+  var allRowsCombined = allRows.concat(allRows25);
+
+  // Build quarters
+  var displayQtrs = [];
+  var dq = new Date(2025,0,1);
+  while (getQuarterKey(dq) <= curQk) { displayQtrs.push(getQuarterKey(dq)); dq.setMonth(dq.getMonth()+3); }
+
+  // Build skuQtr
+  var skuQtr = {}, totalQtrUnits = {};
+  allRowsCombined.forEach(function(r) {
+    var dt = new Date(r['Date']); if (isNaN(dt)||dt<cutoff) return;
+    var lot = (r['Lot Number']||'').trim(); if (!lot) return;
+    var sku = getSku(r); if (!sku) return;
+    var qk = getQuarterKey(dt);
+    var u = getUnits(r);
+    if (!skuQtr[sku]) skuQtr[sku] = {};
+    if (!skuQtr[sku][qk]) skuQtr[sku][qk] = {units:0, lots:new Set()};
+    skuQtr[sku][qk].units += u;
+    skuQtr[sku][qk].lots.add(lot);
+    totalQtrUnits[qk] = (totalQtrUnits[qk]||0) + u;
+  });
+
+  // YTD windows
+  var nowYr = now.getFullYear();
+  var ytdStart    = new Date(nowYr,0,1);
+  var ytd25start  = new Date(nowYr-1,0,1);
+  var ytd25cutoff = new Date(nowYr-1,now.getMonth(),now.getDate(),23,59,59);
+
+  // Build summary rows
+  var skus = Object.keys(skuQtr).filter(function(s){
+    var ytd = 0;
+    allRowsCombined.forEach(function(r){ var dt=new Date(r['Date']); if(isNaN(dt)) return; if(getSku(r)!==s) return; var u=getUnits(r); if(dt>=ytdStart&&dt<=now) ytd+=u; });
+    return showZeroDes || ytd > 0;
+  });
+
+  // For each SKU compute YTD and FY
+  var summaryData = skus.map(function(sku) {
+    var qVals = displayQtrs.map(function(qk){ return skuQtr[sku][qk] ? skuQtr[sku][qk].units : 0; });
+    var ytd=0, ytd25=0, fy25=0;
+    allRowsCombined.forEach(function(r) {
+      var dt=new Date(r['Date']); if(isNaN(dt)) return;
+      if(getSku(r)!==sku) return;
+      var u=getUnits(r);
+      if(dt>=ytdStart&&dt<=now) ytd+=u;
+      if(dt>=ytd25start&&dt<=ytd25cutoff) ytd25+=u;
+      if(dt.getFullYear()===2025) fy25+=u;
+    });
+    var chg = ytd25>0 ? (ytd-ytd25)/ytd25 : null;
+    var tag = ytd25>0 ? (chg>0.05?'↑ Growing':chg<-0.05?'↓ Declining':'→ Flat') : 'New';
+    return {sku:sku, qVals:qVals, fy25:fy25, ytd:ytd, ytd25:ytd25, chg:chg, tag:tag};
+  }).sort(function(a,b){return b.ytd-a.ytd;});
+
+  var totalYtd = summaryData.reduce(function(s,r){return s+r.ytd;},0)||1;
+
+  var wb = XLSX.utils.book_new();
+
+  // ── Sheet 1: Quarterly Summary ──
+  var qtrLabels = displayQtrs.map(function(qk){ return quarterLabel(qk)+(qk===curQk?' (partial)':''); });
+  var s1Headers = [Label+' SKU','Trajectory'].concat(qtrLabels).concat(['FY 2025','YTD '+nowYr,'YTD Change','% of Usage']);
+  var s1Rows = [
+    ['DTF Operations Center — Procurement Export'],
+    [Label+' usage  ·  Q1 2025 → present  ·  Generated '+dateStr],
+    [],
+    s1Headers
+  ];
+
+  summaryData.forEach(function(d) {
+    var row = [d.sku, d.tag].concat(d.qVals).concat([
+      d.fy25,
+      d.ytd,
+      d.chg !== null ? d.chg : 'N/A',
+      parseFloat((d.ytd/totalYtd*100).toFixed(1))+'%'
+    ]);
+    s1Rows.push(row);
+  });
+
+  // Totals row
+  var totQtrs = displayQtrs.map(function(qk){ return summaryData.reduce(function(s,d){ return s+(skuQtr[d.sku][qk]?skuQtr[d.sku][qk].units:0); },0); });
+  s1Rows.push(['TOTAL',''].concat(totQtrs).concat([
+    summaryData.reduce(function(s,d){return s+d.fy25;},0),
+    summaryData.reduce(function(s,d){return s+d.ytd;},0),
+    '',
+    '100.0%'
+  ]));
+
+  var ws1 = XLSX.utils.aoa_to_sheet(s1Rows);
+
+  // Column widths
+  var w1 = [{wch:30},{wch:13}].concat(displayQtrs.map(function(){return{wch:13};})).concat([{wch:14},{wch:12},{wch:12},{wch:12}]);
+  ws1['!cols'] = w1;
+  ws1['!merges'] = [{s:{r:0,c:0},e:{r:0,c:s1Headers.length-1}},{s:{r:1,c:0},e:{r:1,c:s1Headers.length-1}}];
+  XLSX.utils.book_append_sheet(wb, ws1, 'Quarterly Summary');
+
+  // ── Sheet 2: Lot Detail ──
+  var detailHeaders = ['Date','Lot #',Label+' SKU','Customer','Product','Line','Projected Units','Final Units','Deviation %','Status'];
+  var s2Rows = [
+    ['DTF Operations Center — Lot Detail by '+Label+' SKU'],
+    ['All lots from Q1 2025 onward  ·  Sorted by date descending  ·  Generated '+dateStr],
+    [],
+    detailHeaders
+  ];
+
+  var detailRows = allRowsCombined.filter(function(r) {
+    var dt = new Date(r['Date']); if (isNaN(dt)||dt<cutoff) return false;
+    var sku = getSku(r); if (!sku) return false;
+    if (!showZeroDes) {
+      var ytd=0; allRowsCombined.forEach(function(r2){var dt2=new Date(r2['Date']);if(isNaN(dt2))return;if(getSku(r2)!==sku)return;var u=getUnits(r2);if(dt2>=ytdStart&&dt2<=now)ytd+=u;});
+      if(ytd===0) return false;
+    }
+    return true;
+  }).sort(function(a,b){ return new Date(b['Date'])-new Date(a['Date']); });
+
+  detailRows.forEach(function(r) {
+    var sku = getSku(r);
+    var prod = (r['Product']||'').trim();
+    var cust = prod.indexOf('-')!==-1 ? prod.split('-')[0].trim() : prod;
+    var proj = num(r['Projected Units']);
+    var final = num(r['Final Units']);
+    var dev = proj>0 ? parseFloat(((final-proj)/proj*100).toFixed(1)) : null;
+    s2Rows.push([
+      r['Date']||'', r['Lot Number']||'', sku, cust, prod,
+      r['Line']||'', proj||'', final||'',
+      dev!==null ? dev+'%' : '',
+      r['Complete or Partial']||''
+    ]);
+  });
+
+  var ws2 = XLSX.utils.aoa_to_sheet(s2Rows);
+  ws2['!cols'] = [{wch:12},{wch:16},{wch:26},{wch:18},{wch:36},{wch:10},{wch:14},{wch:14},{wch:12},{wch:12}];
+  ws2['!merges'] = [{s:{r:0,c:0},e:{r:0,c:9}},{s:{r:1,c:0},e:{r:1,c:9}}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Lot Detail');
+
+  // Download
+  var fname = 'DTF_'+Label+'s_'+now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0')+'.xlsx';
+  XLSX.writeFile(wb, fname);
+}
+
 function renderProcurement() {
   var now = new Date();
   var curQk = getQuarterKey(now);
@@ -3046,12 +3202,18 @@ function renderProcurement() {
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;">'
       +'<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">'
         +'<div style="font-size:10px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.05em;">'+Label+' usage — Q1 2025 &#x2192; present &middot; sorted by YTD &middot; thru '+ytdLabelFull+'</div>'
-        +((hiddenCount > 0 || showZeroDes)
+      +'<div style="display:flex;align-items:center;gap:10px;">'
+        +(( hiddenCount > 0 || showZeroDes)
           ? '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;color:#5f5e5a;user-select:none;">'
               +'<input type="checkbox" onchange="showZeroDes=this.checked;renderProcurement()" '+(showZeroDes?'checked':'')+' style="accent-color:#378ADD;cursor:pointer;">'
               +'Show '+Label.toLowerCase()+'s with zero usage YTD'+(hiddenCount > 0 && !showZeroDes ? ' ('+hiddenCount+')' : '')
             +'</label>'
           : '')
+        +'<button onclick="exportProcurement()" style="display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:6px;border:0.5px solid #2c2c2a;background:#1e2124;color:#888780;font-size:11px;font-weight:500;cursor:pointer;font-family:system-ui;" onmouseover="this.style.background=\'#252829\';this.style.color=\'#e8e6e0\'" onmouseout="this.style.background=\'#1e2124\';this.style.color=\'#888780\'">'
+          +'<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 1v7M3 5l3 3 3-3"/><path d="M1 9v1.5a.5.5 0 00.5.5h9a.5.5 0 00.5-.5V9"/></svg>'
+          +'Export'
+        +'</button>'
+      +'</div>'
       +'</div>'
       +'<div style="display:flex;gap:6px;">'
         +'<span style="font-size:10px;font-weight:500;padding:2px 8px;border-radius:5px;background:#085041;color:#9FE1CB;">&#x2191; Up</span>'
