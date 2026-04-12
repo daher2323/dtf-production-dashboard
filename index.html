@@ -2732,7 +2732,7 @@ function renderProcurement() {
       var parts = [r['Lid Size'], r['Lid Color'], r['Lid Profile']].map(function(v){ return (v||'').trim(); }).filter(Boolean);
       return parts.join(' ');
     }
-    if (isDes)  return (r['Desiccant']||'').trim();
+    if (isDes)  { var dv = (r['Desiccant']||'').trim(); return /^(none|n\/a)$/i.test(dv) ? '' : dv; }
     if (isNeck) return (r['Neckband Used']||'').trim();
     return (r[procView === 'jars' ? 'Jar Size' : 'Bottle Size']||'').trim();
   }
