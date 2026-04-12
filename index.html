@@ -725,13 +725,14 @@ function renderSubBar() {
       sb.innerHTML = '';
     }
   } else if (mainSection === 'procurement') {
-    var pj = procView==='jars', pb = procView==='bottles', pl = procView==='lids', pd = procView==='desiccants';
+    var pj = procView==='jars', pb = procView==='bottles', pl = procView==='lids', pd = procView==='desiccants', pn = procView==='neckbands';
     sb.innerHTML =
       '<div style="display:flex;gap:2px;padding:3px;background:#141618;border:0.5px solid #2c2c2a;border-radius:8px;margin:6px 0;">'
       + '<button onclick="setProcView(\'jars\')" style="'+navBtnStyle(pj)+'">Jars</button>'
       + '<button onclick="setProcView(\'bottles\')" style="'+navBtnStyle(pb)+'">Bottles</button>'
       + '<button onclick="setProcView(\'lids\')" style="'+navBtnStyle(pl)+'">Lids</button>'
       + '<button onclick="setProcView(\'desiccants\')" style="'+navBtnStyle(pd)+'">Desiccants</button>'
+      + '<button onclick="setProcView(\'neckbands\')" style="'+navBtnStyle(pn)+'">Neckbands</button>'
       + '</div>';
       + '</div>';
   }
@@ -739,7 +740,7 @@ function renderSubBar() {
 
 function setProcView(v) {
   closeMsPanel();
-  if (v !== 'desiccants') showZeroDes = false;
+  if (v !== 'desiccants' && v !== 'neckbands') showZeroDes = false;
   procView = v;
   renderSubBar();
   render();
@@ -2719,18 +2720,20 @@ function renderProcurement() {
   var now = new Date();
   var curQk = getQuarterKey(now);
   var cutoff = new Date(2025, 0, 1);
-  var col = procView === 'jars' ? 'jarSize' : procView === 'bottles' ? 'bottleSize' : procView === 'lids' ? 'lidSize' : 'desiccant';
-  var label = procView === 'jars' ? 'jar' : procView === 'bottles' ? 'bottle' : procView === 'lids' ? 'lid' : 'desiccant';
-  var Label = procView === 'jars' ? 'Jar' : procView === 'bottles' ? 'Bottle' : procView === 'lids' ? 'Lid' : 'Desiccant';
+  var col = procView === 'jars' ? 'jarSize' : procView === 'bottles' ? 'bottleSize' : procView === 'lids' ? 'lidSize' : procView === 'desiccants' ? 'desiccant' : 'neckband';
+  var label = procView === 'jars' ? 'jar' : procView === 'bottles' ? 'bottle' : procView === 'lids' ? 'lid' : procView === 'desiccants' ? 'desiccant' : 'neckband';
+  var Label = procView === 'jars' ? 'Jar' : procView === 'bottles' ? 'Bottle' : procView === 'lids' ? 'Lid' : procView === 'desiccants' ? 'Desiccant' : 'Neckband';
 
   var isDes = procView === 'desiccants';
+  var isNeck = procView === 'neckbands';
 
   function getSku(r) {
     if (procView === 'lids') {
       var parts = [r['Lid Size'], r['Lid Color'], r['Lid Profile']].map(function(v){ return (v||'').trim(); }).filter(Boolean);
       return parts.join(' ');
     }
-    if (isDes) return (r['Desiccant']||'').trim();
+    if (isDes)  return (r['Desiccant']||'').trim();
+    if (isNeck) return (r['Neckband Used']||'').trim();
     return (r[procView === 'jars' ? 'Jar Size' : 'Bottle Size']||'').trim();
   }
 
@@ -2862,8 +2865,8 @@ function renderProcurement() {
   // Sort by YTD units descending
   results.sort(function(a,b){ return b.ytdUnits - a.ytdUnits; });
 
-  // For desiccants, optionally hide zero-YTD items
-  var visibleResults = (isDes && !showZeroDes)
+  // For desiccants/neckbands, optionally hide zero-YTD items
+  var visibleResults = ((isDes || isNeck) && !showZeroDes)
     ? results.filter(function(r){ return r.ytdUnits > 0; })
     : results;
   var hiddenCount = results.length - visibleResults.length;
@@ -2925,9 +2928,9 @@ function renderProcurement() {
       +'<div style="display:flex;gap:20px;flex-shrink:0;margin-left:16px;">'
         +'<div style="text-align:right;"><div style="font-size:10px;color:#888780;margin-bottom:2px;">Lots YTD</div>'
           +'<div style="font-size:12px;font-weight:500;color:#e8e6e0;">'+cd.ytdLots+(cd.ytd25Lots?' <span style="font-size:11px;color:#5f5e5a;font-weight:400;">was '+cd.ytd25Lots+'</span>':'')+'</div></div>'
-        +'<div style="text-align:right;border-left:0.5px solid #2c2c2a;padding-left:16px;"><div style="font-size:10px;color:#888780;margin-bottom:2px;">'+(isDes?'Total YTD':'% of '+label+' usage')+'</div>'
+        +'<div style="text-align:right;border-left:0.5px solid #2c2c2a;padding-left:16px;"><div style="font-size:10px;color:#888780;margin-bottom:2px;">'+(isDes||isNeck?'Total YTD':'% of '+label+' usage')+'</div>'
           +'<div style="font-size:14px;font-weight:500;color:#e8e6e0;">'
-          +(isDes ? cd.ytdUnits.toLocaleString()+pctB(cd.ytdUnits, cd.ytd25Units, true) : (cd.ytdPct!==null?cd.ytdPct+'%':'&#x2014;')+pctB(cd.ytdPct, cd.ytdPct25, true))
+          +(isDes||isNeck ? cd.ytdUnits.toLocaleString()+pctB(cd.ytdUnits, cd.ytd25Units, true) : (cd.ytdPct!==null?cd.ytdPct+'%':'&#x2014;')+pctB(cd.ytdPct, cd.ytdPct25, true))
           +'</div></div>'
       +'</div>'
       +'<div style="display:flex;align-items:flex-end;gap:2px;height:28px;flex-shrink:0;margin-left:16px;">'+sparkBars+'</div>'
@@ -3007,7 +3010,7 @@ function renderProcurement() {
     var qtrSection = '<table style="width:100%;border-collapse:collapse;">'
       +'<thead><tr>'
         +'<th style="'+thSL+'">Quarter</th>'
-        +'<th style="'+thS+'">'+(isDes?'Desiccants':'Units')+'</th>'
+        +'<th style="'+thS+'">'+(isDes?'Desiccants':isNeck?'Neckbands':'Units')+'</th>'
         +'<th style="'+thS+'width:70px;">vs prev</th>'
         +'<th style="'+thS+'">Lots</th>'
         +'<th style="'+thS+'">% of total</th>'
@@ -3043,7 +3046,7 @@ function renderProcurement() {
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;">'
       +'<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">'
         +'<div style="font-size:10px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.05em;">'+Label+' usage — Q1 2025 &#x2192; present &middot; sorted by YTD &middot; thru '+ytdLabelFull+'</div>'
-        +(isDes && (hiddenCount > 0 || showZeroDes)
+        +((isDes || isNeck) && (hiddenCount > 0 || showZeroDes)
           ? '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;color:#5f5e5a;user-select:none;">'
               +'<input type="checkbox" onchange="showZeroDes=this.checked;renderProcurement()" '+(showZeroDes?'checked':'')+' style="accent-color:#378ADD;cursor:pointer;">'
               +'Show desiccants with zero usage YTD'+(hiddenCount > 0 && !showZeroDes ? ' ('+hiddenCount+')' : '')
