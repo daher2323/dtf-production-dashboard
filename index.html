@@ -736,7 +736,7 @@ function setProcView(v) {
   render();
 }
 
-
+function setTop(v) {
   closeMsPanel();
   topView = v;
   renderSubBar();
@@ -2832,7 +2832,7 @@ function renderProcurement() {
     + summaryBar;
 }
 
-
+function renderCustomers() {
   var now = new Date();
   if (!selectedPerfRange) selectedPerfRange = getDefaultPerfRange();
   var range = selectedPerfRange;
