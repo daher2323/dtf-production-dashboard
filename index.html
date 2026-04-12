@@ -2683,6 +2683,20 @@ function generateProcSynopsis(sid) {
   el.innerHTML = html;
 }
 
+function switchProcTab(sid, tab) {
+  var custEl = document.getElementById('pcust-' + sid);
+  var qtrEl  = document.getElementById('pqtr-'  + sid);
+  var btnC   = document.getElementById('ptab-cust-' + sid);
+  var btnQ   = document.getElementById('ptab-qtr-'  + sid);
+  var onC = tab === 'cust';
+  if (custEl) custEl.style.display = onC ? 'block' : 'none';
+  if (qtrEl)  qtrEl.style.display  = onC ? 'none'  : 'block';
+  var navOn  = 'padding:4px 12px;border-radius:6px;border:1.5px solid #378ADD;background:#0C447C;color:#85B7EB;font-weight:500;font-size:12px;cursor:pointer;font-family:system-ui;';
+  var navOff = 'padding:4px 12px;border-radius:6px;border:1.5px solid transparent;background:transparent;color:#888780;font-weight:400;font-size:12px;cursor:pointer;font-family:system-ui;';
+  if (btnC) btnC.style.cssText = onC  ? navOn : navOff;
+  if (btnQ) btnQ.style.cssText = !onC ? navOn : navOff;
+}
+
 function toggleProc(sid) {
   if (!window._procExpanded) window._procExpanded = {};
   window._procExpanded[sid] = !window._procExpanded[sid];
@@ -2940,19 +2954,9 @@ function renderProcurement() {
       +'</div>';
     }).join('');
 
-    var custSection = '<div style="border-bottom:0.5px solid #2c2c2a;">'
-      +'<div style="padding:6px 14px;background:#1a1d20;">'
-        +'<span style="font-size:10px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.04em;">Usage by customer</span>'
-        +'<span style="font-size:10px;color:#5f5e5a;margin-left:8px;">all time · top products shown per customer</span>'
-      +'</div>'
-      + custRows
-    +'</div>';
+    var custSection = custRows;
 
-    var detailTable = '<div id="pb-'+sid+'" style="display:'+(expanded?'block':'none')+';border-top:0.5px solid #2c2c2a;">'
-      +'<script type="application/json" id="pdata-'+sid+'">'+JSON.stringify(procDataObj)+'<\/script>'
-      +'<div id="psynopsis-'+sid+'" style="padding:12px 14px;border-bottom:0.5px solid #2c2c2a;background:#141618;min-height:44px;"></div>'
-      + custSection
-      +'<table style="width:100%;border-collapse:collapse;">'
+    var qtrSection = '<table style="width:100%;border-collapse:collapse;">'
       +'<thead><tr>'
         +'<th style="'+thSL+'">Quarter</th>'
         +'<th style="'+thS+'">Lots</th>'
@@ -2963,7 +2967,22 @@ function renderProcurement() {
         +'<th style="'+thS+'padding-right:14px;width:110px;">Volume</th>'
       +'</tr></thead>'
       +'<tbody>'+tableRows+'</tbody>'
-      +'</table>'
+    +'</table>';
+
+    var navS = function(active) { return 'padding:4px 12px;border-radius:6px;border:'+(active?'1.5px solid #378ADD':'1.5px solid transparent')+';background:'+(active?'#0C447C':'transparent')+';color:'+(active?'#85B7EB':'#888780')+';font-weight:'+(active?'500':'400')+';font-size:12px;cursor:pointer;font-family:system-ui;'; };
+
+    var detailTable = '<div id="pb-'+sid+'" style="display:'+(expanded?'block':'none')+';border-top:0.5px solid #2c2c2a;">'
+      +'<script type="application/json" id="pdata-'+sid+'">'+JSON.stringify(procDataObj)+'<\/script>'
+      +'<div id="psynopsis-'+sid+'" style="padding:12px 14px;border-bottom:0.5px solid #2c2c2a;background:#141618;min-height:44px;"></div>'
+      // Inner tab bar
+      +'<div style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-bottom:0.5px solid #2c2c2a;background:#1a1d20;">'
+        +'<div style="display:flex;gap:2px;padding:3px;background:#141618;border:0.5px solid #2c2c2a;border-radius:8px;">'
+          +'<button id="ptab-cust-'+sid+'" onclick="switchProcTab(\''+sid+'\',\'cust\')" style="'+navS(true)+'">By customer</button>'
+          +'<button id="ptab-qtr-'+sid+'"  onclick="switchProcTab(\''+sid+'\',\'qtr\')"  style="'+navS(false)+'">By quarter</button>'
+        +'</div>'
+      +'</div>'
+      +'<div id="pcust-'+sid+'">'+ custSection +'</div>'
+      +'<div id="pqtr-'+sid+'"  style="display:none;">'+ qtrSection +'</div>'
     +'</div>';
 
     return '<div style="background:#1e2124;border:0.5px solid #2c2c2a;border-left:3px solid '+borderColor+';border-radius:0 10px 10px 0;overflow:hidden;margin-bottom:5px;">'
