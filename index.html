@@ -3234,9 +3234,9 @@ function renderProcurement() {
           +(isCur?'<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#378ADD;margin-right:5px;vertical-align:middle;"></span>':'')
           +quarterLabel(q.key)+(isCur?' <span style="font-size:10px;color:#5f5e5a;font-weight:400;">partial</span>':'')
         +'</td>'
-        +'<td style="'+tdB+rBg+'text-align:right;color:#e8e6e0;">'+(q.lots||'&#x2014;')+'</td>'
         +'<td style="'+tdB+rBg+'text-align:right;color:#e8e6e0;">'+(q.units?q.units.toLocaleString():'&#x2014;')+'</td>'
         +'<td style="'+tdB+rBg+'text-align:right;">'+unitsDelta+'</td>'
+        +'<td style="'+tdB+rBg+'text-align:right;color:#e8e6e0;">'+(q.lots||'&#x2014;')+'</td>'
         +'<td style="'+tdB+rBg+'text-align:right;color:#888780;">'+(q.pctOfTotal!==null?q.pctOfTotal+'%':'&#x2014;')+'</td>'
         +'<td style="'+tdB+rBg+'text-align:right;">'+pctDelta+'</td>'
         +'<td style="'+tdB+rBg+'padding-right:14px;width:110px;">'
