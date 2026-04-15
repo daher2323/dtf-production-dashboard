@@ -1607,7 +1607,7 @@ function renderToday() {
   var allLinesHaveTarget=ALL_LINES.every(function(line){ var g=lineGoal(line); return g.isTarget; });
   var bannerGoalLabel=allLinesHaveTarget?'% of Target':'% of Avg';
   var todayPct=totalGoal?Math.round((todayTotal/totalGoal)*100):0;
-  var statusLabel=isLive&&!dayComplete?'Day in progress':(todayPct>=100?'Target exceeded':'Day complete');
+  var statusLabel=isLive&&!dayComplete?'Day in progress':(todayPct>100?'Target exceeded':todayPct>=TARGET_HIT_THRESHOLD*100?'Target met':'Day complete');
   var statusColor=isLive&&!dayComplete?'#888780':(todayPct>=100?'#1D9E75':'#EF9F27');
   var barColor=isLive&&!dayComplete?'#5f5e5a':(todayPct>=100?'#1D9E75':'#EF9F27');
 
@@ -1992,7 +1992,7 @@ function renderWeekly() {
     } else {
       statusLabel=onPace?'On pace':'Behind pace'; statusBg=onPace?'#085041':'#633806'; statusTxt=onPace?'#9FE1CB':'#FAC775';
     }
-  } else{ var finalPct=weeklyTarget?(weekUnits/weeklyTarget)*100:0; if(finalPct>=100){statusLabel='Target exceeded';statusBg='#085041';statusTxt='#9FE1CB';}else if(finalPct>=98){statusLabel='Target met';statusBg='#085041';statusTxt='#9FE1CB';}else{statusLabel='Target missed';statusBg='#791F1F';statusTxt='#F09595';} }
+  } else{ var finalPct=weeklyTarget?(weekUnits/weeklyTarget)*100:0; if(finalPct>100){statusLabel='Target exceeded';statusBg='#085041';statusTxt='#9FE1CB';}else if(finalPct>=TARGET_HIT_THRESHOLD*100){statusLabel='Target met';statusBg='#085041';statusTxt='#9FE1CB';}else{statusLabel='Target missed';statusBg='#791F1F';statusTxt='#F09595';} }
   // Build per-lot unit counts within this week's window only
   var weekLotUnits={};
   var weekLotLastDate={};
@@ -2143,10 +2143,11 @@ function renderWeekly() {
       var lineWeeklyShare=Math.round(weeklyTarget*lineShareFrac);
       var sharePct=lineWeeklyShare?Math.min(Math.round((u/lineWeeklyShare)*100),100):0;
       var weekElapsedPct=Math.round((daysElapsed/wkDayCount)*100);
-      // On track = actual units >= cumulative daily targets for days worked (with 1% tolerance)
+      // On track = actual units >= cumulative daily targets for completed days only (not today)
       var lineCumTarget=0, lineCumActual=u;
       wkDates.slice(0,daysElapsed).forEach(function(d){
         var dk=dateKey(d);
+        if(isLiveWeek&&dk===dateKey(now)) return; // skip today — still in progress
         var row=dailyTargets[dk]||{};
         lineCumTarget+=(row[line]||0);
       });
@@ -2168,10 +2169,11 @@ function renderWeekly() {
         var dayTgt=(dailyTargets[dk]||{})[line]||0;
         var hasDayData=dayU>0;
         var isFuture=isLiveWeek&&d>now;
-        var hitDay=dayTgt>0&&hasDayData&&(dayU/dayTgt)>=TARGET_HIT_THRESHOLD;
-        var devPct=dayTgt&&hasDayData?Math.round((dayU-dayTgt)/dayTgt*100):null;
-        var devColor=devPct===null?'#444441':devPct>=-1?'#1D9E75':'#EF9F27';
-        var devStr=devPct===null?'':(devPct>=0?'+':'')+devPct+'% of tgt';
+        var isToday=isLiveWeek&&dateKey(d)===dateKey(now);
+        var hitDay=dayTgt>0&&hasDayData&&!isToday&&(dayU/dayTgt)>=TARGET_HIT_THRESHOLD;
+        var devPct=dayTgt&&hasDayData&&!isToday?Math.round((dayU-dayTgt)/dayTgt*100):null;
+        var devColor=devPct===null?'#888780':devPct>=-1?'#1D9E75':'#EF9F27';
+        var devStr=isToday&&hasDayData?'In progress':devPct===null?'':(devPct>=0?'+':'')+devPct+'% of tgt';
         if(hitDay) daysHit++;
         var cellBg=hitDay?'background:#041f18;border:0.5px solid #1D9E75;box-shadow:0 0 6px 1px rgba(29,158,117,0.18);':'background:#141618;border:0.5px solid #2c2c2a;';
         return '<div style="text-align:center;border-radius:6px;padding:5px 2px;'+cellBg+'">'
@@ -2190,7 +2192,10 @@ function renderWeekly() {
           )
         +'</div>';
       }).join('');
-      var daysWithData=wkDates.filter(function(d){ var dk=dateKey(d); return ((dayLineUnits[line]||{})[dk]||0)>0; }).length;
+      var daysWithData=wkDates.filter(function(d){
+        if(isLiveWeek&&dateKey(d)===dateKey(now)) return false; // today is in progress, not counted
+        var dk=dateKey(d); return ((dayLineUnits[line]||{})[dk]||0)>0;
+      }).length;
       // Only show days hit counter when daily targets exist to compare against
       var daysHitStr=hasDailyTargetsForLine&&daysWithData>0?daysHit+'/'+daysWithData+' days hit':'';
       return '<div style="background:#1e2124;border:0.5px solid '+borderColor+';border-top:2px solid '+color+';border-radius:10px;overflow:hidden;">'
