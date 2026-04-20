@@ -186,14 +186,61 @@
 var CORRECT_PW = '53381b5017ab006a3be103e760d153ad240bc964495bf36cc674dcfc5319250f';
 var ADMIN_PW   = '976130b2d1e873ea6c0f6663f7bab915393516be9fb4d69428d3daf59e459366';
 var userRole   = 'viewer'; // 'viewer' | 'admin'
-var CSV_2026 = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ0Vqunj5euX6ZRNwnYeF22UChTxiCd6gP_GVEiuFBeUo6o9c2Mc6Idt1pQkckhuyukmNJesy8_nZqX/pub?gid=943770391&single=true&output=csv';
-var CSV_2025 = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ0Vqunj5euX6ZRNwnYeF22UChTxiCd6gP_GVEiuFBeUo6o9c2Mc6Idt1pQkckhuyukmNJesy8_nZqX/pub?gid=2024063496&single=true&output=csv';
+
+// Per-year production CSVs and annual unit targets.
+// To add a new year: append one entry to each map below (key = 4-digit year).
+// On Jan 1 of the new year, CURRENT_YEAR flips automatically and the dashboard
+// picks up the new URL and target without any other code changes.
+// If the current year is missing from the maps, the dashboard falls back to
+// the most recent configured year and logs a console.warn — the dashboard
+// keeps working, but YoY comparisons will show stale data until the entry is added.
+var CSV_BY_YEAR = {
+  2025: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ0Vqunj5euX6ZRNwnYeF22UChTxiCd6gP_GVEiuFBeUo6o9c2Mc6Idt1pQkckhuyukmNJesy8_nZqX/pub?gid=2024063496&single=true&output=csv',
+  2026: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ0Vqunj5euX6ZRNwnYeF22UChTxiCd6gP_GVEiuFBeUo6o9c2Mc6Idt1pQkckhuyukmNJesy8_nZqX/pub?gid=943770391&single=true&output=csv'
+};
+var YEAR_TARGETS = {
+  2025: 3300000,
+  2026: 3927000
+};
+
+// Per-year Lot # reference sheets. Each row: Lot #, Brand Name, Product Name,
+// Exp. Date, Amt, Brand Name - Product Name. Used as a fallback when a lot
+// drawn in the materials sheet doesn't appear in the production log
+// (e.g. bulk powder shipments). Same year-rollover pattern as CSV_BY_YEAR —
+// add a new entry when a new-year tab is published.
+var CSV_LOT_INDEX_BY_YEAR = {
+  2025: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRgNR9iCy2D2z4OFKG97LIU0M9fCh0jaBzIXVQduVhazkoAWYPjBU_qE6XKOtn7kMS1H-qy9WwbqxL4/pub?gid=902688868&single=true&output=csv',
+  2026: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRgNR9iCy2D2z4OFKG97LIU0M9fCh0jaBzIXVQduVhazkoAWYPjBU_qE6XKOtn7kMS1H-qy9WwbqxL4/pub?gid=1261158834&single=true&output=csv'
+};
+
+function resolveConfiguredYear(y) {
+  if (CSV_BY_YEAR[y] && YEAR_TARGETS[y]) return y;
+  var years = Object.keys(CSV_BY_YEAR).filter(function(k){ return YEAR_TARGETS[k]; }).map(Number).sort(function(a,b){ return a-b; });
+  if (!years.length) return null;
+  var fallback = years[years.length - 1];
+  console.warn('[DTF] No CSV/target configured for year ' + y + '. Falling back to ' + fallback + '. Add an entry to CSV_BY_YEAR and YEAR_TARGETS at the top of index.html.');
+  return fallback;
+}
+
+var CURRENT_YEAR = resolveConfiguredYear(new Date().getFullYear());
+var PRIOR_YEAR   = CURRENT_YEAR ? resolveConfiguredYear(CURRENT_YEAR - 1) : null;
+var CSV_CURRENT  = CSV_BY_YEAR[CURRENT_YEAR];
+var CSV_PRIOR    = CSV_BY_YEAR[PRIOR_YEAR];
+var YEAR_TARGET         = YEAR_TARGETS[CURRENT_YEAR] || 0;
+var YEAR_TARGET_PRIOR   = YEAR_TARGETS[PRIOR_YEAR]   || 0;
+var WEEKLY_TARGET       = Math.round(YEAR_TARGET / 52);
+var WEEKLY_TARGET_PRIOR = Math.round(YEAR_TARGET_PRIOR / 52);
+
+// Historical anchors — when DTF began tracking. These do NOT move year-over-year.
+var TRACKING_START = new Date(2025, 0, 1);           // Jan 1, 2025 — first quarter of customer/SKU history
+var MATERIALS_TRACKING_START = new Date(2025, 9, 1); // Oct 1, 2025 — materials data becomes reliable here
+
 var CSV_TARGETS = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ0Vqunj5euX6ZRNwnYeF22UChTxiCd6gP_GVEiuFBeUo6o9c2Mc6Idt1pQkckhuyukmNJesy8_nZqX/pub?gid=1686526578&single=true&output=csv';
 var CSV_WEEKLY_TARGETS = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ0Vqunj5euX6ZRNwnYeF22UChTxiCd6gP_GVEiuFBeUo6o9c2Mc6Idt1pQkckhuyukmNJesy8_nZqX/pub?gid=329792715&single=true&output=csv';
-var YEAR_TARGET = 3927000;
-var YEAR_TARGET_2025 = 3300000;
-var WEEKLY_TARGET = Math.round(YEAR_TARGET / 52);
-var WEEKLY_TARGET_2025 = Math.round(YEAR_TARGET_2025 / 52);
+var CSV_MATERIALS = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vR0qIxGwCZPR0M4t9Q_XGMDSd5eFi1a46beypexJEcUMNZE5Sz5bLzZ7LqZqL7T5_REKjoqrOLyNN7f/pub?gid=0&single=true&output=csv';
+var materialsData = [];
+var lotIndex = {};           // lot number -> { combined, brand, product } populated from the Lot # reference sheets
+var lotIndexLoaded = false;
 var TARGET_HIT_THRESHOLD = 0.99; // 99% = within 1% tolerance
 var ALL_LINES = ['Line #1', 'Line #2', 'Line #4'];
 var LINE_COLOR = {'line#1':'#378ADD','line#2':'#7F77DD','line#4':'#D4537E'};
@@ -215,7 +262,22 @@ var selectedDetailQuarter = 'ytd';
 var selectedDetailYear = new Date().getFullYear();
 var selectedDetailRange = null;
 var selectedPerfRange = null;
-var procView = 'jars'; // 'jars' | 'bottles' | 'lids' | 'desiccants'
+var procView = 'materials'; // 'materials' | 'jars' | 'bottles' | 'lids' | 'desiccants'
+var matYear = new Date().getFullYear(); // kept for renderMatInline compat
+var matWindow = 6; // lookback months: 6 | 12 | 0=all
+var matSearch = '';
+
+// Part number -> display group name. Parts listed here roll up under one row.
+var SKU_GROUPS = {
+  '20-1100': 'Whey Protein Concentrate (WPC)',
+  '20-1185': 'Whey Protein Concentrate (WPC)',
+  '20-094':  'Whey Protein Concentrate (WPC)',
+  '20-092':  'Whey Protein Concentrate (WPC)',
+  '20-716':  'Whey Protein Concentrate (WPC)',
+  '20-1194': 'Whey Protein Concentrate (WPC)',
+  '20-093':  'Whey Protein Isolate (WPI)',
+  '20-090':  'Whey Protein Isolate (WPI)'
+};
 var showZeroDes = false;
 var lastRefreshTime = 0;
 var filterState = { customer:[], product:[], status:[], bottle:[], jar:[] };
@@ -223,6 +285,123 @@ var filterState = { customer:[], product:[], status:[], bottle:[], jar:[] };
 var _openMsId = null;
 
 function lk(s) { return (s||'').replace(/\s/g,'').toLowerCase(); }
+
+// HTML-escape a CSV-derived value before interpolating into innerHTML or an
+// attribute value. Use for text content AND attribute values (both are safe
+// once &, <, >, ", ' are replaced).
+function esc(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Produce a JS string literal safe to embed inside a double-quoted HTML
+// attribute (e.g. onclick="foo(" + jsStr(name) + ")"). Escapes HTML-significant
+// chars into Unicode escapes so the result doesn't need additional esc().
+function jsStr(s) {
+  return JSON.stringify(String(s == null ? '' : s))
+    .replace(/</g, '\\u003C')
+    .replace(/>/g, '\\u003E')
+    .replace(/&/g, '\\u0026')
+    .replace(/"/g, '&quot;');
+}
+
+// Parse a Date cell to a local-TZ calendar date (midnight in browser's local TZ).
+// Handles M/D/YYYY, M/D/YY, MM/DD/YYYY, and YYYY-MM-DD (ISO date-only).
+// Refuses strings containing 'T', 'Z', or a numeric timezone offset so that a
+// datetime like "2026-04-18T00:00:00Z" never silently shifts to the previous day
+// in Eastern time. Returns null if the string can't be parsed as a plain date.
+function parseLocalDate(s) {
+  if (!s) return null;
+  var str = String(s).trim();
+  if (!str) return null;
+  // Google Sheets date-with-time CSV cells: "4/18/2026 9:30:00" — match the date prefix.
+  var us = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:\b|$)/);
+  if (us) {
+    var mo = parseInt(us[1], 10), dy = parseInt(us[2], 10), yr = parseInt(us[3], 10);
+    if (yr < 100) yr += 2000;
+    // Reject out-of-range months/days so a D/M/YYYY-locale cell isn't silently misread.
+    if (mo < 1 || mo > 12 || dy < 1 || dy > 31) return null;
+    var d = new Date(yr, mo - 1, dy);
+    return isNaN(d) ? null : d;
+  }
+  var iso = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[\sT]|$)/);
+  if (iso) {
+    var isoMo = parseInt(iso[2], 10), isoDy = parseInt(iso[3], 10);
+    if (isoMo < 1 || isoMo > 12 || isoDy < 1 || isoDy > 31) return null;
+    var d2 = new Date(parseInt(iso[1], 10), isoMo - 1, isoDy);
+    return isNaN(d2) ? null : d2;
+  }
+  // Anything with a 'T', 'Z', or timezone offset is a timestamp — refuse so we never shift days.
+  if (/[TZ]|[+\-]\d{2}:?\d{2}$/.test(str)) return null;
+  // Last resort: browser's Date parser. Normalize to local midnight of that day.
+  var fb = new Date(str);
+  if (isNaN(fb)) return null;
+  return new Date(fb.getFullYear(), fb.getMonth(), fb.getDate());
+}
+
+// Normalize a Line cell to the canonical 'Line #N' form used by ALL_LINES.
+// Defense-in-depth: Google Sheets data validation is expected to enforce this,
+// but paste-as-value or a future edit can bypass DV — we still want the data.
+// Returns null if no digit can be extracted or the line isn't one we track.
+function canonicalLine(raw) {
+  if (raw == null) return null;
+  var m = String(raw).match(/\d+/);
+  if (!m) return null;
+  var canon = 'Line #' + m[0];
+  return ALL_LINES.indexOf(canon) !== -1 ? canon : null;
+}
+
+// Diagnostic counter for skipped/orphaned rows per refresh. No visible UI —
+// managers and leadership use the admin login, and error badges would be noisy.
+// Developers can inspect the most recent skip breakdown from the browser console:
+//   __dtfSkipped()        → summary counts + last refresh timestamp
+//   __dtfSkipped(true)    → also returns a capped list of example rows per reason
+var _skipStats = null;
+function _resetSkipStats() {
+  _skipStats = {
+    at: new Date(),
+    invalid_date: 0, missing_lot: 0, missing_product: 0,
+    sentinel: 0, orphan_line: 0,
+    examples: { invalid_date: [], missing_lot: [], missing_product: [], sentinel: [], orphan_line: [] }
+  };
+}
+function _recordSkip(reason, sample) {
+  if (!_skipStats) _resetSkipStats();
+  if (_skipStats[reason] == null) return;
+  _skipStats[reason]++;
+  var ex = _skipStats.examples[reason];
+  if (ex && ex.length < 5 && sample) ex.push(sample);
+}
+function _logSkipSummary() {
+  if (!_skipStats) return;
+  var total = _skipStats.invalid_date + _skipStats.missing_lot + _skipStats.missing_product + _skipStats.sentinel + _skipStats.orphan_line;
+  if (total === 0) return;
+  console.warn('[DTF] Refresh skipped ' + total + ' row(s): '
+    + 'invalid_date=' + _skipStats.invalid_date
+    + ', missing_lot=' + _skipStats.missing_lot
+    + ', missing_product=' + _skipStats.missing_product
+    + ', sentinel=' + _skipStats.sentinel
+    + ', orphan_line=' + _skipStats.orphan_line
+    + '. Call __dtfSkipped(true) for examples.');
+}
+window.__dtfSkipped = function(withExamples) {
+  if (!_skipStats) return { message: 'No refresh has completed yet.' };
+  var out = {
+    at: _skipStats.at,
+    invalid_date: _skipStats.invalid_date,
+    missing_lot: _skipStats.missing_lot,
+    missing_product: _skipStats.missing_product,
+    sentinel: _skipStats.sentinel,
+    orphan_line: _skipStats.orphan_line
+  };
+  if (withExamples) out.examples = _skipStats.examples;
+  return out;
+};
 
 function toggleMsPanel(id) {
   if (_openMsId === id) { closeMsPanel(); return; }
@@ -282,11 +461,11 @@ function renderMsItems(id, opts, selected, search) {
   if (!filtered.length) return '<div style="padding:8px;font-size:12px;color:#5f5e5a;font-style:italic;">No options</div>';
   return filtered.map(function(o) {
     var on = selected.indexOf(o) !== -1;
-    var safe = o.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+    var safe = esc(o);
     return '<div class="ms-item" data-ms-val="' + safe + '">'
       + '<div class="ms-chk' + (on ? ' on' : '') + '">'
       + (on ? '<svg width="8" height="6" viewBox="0 0 8 6" fill="none"><polyline points="1,3 3,5 7,1" stroke="#85B7EB" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>' : '')
-      + '</div><span>' + o + '</span></div>';
+      + '</div><span>' + safe + '</span></div>';
   }).join('');
 }
 
@@ -427,8 +606,8 @@ function resetDashboard() {
   sortCol = 'date'; sortDir = -1; page = 1;
   custLimit = 10;
   ['customer','product','status','bottle','jar'].forEach(function(id){ filterState[id] = []; });
+  _nextRenderScrollY = 0;
   setMainSection('production');
-  window.scrollTo(0, 0);
 }
 
 function showAdminLogin() {
@@ -560,12 +739,23 @@ function parseCSV(text) {
 function isValid(r) {
   if (!r || typeof r !== 'object') return false;
   var d=(r['Date']||'').trim(), l=(r['Lot Number']||'').trim(), p=(r['Product']||'').trim();
-  if (!d||!l||!p) return false;
-  if (p.startsWith('#')||l.startsWith('#')||d.startsWith('#')) return false;
-  var suspect = /loading|#error|#ref|#n\/a|#value|#name|#div/i;
-  if (suspect.test(p) || suspect.test(l) || suspect.test(d)) return false;
-  var dt = new Date(d); if (isNaN(dt)) return false;
-  var yr = dt.getFullYear(); if (yr < 2020 || yr > 2035) return false;
+  if (!d) { _recordSkip('invalid_date', {date:d, lot:l, product:p}); return false; }
+  if (!l) { _recordSkip('missing_lot',  {date:d, lot:l, product:p}); return false; }
+  if (!p) { _recordSkip('missing_product', {date:d, lot:l, product:p}); return false; }
+  // Reject cells whose entire trimmed value is a Google Sheets error sentinel.
+  // (Previous substring match rejected any product name containing 'loading'.)
+  var suspect = /^(loading|#error|#ref|#n\/?a|#value|#name|#div|#num|#null)[!?\s]*$/i;
+  if (suspect.test(p) || suspect.test(l) || suspect.test(d)) {
+    _recordSkip('sentinel', {date:d, lot:l, product:p});
+    return false;
+  }
+  var dt = parseLocalDate(d);
+  if (!dt) { _recordSkip('invalid_date', {date:d, lot:l, product:p}); return false; }
+  var yr = dt.getFullYear();
+  if (yr < 2020 || yr > (CURRENT_YEAR || new Date().getFullYear()) + 5) {
+    _recordSkip('invalid_date', {date:d, lot:l, product:p, reason:'year_out_of_range'});
+    return false;
+  }
   return true;
 }
 
@@ -612,7 +802,7 @@ function deltaTag(vCur, vComp, isHigherBetter, fmt, compLabel, compYearLabel) {
   var positive = isHigherBetter ? diff > 0 : diff < 0;
   var bg = positive ? '#085041' : '#791F1F', txt = positive ? '#9FE1CB' : '#F09595';
   var sign = diff > 0 ? '+' : '';
-  var vsLabel = compYearLabel || '2025';
+  var vsLabel = compYearLabel || String(PRIOR_YEAR);
   var label = fmt === 'pct' ? sign+pctDiff.toFixed(1)+'% vs '+vsLabel : sign+Math.round(diff).toLocaleString()+' vs '+vsLabel;
   return '<div style="font-size:10px;color:#5f5e5a;margin-bottom:3px">'+vsLabel+': '+(compLabel||vComp.toLocaleString())+'</div>'
        + '<span style="display:inline-block;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:500;background:'+bg+';color:'+txt+'">'+label+'</span>';
@@ -671,6 +861,16 @@ function fetchCSVSimple(url) {
   }).catch(function(){ return ''; });
 }
 
+function fetchMaterialsCSV() {
+  return fetch(CSV_MATERIALS).then(function(r){
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.text();
+  }).then(function(text){
+    if (!text || text.trim().startsWith('<!')) throw new Error('Invalid response');
+    return text;
+  }).catch(function(){ return ''; });
+}
+
 function fetchWithRetry(url, retries, delay) {
   retries = retries || 5; delay = delay || 2000;
   return fetch(url).then(function(r){
@@ -692,26 +892,126 @@ function fetchWithRetry(url, retries, delay) {
 
 function fetchData() {
   return Promise.all([
-    fetchWithRetry(CSV_2026),
-    fetchWithRetry(CSV_2025),
+    fetchWithRetry(CSV_CURRENT),
+    fetchWithRetry(CSV_PRIOR),
     fetchWithRetry(CSV_TARGETS).catch(function(){ return ''; }),
     fetchCSVSimple(CSV_WEEKLY_TARGETS)
   ]);
 }
 
+function fetchMaterialsIfNeeded() {
+  if (materialsData.length > 0) return;
+  fetchMaterialsCSV().then(function(t){
+    var parsed = parseMaterials(t);
+    if (parsed.length > 0) {
+      materialsData = parsed;
+      if (mainSection === 'procurement' && procView === 'materials') renderMaterials();
+    }
+  });
+}
+
+// Parse a Lot # reference sheet (columns: Lot #, Brand Name, Product Name,
+// Exp. Date, Amt, Brand Name - Product Name). Returns a lot→{combined} map
+// where `combined` matches the production-log "Customer - Product" format.
+function parseLotIndex(text) {
+  if (!text) return {};
+  try {
+    var rows = parseCSV(text);
+    var out = {};
+    rows.forEach(function(r){
+      var lot = (r['Lot #']||'').trim(); if (!lot) return;
+      var brand = (r['Brand Name']||'').trim();
+      var product = (r['Product Name']||'').trim();
+      var combined = (r['Brand Name - Product Name']||'').trim();
+      var amt = (r['Amt']||'').trim();
+      // Skip placeholder rows where only the lot number is filled in.
+      if (!brand && !product && (!combined || combined === '-' || combined === ' - ')) return;
+      if (!combined) combined = (brand + ' - ' + product).trim();
+      out[lot] = { combined: combined, brand: brand, product: product, amt: amt };
+    });
+    return out;
+  } catch(e) { return {}; }
+}
+
+// Parse an "Amt" cell from the Lot # sheet. Handles plain numbers ("1510"),
+// comma-separated ("185,125 servings"), and k-suffixed shorthand ("25.2k servings").
+// Returns { value, unit } or null.
+function parseAmt(s) {
+  if (!s) return null;
+  var str = String(s).trim();
+  var m = str.match(/^([0-9,]+(?:\.[0-9]+)?)\s*(k|K)?\s*(.*)$/);
+  if (!m) return null;
+  var n = parseFloat(m[1].replace(/,/g, ''));
+  if (isNaN(n)) return null;
+  if (m[2]) n *= 1000;
+  return { value: Math.round(n), unit: (m[3] || '').trim() };
+}
+
+function fetchLotIndexIfNeeded() {
+  if (lotIndexLoaded) return;
+  var urls = Object.keys(CSV_LOT_INDEX_BY_YEAR).map(function(y){ return CSV_LOT_INDEX_BY_YEAR[y]; });
+  if (!urls.length) { lotIndexLoaded = true; return; }
+  Promise.all(urls.map(function(u){ return fetchCSVSimple(u); })).then(function(texts){
+    var merged = {};
+    texts.forEach(function(t){
+      var partial = parseLotIndex(t);
+      Object.keys(partial).forEach(function(k){ merged[k] = partial[k]; });
+    });
+    lotIndex = merged;
+    lotIndexLoaded = true;
+    // If the user is already sitting on the materials view, re-render so any
+    // previously-"Unknown" lots pick up their brand/product from the index.
+    if (mainSection === 'procurement' && procView === 'materials') renderMaterials();
+  });
+}
+
+function parseMaterials(text) {
+  if (!text) return [];
+  try {
+    var rows = parseCSV(text);
+    var keys = rows[0] ? Object.keys(rows[0]) : [];
+    var dateCol = keys[0]; // Google Forms: first column is always the timestamp
+    console.log('CSV row count:', rows.length);
+    console.log('CSV headers:', rows[0] ? Object.keys(rows[0]).join(' | ') : 'none');
+    console.log('CSV row 1 sample:', rows[1] ? JSON.stringify(rows[1]) : 'none');
+    return rows.filter(function(r){
+      return (r['Order Lot #']||'').trim() && (r['Material Name']||'').trim() && parseFloat(r['Qty Needed']||0) > 0;
+    }).map(function(r){
+      var raw = (r[dateCol]||'').trim();
+      var d = new Date(raw);
+      if (isNaN(d) && raw) {
+        var parts = raw.split(' ')[0].split('/');
+        if (parts.length === 3) d = new Date(parseInt(parts[2]), parseInt(parts[0])-1, parseInt(parts[1]));
+      }
+      return {
+        date: isNaN(d) ? null : d,
+        lot: (r['Order Lot #']||'').trim(),
+        partNum: (r['Part #']||'').trim(),
+        material: (r['Material Name']||'').trim(),
+        qty: parseFloat(r['Qty Needed']||0)
+      };
+    }).filter(function(r){ return r.date && r.date >= MATERIALS_TRACKING_START; });
+  } catch(e) { return []; }
+}
+
 function applyFreshData(res) {
+  _resetSkipStats();
   var newRows = parseCSV(res[0]).filter(isValid);
   var newRows25 = parseCSV(res[1]).filter(isValid);
   var newTargets = parseTargets(res[2]);
   var newWeeklyTargets = parseWeeklyTargets(res[3]||'');
-  if (newRows.length < 3) { console.warn('Refresh aborted: too few rows'); return false; }
-  if (allRows.length > 0 && newRows.length < allRows.length) {
-    console.warn('Refresh aborted: new data (' + newRows.length + ' rows) has fewer rows than current (' + allRows.length + '). Keeping existing data.');
+  if (newRows.length < 3) { console.warn('[DTF] Refresh aborted: too few rows (' + newRows.length + '). Keeping existing data.'); return false; }
+  // Allow shrinkage up to 15% so normal operator cleanup (dup-row deletes, minor
+  // edits) doesn't freeze the dashboard. Larger drops still reject — those
+  // usually mean a stale/empty CDN response, not a real edit.
+  if (allRows.length > 0 && newRows.length < Math.floor(allRows.length * 0.85)) {
+    console.warn('[DTF] Refresh aborted: new data has ' + newRows.length + ' rows vs current ' + allRows.length + ' (>15% shrink). Keeping existing data.');
     return false;
   }
   allRows = newRows; allRows25 = newRows25; dailyTargets = newTargets; weeklyTargets = newWeeklyTargets;
   lotMap = buildLotMap(allRows);
   buildProductionDays(true);
+  _logSkipSummary();
   return true;
 }
 
@@ -720,8 +1020,7 @@ function buildProductionDays(preserveSelection) {
   var todayStr = (now.getMonth()+1)+'/'+now.getDate()+'/'+now.getFullYear();
   var seen = new Set();
   allRows.concat(allRows25).forEach(function(r){
-    var d = (r['Date']||'').trim(); if (!d) return;
-    var dt = new Date(d); if (isNaN(dt)) return;
+    var dt = parseLocalDate(r['Date']); if (!dt) return;
     seen.add((dt.getMonth()+1)+'/'+dt.getDate()+'/'+dt.getFullYear());
   });
   var days = Array.from(seen).sort(function(a,b){ return new Date(a)-new Date(b); });
@@ -740,10 +1039,13 @@ function loadDashboard() {
   document.getElementById('loading').textContent = 'Loading production data...';
   document.getElementById('loading').style.display = 'block';
   fetchData().then(function(results) {
+    _resetSkipStats();
     var rows = parseCSV(results[0]).filter(isValid);
     var rows25 = parseCSV(results[1]).filter(isValid);
-    if (rows.length < 3) {
-      document.getElementById('loading').textContent = 'Data appears incomplete — retrying...';
+    // Reject suspiciously small datasets — Google Sheets CDN occasionally serves stale/empty CSVs
+    var minRows = allRows.length > 0 ? Math.floor(allRows.length * 0.8) : 50;
+    if (rows.length < minRows) {
+      document.getElementById('loading').textContent = 'Data appears incomplete (' + rows.length + ' rows) — retrying...';
       setTimeout(loadDashboard, 4000);
       return;
     }
@@ -752,12 +1054,25 @@ function loadDashboard() {
     weeklyTargets = parseWeeklyTargets(results[3]||'');
     lotMap = buildLotMap(allRows);
     buildProductionDays(false);
+    _logSkipSummary();
     lastRefreshTime = Date.now();
     document.getElementById('loading').style.display = 'none';
     document.getElementById('content').style.display = 'block';
     renderSubBar();
     render();
     startRefreshTimers();
+    // Fetch materials + lot index in background — don't block main load
+    fetchMaterialsIfNeeded();
+    fetchLotIndexIfNeeded();
+    // Safety net: if daily view looks empty after load, re-fetch once after a short delay
+    // Guards against Google Sheets CDN serving a stale response on first hit
+    if (topView === 'summary' && subView === 'today') {
+      setTimeout(function() {
+        if (allRows.length > 0) {
+          refreshAndRender(false);
+        }
+      }, 8000);
+    }
   }).catch(function(e){
     console.error('Load failed:', e);
     document.getElementById('loading').textContent = 'Connection issue — retrying in 10 seconds...';
@@ -854,8 +1169,14 @@ function startRefreshTimers() {
     if(topView==='summary'&&subView==='today') refreshAndRender(false);
   }, 60*1000);
   document.addEventListener('visibilitychange', function(){
-    checkDateRollover();
-    if(document.visibilityState==='visible' && Date.now()-lastRefreshTime > 45000) refreshAndRender(true);
+    if(document.visibilityState==='visible') {
+      checkDateRollover();
+      // Always snap to latest day when returning to tab on daily view
+      if(topView==='summary' && subView==='today') {
+        selectedDayIdx = productionDays.length - 1;
+      }
+      if(Date.now()-lastRefreshTime > 45000) refreshAndRender(true);
+    }
   });
 }
 
@@ -918,7 +1239,7 @@ function renderSubBar() {
         + '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><polyline points="7,2 3,6 7,10" stroke="#888780" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>'
         + 'All customers</button>'
         + '<svg width="10" height="10" viewBox="0 0 10 10" fill="none"><polyline points="3,2 7,5 3,8" stroke="#444441" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
-        + '<span style="font-size:12px;font-weight:500;color:#e8e6e0;">'+selectedCustomer+'</span>';
+        + '<span style="font-size:12px;font-weight:500;color:#e8e6e0;">'+esc(selectedCustomer)+'</span>';
     } else {
       sb.innerHTML =
         '<div style="display:flex;gap:2px;padding:3px;background:#1a1d20;border:0.5px solid #2c2c2a;border-radius:8px;">'
@@ -928,9 +1249,10 @@ function renderSubBar() {
         + '</div>';
     }
   } else if (mainSection === 'procurement') {
-    var pj = procView==='jars', pb = procView==='bottles', pl = procView==='lids', pd = procView==='desiccants', pn = procView==='neckbands';
+    var pm = procView==='materials', pj = procView==='jars', pb = procView==='bottles', pl = procView==='lids', pd = procView==='desiccants', pn = procView==='neckbands';
     sb.innerHTML =
       '<div style="display:flex;gap:2px;padding:3px;background:#1a1d20;border:0.5px solid #2c2c2a;border-radius:8px;">'
+      + '<button onclick="setProcView(\'materials\')" style="'+navBtnStyle(pm)+'">Materials</button>'
       + '<button onclick="setProcView(\'jars\')" style="'+navBtnStyle(pj)+'">Jars</button>'
       + '<button onclick="setProcView(\'bottles\')" style="'+navBtnStyle(pb)+'">Bottles</button>'
       + '<button onclick="setProcView(\'lids\')" style="'+navBtnStyle(pl)+'">Lids</button>'
@@ -963,33 +1285,25 @@ function setSub(v) {
 }
 
 function navDay(dir) {
-  var scrollY = window.scrollY;
   selectedDayIdx = Math.max(0, Math.min(productionDays.length-1, selectedDayIdx+dir));
   render();
-  requestAnimationFrame(function(){ requestAnimationFrame(function(){ window.scrollTo(0, scrollY); }); });
 }
 
 function navToToday() {
-  var scrollY = window.scrollY;
   selectedDayIdx = productionDays.length - 1;
   render();
-  requestAnimationFrame(function(){ requestAnimationFrame(function(){ window.scrollTo(0, scrollY); }); });
 }
 
 function goLive() {
-  var scrollY = window.scrollY;
   selectedDayIdx = productionDays.length - 1;
   render();
-  requestAnimationFrame(function(){ requestAnimationFrame(function(){ window.scrollTo(0, scrollY); }); });
 }
 
 function pickDay(str) {
-  var scrollY = window.scrollY;
   var idx = productionDays.indexOf(str);
   if (idx !== -1) selectedDayIdx = idx;
   closePicker();
   render();
-  requestAnimationFrame(function(){ requestAnimationFrame(function(){ window.scrollTo(0, scrollY); }); });
 }
 
 function openPicker() {
@@ -1334,7 +1648,41 @@ function applyPerfCustomRange() {
 
 function closePerfRangePicker() { var p = document.getElementById('perf-range-picker'); if(p) p.remove(); }
 
+// Wraps the actual render (renderImpl) to preserve scroll position, active-element
+// focus, and text-input selection across full re-renders. Callers don't need to
+// capture/restore scroll manually — rAF-scroll hacks at navigation sites are
+// therefore unnecessary. Callers that want to override scroll (e.g. reset-to-top)
+// can assign a number to _nextRenderScrollY before triggering render().
+var _nextRenderScrollY = null;
 function render() {
+  var scrollY = (_nextRenderScrollY !== null) ? _nextRenderScrollY : window.scrollY;
+  _nextRenderScrollY = null;
+  var active = document.activeElement;
+  var focusId = (active && active.id) ? active.id : null;
+  var selStart = null, selEnd = null;
+  if (focusId && active && typeof active.selectionStart === 'number') {
+    try { selStart = active.selectionStart; selEnd = active.selectionEnd; } catch(e){}
+  }
+  renderImpl();
+  // Two rAFs: first lets the new DOM lay out, second lets Chart.js finish painting
+  // into canvases we just inserted (which can shift layout and reset scroll).
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      window.scrollTo(0, scrollY);
+      if (focusId) {
+        var el = document.getElementById(focusId);
+        if (el && typeof el.focus === 'function') {
+          try { el.focus({ preventScroll: true }); } catch(e) { try { el.focus(); } catch(_){} }
+          if (selStart !== null && typeof el.setSelectionRange === 'function') {
+            try { el.setSelectionRange(selStart, selEnd); } catch(e){}
+          }
+        }
+      }
+    });
+  });
+}
+
+function renderImpl() {
   closeMsPanel();
   Object.values(charts).forEach(function(c){ try{c.destroy();}catch(e){} });
   charts = {};
@@ -1440,31 +1788,48 @@ function animateGauges(gaugeData, todayTotal, totalGoal, barColor) {
 
     // Animate segmented bar
     if(totalGoal) {
-      var w1=Math.min((gaugeData[0].units*e)/totalGoal*100,100);
-      var w2=Math.min((gaugeData[1].units*e)/totalGoal*100,100);
-      var w4=Math.min((gaugeData[2].units*e)/totalGoal*100,100);
+      var barScale = Math.max(totalGoal, gaugeData[0].units+gaugeData[1].units+gaugeData[2].units) * e || totalGoal;
+      var w1=(gaugeData[0].units*e)/barScale*100;
+      var w2=(gaugeData[1].units*e)/barScale*100;
+      var w4=(gaugeData[2].units*e)/barScale*100;
       var totalW=Math.min(w1+w2+w4,100);
       var s1=document.getElementById('banner-seg1');
       var s2=document.getElementById('banner-seg2');
       var s4=document.getElementById('banner-seg4');
       var rem=document.getElementById('banner-remaining');
+      // When over target, fill bar edge-to-edge by stretching last active segment
+      var overTarget = (gaugeData[0].units+gaugeData[1].units+gaugeData[2].units) > totalGoal;
+      var w4adj = overTarget ? Math.max(w4, 100-w1-w2) : w4;
       if(s1){s1.style.width=w1+'%';}
       if(s2){s2.style.left=w1+'%';s2.style.width=w2+'%';}
-      if(s4){s4.style.left=(w1+w2)+'%';s4.style.width=w4+'%';}
+      if(s4){s4.style.left=(w1+w2)+'%';s4.style.width=w4adj+'%';}
       if(rem){
-        var remaining=Math.max(0,totalGoal-Math.round(todayTotal*e));
-        rem.style.fontSize='11px';rem.style.fontWeight='500';rem.style.color='#888780';
-        rem.textContent=remaining>0?remaining.toLocaleString()+' to go':'';
+        var remaining=Math.round(totalGoal-todayTotal*e);
+        rem.style.fontSize='11px';rem.style.fontWeight='500';
+        if(remaining<=0){rem.style.color='#9FE1CB';rem.textContent='+'+(Math.abs(remaining)).toLocaleString()+' over target';}
+        else{rem.style.color='#888780';rem.textContent=remaining.toLocaleString()+' to go';}
       }
-      // Position labels at midpoint of each segment
-      var segs=[{id:'line#1',left:0,width:w1},{id:'line#2',left:w1,width:w2},{id:'line#4',left:w1+w2,width:w4}];
+      // Fixed left/center/right label positions — never overlap
+      var segs=[
+        {id:'line#1', left:0,    width:w1,  anchor:'left',   transform:'translateX(0)'},
+        {id:'line#2', left:w1,   width:w2,  anchor:'center', transform:'translateX(-50%)'},
+        {id:'line#4', left:w1+w2,width:w4,  anchor:'right',  transform:'translateX(-100%)'}
+      ];
       segs.forEach(function(s){
         var leg=document.getElementById('banner-leg-'+s.id);
         if(!leg) return;
         var units=Math.round((gaugeData.find(function(g){return lk(g.line||ALL_LINES[g.idx]||'')===s.id;})||{units:0}).units*e);
         leg.textContent=s.id.replace('line#','Line #')+' — '+units.toLocaleString();
-        if(s.width>2){ leg.style.display='block'; leg.style.left=(s.left+s.width/2)+'%'; }
-        else { leg.style.display='none'; }
+        if(s.width>2){
+          leg.style.display='block';
+          leg.style.transform=s.transform;
+          var pos = s.anchor==='left' ? s.left
+                  : s.anchor==='right' ? s.left+s.width
+                  : s.left+s.width/2;
+          leg.style.left=pos+'%';
+        } else {
+          leg.style.display='none';
+        }
       });
     }
     if(t>=1){
@@ -1538,17 +1903,25 @@ function renderToday() {
   var etHour=parseInt(new Date().toLocaleString('en-US',{hour:'numeric',hour12:false,timeZone:'America/New_York'}));
   var dayComplete=!isLive||(etHour>=16);
 
+  var viewDateObj = parseLocalDate(viewStr) || new Date(viewStr);
   function matchDate(rowDate) {
-    if(!rowDate) return false;
-    var dt=new Date(rowDate); if(isNaN(dt)) return false;
-    var vd=new Date(viewStr);
-    return dt.getFullYear()===vd.getFullYear()&&dt.getMonth()===vd.getMonth()&&dt.getDate()===vd.getDate();
+    var dt = parseLocalDate(rowDate);
+    if (!dt || !viewDateObj) return false;
+    return dt.getFullYear()===viewDateObj.getFullYear()
+        && dt.getMonth()===viewDateObj.getMonth()
+        && dt.getDate()===viewDateObj.getDate();
   }
 
   var todayByLine={};
   allRows.forEach(function(r){
     if(!matchDate(r['Date'])) return;
-    var line=(r['Line']||'').trim(); if(!line) return;
+    var line = canonicalLine(r['Line']);
+    if (!line) {
+      if ((r['Line']||'').trim() && num(r['Final Units']) > 0) {
+        _recordSkip('orphan_line', {date:r['Date'], lot:r['Lot Number'], line:r['Line'], units:r['Final Units']});
+      }
+      return;
+    }
     todayByLine[line]=(todayByLine[line]||0)+num(r['Final Units']);
   });
 
@@ -1564,14 +1937,14 @@ function renderToday() {
     if(!todayLotData[lot]) todayLotData[lot]={product:'',projected:0,line:'',startTime:'',status:''};
     if(r['Product']) todayLotData[lot].product=r['Product'];
     if(r['Projected Units']) todayLotData[lot].projected=num(r['Projected Units']);
-    if(r['Line']) todayLotData[lot].line=(r['Line']||'').trim();
+    var cl = canonicalLine(r['Line']);
+    if (cl) todayLotData[lot].line = cl;
     if(r['Start Time']) todayLotData[lot].startTime=(r['Start Time']||'').trim();
     if(r['Complete or Partial']) todayLotData[lot].status=(r['Complete or Partial']||'').trim();
   });
-  var viewDateObj=new Date(viewStr);
   var runningTotalByLot={};
   allRows.forEach(function(r){
-    var dt=new Date(r['Date']); if(isNaN(dt)||dt>viewDateObj) return;
+    var dt = parseLocalDate(r['Date']); if(!dt || dt>viewDateObj) return;
     var lot=(r['Lot Number']||'').trim(); if(!lot) return;
     runningTotalByLot[lot]=(runningTotalByLot[lot]||0)+num(r['Final Units']);
   });
@@ -1589,7 +1962,12 @@ function renderToday() {
     if(st.includes('complete')||st.includes('partial')){
       completedToday.push({lot:lot,product:product,projected:projected,finalUnits:runningTotal,todayUnits:todayUnits,status:todayStatus,line:line,rowIdx:lotData?lotData.rowIdx:0,bottleSize:lotData?lotData.bottleSize:'',jarSize:lotData?lotData.jarSize:'',lidSize:lotData?lotData.lidSize:'',lidColor:lotData?lotData.lidColor:'',lidProfile:lotData?lotData.lidProfile:''});
     } else {
-      if(!runningByLine[line]) runningByLine[line]=[];
+      // Running lots with an unrecognized line would be silently dropped by the render loop;
+      // record so __dtfSkipped() can surface it in the console.
+      if (!runningByLine[line]) {
+        _recordSkip('orphan_line', {date:viewStr, lot:lot, line:line||'(empty)', product:product});
+        return;
+      }
       runningByLine[line].push({product:product,projected:projected,startTime:startTime});
     }
   });
@@ -1618,10 +1996,10 @@ function renderToday() {
     recLineRank[line] = (recs.top5byLine[line]||[]).findIndex(function(d){ return d.date===viewStr; });
   });
 
-  var ytdRows=allRows.filter(function(r){ var dt=new Date(r['Date']); return !isNaN(dt)&&dt<=viewDateObj; });
+  var ytdRows=allRows.filter(function(r){ var dt=parseLocalDate(r['Date']); return !!dt&&dt<=viewDateObj; });
   var ytdUnits=Object.values(buildLotMap(ytdRows)).filter(Boolean).reduce(function(s,l){return s+l.finalUnits;},0);
   var viewMo=viewDateObj.getMonth(), viewDy=viewDateObj.getDate();
-  var total25banner=allRows25.filter(function(r){ var dt=new Date(r['Date']); if(isNaN(dt)) return false; return (dt.getMonth()<viewMo)||(dt.getMonth()===viewMo&&dt.getDate()<=viewDy); }).reduce(function(s,r){return s+num(r['Final Units']);},0);
+  var total25banner=allRows25.filter(function(r){ var dt=parseLocalDate(r['Date']); if(!dt) return false; return (dt.getMonth()<viewMo)||(dt.getMonth()===viewMo&&dt.getDate()<=viewDy); }).reduce(function(s,r){return s+num(r['Final Units']);},0);
   var viewDayOfYear=Math.round((new Date(viewDateObj.getFullYear(),viewDateObj.getMonth(),viewDateObj.getDate())-new Date(viewDateObj.getFullYear(),0,0))/86400000);
   var yearProjBanner=viewDayOfYear?Math.round((ytdUnits/viewDayOfYear)*365):0;
   var targetPctBanner=Math.round((yearProjBanner/YEAR_TARGET)*100);
@@ -1684,7 +2062,12 @@ function renderToday() {
     completedHTML='<div style="font-size:12px;color:#5f5e5a;font-style:italic;padding:6px 0">'+(isLive?'No completed lots yet today':'No completed lots for this day')+'</div>';
   } else {
     var byLine={'Line #1':[],'Line #2':[],'Line #4':[]};
-    completedToday.forEach(function(l){ if(byLine[l.line]) byLine[l.line].push(l); else byLine[l.line]=[l]; });
+    completedToday.forEach(function(l){
+      if (byLine[l.line]) { byLine[l.line].push(l); return; }
+      // Unrecognized line on a completed lot — record so it shows up in __dtfSkipped().
+      // With Google Sheets data validation this should never fire; included as belt-and-braces.
+      _recordSkip('orphan_line', {date:viewStr, lot:l.lot, line:l.line||'(empty)', product:l.product, status:l.status});
+    });
     // Sort each line's lots by rowIdx — order they appear in the sheet = completion order
     Object.keys(byLine).forEach(function(line){ byLine[line].sort(function(a,b){ return (a.rowIdx||0)-(b.rowIdx||0); }); });
     completedHTML='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;align-items:start">'
@@ -1694,7 +2077,7 @@ function renderToday() {
         var trackColor=LINE_TRACK[k2]||'#2c2c2a';
         var hdrBg=k2==='line#1'?'#0a1520':k2==='line#2'?'#110f22':'#1a0c14';
         var lots=byLine[line]||[];
-        var totalLineUnits=lots.reduce(function(s,l){return s+l.finalUnits;},0);
+        var totalLineUnits=lots.reduce(function(s,l){return s+l.todayUnits;},0);
         var rows=lots.length===0?'<div style="padding:10px;font-size:11px;color:#5f5e5a;font-style:italic;font-family:system-ui;">No completed lots</div>'
           :lots.map(function(l){
             var parts=(l.product||'').split('-'); var brand=parts[0].trim(); var product=parts.slice(1).join('-').trim()||brand;
@@ -1706,20 +2089,22 @@ function renderToday() {
             var devS=dev!==null?(dev>0?'+':'')+dev.toFixed(1)+'%':'';
             var devBg=dev===null?'':Math.abs(dev)<=2?'#2c2c2a':dev<0?'#791F1F':'#085041';
             var devTxt=dev===null?'':Math.abs(dev)<=2?'#888780':dev<0?'#F09595':'#9FE1CB';
-            var containerStr=[l.bottleSize||l.jarSize,[l.lidSize,l.lidColor,l.lidProfile].filter(Boolean).join(' ')].filter(Boolean).join(' / ');
+            function cleanLid(v){ return v&&!/^(n\/a|none|n\/a n\/a|n\/a n\/a n\/a)$/i.test(v.trim())&&v.trim()!==''?v.trim():''; }
+            var lidStr=[l.lidSize,l.lidColor,l.lidProfile].map(cleanLid).filter(Boolean).join(' ');
+            var containerStr=[l.bottleSize||l.jarSize,lidStr].filter(Boolean).join(' / ');
             var tileContent='<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;">'
               +'<div>'
-              +(l.lot?'<div style="font-size:11px;font-weight:500;color:#5f5e5a;font-family:system-ui;margin-bottom:2px;">#'+l.lot+'</div>':'')
-              +'<div style="font-size:12px;font-weight:500;color:#e8e6e0;font-family:system-ui;margin-bottom:1px;">'+brand+'</div>'
-              +'<div style="font-size:12px;font-weight:500;color:#e8e6e0;font-family:system-ui;">'+product+'</div>'
-              +(containerStr?'<div style="font-size:10px;color:#5f5e5a;font-family:system-ui;margin-top:2px;">'+containerStr+'</div>':'')
+              +(l.lot?'<div style="font-size:11px;font-weight:500;color:#5f5e5a;font-family:system-ui;margin-bottom:2px;">#'+esc(l.lot)+'</div>':'')
+              +'<div style="font-size:12px;font-weight:500;color:#e8e6e0;font-family:system-ui;margin-bottom:1px;">'+esc(brand)+'</div>'
+              +'<div style="font-size:12px;font-weight:500;color:#e8e6e0;font-family:system-ui;">'+esc(product)+'</div>'
+              +(containerStr?'<div style="font-size:10px;color:#5f5e5a;font-family:system-ui;margin-top:2px;">'+esc(containerStr)+'</div>':'')
               +'</div>'
               +'<span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:6px;background:'+sBg+';color:'+sTxt+';font-family:system-ui;flex-shrink:0;margin-left:8px;">'+sLabel+'</span>'
               +'</div>'
               +'<div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;">'
                 +'<div style="display:flex;align-items:baseline;gap:5px;">'
-                  +'<span style="font-size:24px;font-weight:500;color:#e8e6e0;font-family:system-ui;">'+l.finalUnits.toLocaleString()+'</span>'
-                  +'<span style="font-size:10px;color:#5f5e5a;font-family:system-ui;">/ '+(l.projected?l.projected.toLocaleString():'—')+' proj</span>'
+                  +'<span style="font-size:24px;font-weight:500;color:#e8e6e0;font-family:system-ui;">'+l.todayUnits.toLocaleString()+'</span>'
+                  +(l.finalUnits!==l.todayUnits?'<span style="font-size:10px;color:#5f5e5a;font-family:system-ui;">'+l.finalUnits.toLocaleString()+' total / '+(l.projected?l.projected.toLocaleString():'—')+' proj</span>':'<span style="font-size:10px;color:#5f5e5a;font-family:system-ui;">/ '+(l.projected?l.projected.toLocaleString():'—')+' proj</span>')
                 +'</div>'
                 +(devS?'<span style="font-size:11px;font-weight:500;padding:2px 6px;border-radius:5px;background:'+devBg+';color:'+devTxt+';font-family:system-ui;">'+devS+'</span>':'')
               +'</div>';
@@ -1828,12 +2213,12 @@ function buildWeekLotsGrid(lots) {
         var tileContent='<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;">'
           +'<div>'
           +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">'
-            +(l.lot?'<div style="font-size:11px;font-weight:500;color:#5f5e5a;font-family:system-ui;">#'+l.lot+'</div>':'')
+            +(l.lot?'<div style="font-size:11px;font-weight:500;color:#5f5e5a;font-family:system-ui;">#'+esc(l.lot)+'</div>':'')
             +(dateStr?'<div style="font-size:10px;color:#444441;font-family:system-ui;">· '+dateStr+'</div>':'')
           +'</div>'
-          +'<div style="font-size:12px;font-weight:500;color:#e8e6e0;font-family:system-ui;margin-bottom:1px;">'+brand+'</div>'
-          +'<div style="font-size:12px;font-weight:500;color:#e8e6e0;font-family:system-ui;">'+product+'</div>'
-          +([l.bottleSize||l.jarSize,[l.lidSize,l.lidColor,l.lidProfile].filter(Boolean).join(' ')].filter(Boolean).length?'<div style="font-size:10px;color:#5f5e5a;font-family:system-ui;margin-top:2px;">'+[l.bottleSize||l.jarSize,[l.lidSize,l.lidColor,l.lidProfile].filter(Boolean).join(' ')].filter(Boolean).join(' / ')+'</div>':'')
+          +'<div style="font-size:12px;font-weight:500;color:#e8e6e0;font-family:system-ui;margin-bottom:1px;">'+esc(brand)+'</div>'
+          +'<div style="font-size:12px;font-weight:500;color:#e8e6e0;font-family:system-ui;">'+esc(product)+'</div>'
+          +(function(){ function cL(v){ return v&&!/^(n\/a|none)$/i.test(v.trim())&&v.trim()!==''?v.trim():''; } var ls=[l.lidSize,l.lidColor,l.lidProfile].map(cL).filter(Boolean).join(' '); var cs=[l.bottleSize||l.jarSize,ls].filter(Boolean).join(' / '); return cs?'<div style="font-size:10px;color:#5f5e5a;font-family:system-ui;margin-top:2px;">'+esc(cs)+'</div>':''; })()
           +'</div>'
           +'<span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:6px;background:'+sBg+';color:'+sTxt+';font-family:system-ui;flex-shrink:0;margin-left:8px;">'+sLabel+'</span>'
           +'</div>'
@@ -1881,8 +2266,8 @@ function showMixPanel(panelId, sizeKey) {
     var devStr = dev===null?'—':(dev>=0?'+':'')+dev+'%';
     return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid #1a1a1a;">'
       +'<div style="flex:1;min-width:0;">'
-        +'<div style="font-size:9px;color:#5f5e5a;font-family:system-ui;">'+brand+' &middot; #'+l.lot+'</div>'
-        +'<div style="font-size:11px;font-weight:500;color:#e8e6e0;font-family:system-ui;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+name+'</div>'
+        +'<div style="font-size:9px;color:#5f5e5a;font-family:system-ui;">'+esc(brand)+' &middot; #'+esc(l.lot)+'</div>'
+        +'<div style="font-size:11px;font-weight:500;color:#e8e6e0;font-family:system-ui;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(name)+'</div>'
       +'</div>'
       +'<div style="font-size:12px;font-weight:500;color:#e8e6e0;font-family:system-ui;flex-shrink:0;">'+l.finalUnits.toLocaleString()+'</div>'
       +'<div style="flex-shrink:0;"><span style="font-size:10px;font-weight:500;padding:1px 5px;border-radius:4px;background:'+devBg+';color:'+devTxt+';">'+devStr+'</span></div>'
@@ -1890,7 +2275,7 @@ function showMixPanel(panelId, sizeKey) {
   }).join('');
   panel.innerHTML =
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
-      +'<div style="font-size:10px;font-weight:500;color:'+col+';font-family:system-ui;">'+sizeKey+' — '+lots.length+' lot'+(lots.length!==1?'s':'')+'</div>'
+      +'<div style="font-size:10px;font-weight:500;color:'+col+';font-family:system-ui;">'+esc(sizeKey)+' — '+lots.length+' lot'+(lots.length!==1?'s':'')+'</div>'
       +'<button onclick="document.getElementById(\''+panelId+'\').style.display=\'none\';document.getElementById(\''+panelId+'\').removeAttribute(\'data-open\');" style="font-size:10px;font-weight:500;color:#888780;background:transparent;border:0.5px solid #444441;border-radius:5px;padding:2px 8px;cursor:pointer;font-family:system-ui;" onmouseover="this.style.borderColor=\'#888780\';this.style.color=\'#e8e6e0\';" onmouseout="this.style.borderColor=\'#444441\';this.style.color=\'#888780\';">Collapse</button>'
     +'</div>'
     +rows;
@@ -1941,7 +2326,7 @@ function renderWeekly() {
   var daysWithTarget=0,daysWithoutTarget=0,targetSum=0;
   wkDates.forEach(function(d){ var k=dateKey(d),row=dailyTargets[k]||{},dayTotal=ALL_LINES.reduce(function(s,line){return s+(row[line]||0);},0); if(dayTotal>0){targetSum+=dayTotal;daysWithTarget++;}else daysWithoutTarget++; });
   var viewYear=wkMon.getFullYear();
-  var annualTarget=viewYear<=2025?YEAR_TARGET_2025:YEAR_TARGET;
+  var annualTarget=YEAR_TARGETS[viewYear]||YEAR_TARGET;
   var avgDailyFallback=daysWithTarget>0?Math.round(targetSum/daysWithTarget):Math.round(annualTarget/52/5);
   // Check for a real weekly target from the Weekly Targets sheet
   var wkMonKey=(wkMon.getMonth()+1)+'/'+wkMon.getDate()+'/'+wkMon.getFullYear();
@@ -1951,7 +2336,8 @@ function renderWeekly() {
     weeklyTarget=weeklyTargetRow.target;
     targetSource='set';
     weekNote=weeklyTargetRow.notes||'';
-  } else if(viewYear<=2025){
+  } else if(viewYear<2026){
+    // Daily targets sheet starts with 2026 — earlier years fall back to annual/52.
     weeklyTarget=Math.round(annualTarget/52);
     targetSource='avg';
   } else {
@@ -1961,7 +2347,10 @@ function renderWeekly() {
   var targetIsEstimated=targetSource==='est';
   var targetIsFullySet=targetSource==='set'||targetSource==='daily';
   var day=now.getDay();
-  var daysElapsed=isLiveWeek?(day===0?wkDayCount:day===6?wkDayCount:Math.min(day,wkDayCount)):wkDayCount;
+  var etHourWeek=parseInt(new Date().toLocaleString('en-US',{hour:'numeric',hour12:false,timeZone:'America/New_York'}));
+  var todayComplete=!isLiveWeek||(etHourWeek>=16);
+  // Don't count today as a full elapsed day until after 4PM ET
+  var daysElapsed=isLiveWeek?(day===0?wkDayCount:day===6?wkDayCount:todayComplete?Math.min(day,wkDayCount):Math.min(day-1,wkDayCount)):wkDayCount;
   var daysRemaining=isLiveWeek?Math.max(0,wkDayCount-daysElapsed):0;
 
   // Last week same days elapsed — apples to apples
@@ -1975,13 +2364,27 @@ function renderWeekly() {
   var unitsNeeded=Math.max(0,weeklyTarget-weekUnits);
   var neededPerDay=daysRemaining>0?Math.round(unitsNeeded/daysRemaining):0;
 
-  // Historical avg daily rate for on-pace check
-  var d2=prepData(); var lineAvg2=d2.lineAvg;
-  var historicalDailyAvg=ALL_LINES.reduce(function(s,line){return s+(lineAvg2[line]||0);},0)||Math.round(annualTarget/52/5);
-
-  // On pace = needed rate is achievable (within 10% of historical avg), or already done
-  var onPace = daysRemaining===0 ? weekUnits>=weeklyTarget*TARGET_HIT_THRESHOLD
-    : neededPerDay <= Math.round(historicalDailyAvg * 1.10);
+  // On pace = cumulative actual >= cumulative daily targets through completed days
+  // (mirrors per-line logic — skips today since it's still in progress)
+  var cumTarget=0, cumActual=0;
+  wkDates.slice(0, daysElapsed).forEach(function(d){
+    var dk=dateKey(d);
+    if(isLiveWeek && dk===dateKey(now)) return; // skip today — still in progress
+    var dayTotal=ALL_LINES.reduce(function(s,line){return s+((dailyTargets[dk]||{})[line]||0);},0);
+    cumTarget+=dayTotal;
+  });
+  // cumActual = all week units minus today's units (completed days only)
+  var todayKey=dateKey(now);
+  var todayUnitsWeek=isLiveWeek?weekRows.reduce(function(s,r){
+    var dt=new Date(r['Date']); if(isNaN(dt)) return s;
+    return dateKey(dt)===todayKey?s+num(r['Final Units']):s;
+  },0):0;
+  cumActual=weekUnits-(isLiveWeek?todayUnitsWeek:0);
+  var onPace = daysRemaining===0
+    ? weekUnits>=weeklyTarget*TARGET_HIT_THRESHOLD
+    : cumTarget===0
+      ? cumActual>=0  // no daily targets set — can't judge, default to neutral (won't show badge)
+      : (cumActual/cumTarget)>=TARGET_HIT_THRESHOLD;
 
   var vsTarget=weekUnits-weeklyTarget;
   var vsTargetPct=weeklyTarget?Math.round((vsTarget/weeklyTarget)*100):0;
@@ -2023,7 +2426,7 @@ function renderWeekly() {
   var friEndFmt=wkLastDay.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
   var realBarPct=weeklyTarget?Math.round((weekUnits/weeklyTarget)*100):0;
   var targetLabel=targetSource==='set'?'<span style="color:#1D9E75;font-weight:500;">&#10003; Target set</span>':targetSource==='daily'?'<span style="color:#1D9E75">(from daily targets)</span>':targetSource==='est'?'<span style="color:#EF9F27">(est. — no weekly target set)</span>':'<span style="color:#888780">(avg)</span>';
-  var chartStaticTarget = viewYear<=2025 ? WEEKLY_TARGET_2025 : WEEKLY_TARGET;
+  var chartStaticTarget = Math.round((YEAR_TARGETS[viewYear]||YEAR_TARGET)/52);
   var week8NonZero=weeks8.filter(function(w){return w.units>0;});
   var week8Avg=week8NonZero.length?Math.round(week8NonZero.reduce(function(s,w){return s+w.units;},0)/week8NonZero.length):0;
   var weekNavHTML='<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;position:relative;" id="week-nav-anchor">'
@@ -2100,10 +2503,10 @@ function renderWeekly() {
           +'</div>'
           +'<div style="background:#2c2c2a;"></div>'
           +'<div style="text-align:center;padding:0 10px;">'
-            +'<div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;font-family:system-ui;">'+(isLiveWeek?'Needed / day':'Status')+'</div>'
-            +(isLiveWeek&&daysRemaining>0
-              ?'<div style="font-size:22px;font-weight:500;color:'+(onPace?'#9FE1CB':'#EF9F27')+';font-family:system-ui;">'+neededPerDay.toLocaleString()+'</div>'
-              :statusLabel?'<div style="font-size:13px;font-weight:500;color:'+statusColor+';padding-top:4px;font-family:system-ui;">'+statusLabel+'</div>'
+            +'<div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;font-family:system-ui;">Avg / day</div>'
+            +(daysElapsed>0
+              ?(function(){ var compDays=isLiveWeek?Math.max(1,daysElapsed):daysElapsed; var compUnits=isLiveWeek?weekUnits:weekUnits; return '<div style="font-size:22px;font-weight:500;color:#e8e6e0;font-family:system-ui;">'+Math.round(compUnits/compDays).toLocaleString()+'</div>'; })()
+                +'<div style="font-size:10px;color:#5f5e5a;font-family:system-ui;margin-top:2px;">'+(isLiveWeek?(daysElapsed+' day'+(daysElapsed!==1?'s':'')):(daysElapsed+' day'+(daysElapsed!==1?'s':'')))+' this week</div>'
               :'<div style="font-size:13px;color:#5f5e5a;font-family:system-ui;">—</div>'
             )
           +'</div>'
@@ -2140,7 +2543,12 @@ function renderWeekly() {
       var borderColor=k2==='line#1'?'#061d35':k2==='line#2'?'#1a1840':'#4B1528';
       var u=weekByLine[line]||0;
       var lineShareFrac=totalAvgPerDay?(lineAvg[line]||0)/totalAvgPerDay:0;
-      var lineWeeklyShare=Math.round(weeklyTarget*lineShareFrac);
+      // Use sum of actual daily targets for this line if available, otherwise estimate
+      var lineWeeklyShareExact=wkDates.reduce(function(s,d){
+        var t=(dailyTargets[dateKey(d)]||{})[line]||0; return s+t;
+      },0);
+      var lineWeeklyShare=lineWeeklyShareExact>0?lineWeeklyShareExact:Math.round(weeklyTarget*lineShareFrac);
+      var lineTargetIsExact=lineWeeklyShareExact>0;
       var sharePct=lineWeeklyShare?Math.min(Math.round((u/lineWeeklyShare)*100),100):0;
       var weekElapsedPct=Math.round((daysElapsed/wkDayCount)*100);
       // On track = actual units >= cumulative daily targets for completed days only (not today)
@@ -2212,7 +2620,7 @@ function renderWeekly() {
         +'<div style="padding:12px 14px;">'
           +'<div style="display:flex;align-items:baseline;gap:6px;margin-bottom:4px;">'
             +'<div style="font-size:26px;font-weight:500;color:'+color+';font-family:system-ui;">'+u.toLocaleString()+'</div>'
-            +(lineWeeklyShare?'<div style="font-size:11px;color:#5f5e5a;font-family:system-ui;">of ~'+lineWeeklyShare.toLocaleString()+'</div>':'')
+            +(lineWeeklyShare?'<div style="font-size:11px;color:#5f5e5a;font-family:system-ui;">of '+(lineTargetIsExact?'':'~')+lineWeeklyShare.toLocaleString()+'</div>':'')
           +'</div>'
           +'<div style="background:#2c2c2a;border-radius:4px;height:8px;overflow:hidden;margin-bottom:5px;"><div style="height:100%;width:'+sharePct+'%;background:'+color+';border-radius:4px;"></div></div>'
           +'<div style="display:flex;justify-content:space-between;font-size:10px;font-family:system-ui;margin-bottom:10px;">'
@@ -2440,7 +2848,7 @@ function updateOpsTable() {
   var om=document.getElementById('ops-metrics');
   if(om) om.innerHTML='<div class="metric info"><div class="label">Lots shown</div><div class="value">'+total.toLocaleString()+'</div></div><div class="metric"><div class="label">Units produced</div><div class="value">'+tF.toLocaleString()+'</div><div class="sub">vs '+tP.toLocaleString()+' projected</div></div><div class="metric"><div class="label">Avg deviation</div><div class="value" style="color:'+dc+'">'+(aD>0?'+':'')+aD.toFixed(1)+'%</div><div class="sub">lot by lot</div></div><div class="metric good"><div class="label">Complete lots</div><div class="value">'+comp+'</div><div class="sub">of '+total+' shown</div></div>';
   var body=document.getElementById('ops-body'); if(!body) return;
-  body.innerHTML=slice.map(function(l){ var dev=lotDev(l),dS=dev!==null?(dev>0?'+':'')+dev.toFixed(1)+'%':'\u2014',dC=dev!==null&&Math.abs(dev)>=5?(dev<0?'neg-dev':'pos-dev'):'',st=l.status.toLowerCase(),bC=st.includes('complete')?'complete':st.includes('partial')?'partial':''; return '<tr><td>'+l.date+'</td><td style="font-weight:500">'+l.lot+'</td><td>'+l.product+'</td><td>'+(l.line||'\u2014')+'</td><td>'+(l.bottleSize||'\u2014')+'</td><td>'+(l.jarSize||'\u2014')+'</td><td style="text-align:right">'+(l.projected?l.projected.toLocaleString():'\u2014')+'</td><td style="text-align:right">'+(l.finalUnits?l.finalUnits.toLocaleString():'\u2014')+'</td><td>'+(dev!==null?'<span class="badge '+dC+'">'+dS+'</span>':'\u2014')+'</td><td><span class="badge '+bC+'">'+(l.status||'\u2014')+'</span></td></tr>'; }).join('');
+  body.innerHTML=slice.map(function(l){ var dev=lotDev(l),dS=dev!==null?(dev>0?'+':'')+dev.toFixed(1)+'%':'\u2014',dC=dev!==null&&Math.abs(dev)>=5?(dev<0?'neg-dev':'pos-dev'):'',st=l.status.toLowerCase(),bC=st.includes('complete')?'complete':st.includes('partial')?'partial':''; return '<tr><td>'+esc(l.date)+'</td><td style="font-weight:500">'+esc(l.lot)+'</td><td>'+esc(l.product)+'</td><td>'+esc(l.line||'\u2014')+'</td><td>'+esc(l.bottleSize||'\u2014')+'</td><td>'+esc(l.jarSize||'\u2014')+'</td><td style="text-align:right">'+(l.projected?l.projected.toLocaleString():'\u2014')+'</td><td style="text-align:right">'+(l.finalUnits?l.finalUnits.toLocaleString():'\u2014')+'</td><td>'+(dev!==null?'<span class="badge '+dC+'">'+dS+'</span>':'\u2014')+'</td><td><span class="badge '+bC+'">'+esc(l.status||'\u2014')+'</span></td></tr>'; }).join('');
   var pi=document.getElementById('pageInfo'),pb=document.getElementById('prevBtn'),nb=document.getElementById('nextBtn'),rc=document.getElementById('rowCount');
   if(pi) pi.textContent='Page '+page+' of '+totalPages;
   if(pb) pb.disabled=page<=1;
@@ -2459,8 +2867,13 @@ function renderPerformance() {
   var rangeRows = allRowsCombined.filter(function(r){ var dt=new Date(r['Date']); return !isNaN(dt)&&dt>=range.start&&dt<=range.end; });
 
   var rangeYear = range.start.getFullYear();
-  var compShift = (rangeYear === 2025) ? 1 : -1;
-  var compLabel = (rangeYear === 2025) ? 'vs. same period in 2026' : 'vs. same period in prior year';
+  // If viewing the earliest configured year, compare forward (nothing older to compare against); otherwise compare to prior year.
+  var configuredYears = Object.keys(CSV_BY_YEAR).map(Number);
+  var earliestYear = configuredYears.length ? Math.min.apply(null, configuredYears) : rangeYear;
+  var compShift = (rangeYear <= earliestYear) ? 1 : -1;
+  var compLabel = (rangeYear <= earliestYear)
+    ? 'vs. same period in ' + (rangeYear + compShift)
+    : 'vs. same period in prior year';
   var compStart = new Date(range.start.getTime()); compStart.setFullYear(rangeYear + compShift);
   var compEnd   = new Date(range.end.getTime());   compEnd.setFullYear(range.end.getFullYear() + compShift);
   var rangeRows25 = allRowsCombined.filter(function(r){ var dt=new Date(r['Date']); return !isNaN(dt)&&dt>=compStart&&dt<=compEnd; });
@@ -2530,7 +2943,7 @@ function renderPerformance() {
   });
   var monthRows=Object.keys(byMonth26).sort().map(function(k){
     var mo=byMonth26[k],dim=new Date(mo.year,mo.month,0).getDate(),diy=(mo.year%4===0&&(mo.year%100!==0||mo.year%400===0))?366:365;
-    var annTarget = mo.year<=2025 ? YEAR_TARGET_2025 : YEAR_TARGET;
+    var annTarget = YEAR_TARGETS[mo.year]||YEAR_TARGET;
     var fmtgt=Math.round((dim/diy)*annTarget);
     var isCur=(now.getFullYear()===mo.year&&now.getMonth()+1===mo.month);
     var tgt=isCur?Math.round(fmtgt*now.getDate()/dim):fmtgt;
@@ -2847,8 +3260,8 @@ function generateSynopsis(safeId) {
 
   // Only ever use completed quarters for any trend/trajectory statements
   var completed = cd.qtrs.filter(function(q){ return q.units > 0 && q.key !== curQk; });
-  var hasActivity2025 = cd.qtrs.some(function(q){ return q.units > 0 && q.key.startsWith('2025-'); });
-  var isNew = !hasActivity2025 && cd.ytd25 === 0;
+  var hasPriorYearActivity = cd.qtrs.some(function(q){ return q.units > 0 && q.key.startsWith(PRIOR_YEAR + '-'); });
+  var isNew = !hasPriorYearActivity && cd.ytd25 === 0;
 
   var ytdAvgRun   = cd.ytdLots   > 0 ? Math.round(cd.ytd   / cd.ytdLots)   : 0;
   var ytdAvgRun25 = cd.ytdLots25 > 0 ? Math.round(cd.ytd25 / cd.ytdLots25) : 0;
@@ -2951,7 +3364,7 @@ function generateSynopsis(safeId) {
     + '<div style="width:20px;height:20px;border-radius:50%;background:#0C447C;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">'
       + '<svg width="10" height="10" viewBox="0 0 10 10" fill="none"><circle cx="5" cy="5" r="4" stroke="#85B7EB" stroke-width="1.2"/><line x1="5" y1="3" x2="5" y2="5.5" stroke="#85B7EB" stroke-width="1.2" stroke-linecap="round"/><circle cx="5" cy="7" r=".6" fill="#85B7EB"/></svg>'
     + '</div>'
-    + '<p style="font-size:12px;color:#e8e6e0;line-height:1.65;margin:0;">' + text + '</p>'
+    + '<p style="font-size:12px;color:#e8e6e0;line-height:1.65;margin:0;">' + esc(text) + '</p>'
   + '</div>';
   _chSynopsis[safeId] = html;
   el.innerHTML = html;
@@ -2963,13 +3376,12 @@ function safeid(s) {
 
 function computeCustomerData() {
   var allRowsCombined = allRows.concat(allRows25);
-  var allRowsCombined = allRows.concat(allRows25);
   var now = new Date();
   var nowYr = now.getFullYear();
   var curQk = getQuarterKey(now);
 
   // Build per-customer per-quarter data from Q1 2025 onward
-  var cutoff = new Date(2025, 0, 1);
+  var cutoff = new Date(TRACKING_START);
   var custQtr = {};
   var totalQtr = {};   // total units across all customers per quarter
   var totalYtd = 0;    // total units across all customers YTD this year
@@ -2994,7 +3406,7 @@ function computeCustomerData() {
 
   // All quarters from Q1 2025 to current
   var displayQtrs = [];
-  var dq = new Date(2025, 0, 1);
+  var dq = new Date(TRACKING_START);
   while (getQuarterKey(dq) <= curQk) {
     displayQtrs.push(getQuarterKey(dq));
     dq.setMonth(dq.getMonth() + 3);
@@ -3137,7 +3549,7 @@ function renderCustomerOverview(healthData) {
 
     var headerInner =
       '<div style="width:140px;flex-shrink:0;">'
-        +'<div style="font-size:13px;font-weight:500;color:#e8e6e0;margin-bottom:4px;">'+cd.cust+'</div>'
+        +'<div style="font-size:13px;font-weight:500;color:#e8e6e0;margin-bottom:4px;">'+esc(cd.cust)+'</div>'
         +tagEl
       +'</div>'
       +'<div style="flex:1;display:flex;flex-direction:column;gap:4px;min-width:0;">'
@@ -3265,7 +3677,7 @@ function renderCustomerOverview(healthData) {
   if(hdrOuter) hdrOuter.style.display = 'none';
 
   return '<div style="font-size:10px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Customer overview &middot; thru '+ytdLabel+'</div>'
-    +rows+'</div>';
+    +rows;
 }
 
 function _triggerExpandedSynopses() {
@@ -3368,7 +3780,7 @@ function generateProcSynopsis(sid) {
     + '<div style="width:20px;height:20px;border-radius:50%;background:#0C447C;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">'
       + '<svg width="10" height="10" viewBox="0 0 10 10" fill="none"><circle cx="5" cy="5" r="4" stroke="#85B7EB" stroke-width="1.2"/><line x1="5" y1="3" x2="5" y2="5.5" stroke="#85B7EB" stroke-width="1.2" stroke-linecap="round"/><circle cx="5" cy="7" r=".6" fill="#85B7EB"/></svg>'
     + '</div>'
-    + '<p style="font-size:12px;color:#e8e6e0;line-height:1.65;margin:0;">' + text + '</p>'
+    + '<p style="font-size:12px;color:#e8e6e0;line-height:1.65;margin:0;">' + esc(text) + '</p>'
   + '</div>';
   _procSynopsis[sid] = html;
   el.innerHTML = html;
@@ -3404,7 +3816,7 @@ function exportProcurement() {
 
   var now = new Date();
   var curQk = getQuarterKey(now);
-  var cutoff = new Date(2025, 0, 1);
+  var cutoff = new Date(TRACKING_START);
   var isDes  = procView === 'desiccants';
   var isNeck = procView === 'neckbands';
   var Label  = procView === 'jars' ? 'Jar' : procView === 'bottles' ? 'Bottle' : procView === 'lids' ? 'Lid' : procView === 'desiccants' ? 'Desiccant' : 'Neckband';
@@ -3422,7 +3834,7 @@ function exportProcurement() {
 
   // Build quarters
   var displayQtrs = [];
-  var dq = new Date(2025,0,1);
+  var dq = new Date(TRACKING_START);
   while (getQuarterKey(dq) <= curQk) { displayQtrs.push(getQuarterKey(dq)); dq.setMonth(dq.getMonth()+3); }
 
   // Build skuQtr
@@ -3463,7 +3875,7 @@ function exportProcurement() {
       var u=getUnits(r);
       if(dt>=ytdStart&&dt<=now) ytd+=u;
       if(dt>=ytd25start&&dt<=ytd25cutoff) ytd25+=u;
-      if(dt.getFullYear()===2025) fy25+=u;
+      if(dt.getFullYear()===PRIOR_YEAR) fy25+=u;
     });
     var chg = ytd25>0 ? (ytd-ytd25)/ytd25 : null;
     var tag = ytd25>0 ? (chg>0.05?'↑ Growing':chg<-0.05?'↓ Declining':'→ Flat') : 'New';
@@ -3476,7 +3888,7 @@ function exportProcurement() {
 
   // ── Sheet 1: Quarterly Summary ──
   var qtrLabels = displayQtrs.map(function(qk){ return quarterLabel(qk)+(qk===curQk?' (partial)':''); });
-  var s1Headers = [Label+' SKU','Trajectory'].concat(qtrLabels).concat(['FY 2025','YTD '+nowYr,'YTD Change','% of Usage']);
+  var s1Headers = [Label+' SKU','Trajectory'].concat(qtrLabels).concat(['FY '+PRIOR_YEAR,'YTD '+nowYr,'YTD Change','% of Usage']);
   var s1Rows = [
     ['DTF Operations Center — Procurement Export'],
     [Label+' usage  ·  Q1 2025 → present  ·  Generated '+dateStr],
@@ -3555,10 +3967,593 @@ function exportProcurement() {
   XLSX.writeFile(wb, fname);
 }
 
-function renderProcurement() {
+function isSoftgel(name) { return /softgel/i.test(name||''); }
+function matUnit(name) { return isSoftgel(name) ? 'softgels' : 'kg'; }
+
+function selectMaterial(idx) {
+  var matList = window._matList;
+  if (!matList || !matList[idx]) return;
+  var m = matList[idx];
+  var wasSelected = window._selectedMaterial === m.name;
+  matList.forEach(function(mi, i) {
+    var row = document.getElementById('mat-row-'+i);
+    if (!row) return;
+    row.style.background = 'transparent';
+    var nameEl = row.querySelector('.mat-name');
+    if (nameEl) nameEl.style.color = '#e8e6e0';
+    var barEl = row.querySelector('.mat-bar-fill');
+    if (barEl) barEl.style.background = '#2c5a8a';
+    var ir = document.getElementById('mat-inline-row-'+i);
+    if (ir) ir.style.display = 'none';
+  });
+  if (wasSelected) { window._selectedMaterial = null; return; }
+  window._selectedMaterial = m.name;
+  var row = document.getElementById('mat-row-'+idx);
+  if (row) {
+    row.style.background = '#1a2535';
+    var nameEl = row.querySelector('.mat-name');
+    if (nameEl) nameEl.style.color = '#85B7EB';
+    var barEl = row.querySelector('.mat-bar-fill');
+    if (barEl) barEl.style.background = '#378ADD';
+  }
+  var inlineRow = document.getElementById('mat-inline-row-'+idx);
+  if (inlineRow) { inlineRow.style.display = ''; renderMatInline(m, idx); }
+}
+
+function filterMaterials() {
+  matSearch = (document.getElementById('matSearchInput')||{}).value || '';
+  var matList = window._matList || [];
+  var q = matSearch.toLowerCase();
+  matList.forEach(function(m, i) {
+    var row = document.getElementById('mat-row-'+i);
+    var ir = document.getElementById('mat-inline-row-'+i);
+    var match = !q || m.name.toLowerCase().indexOf(q) !== -1
+      || m.partNums.some(function(p){ return p.toLowerCase().indexOf(q) !== -1; });
+    if (row) row.style.display = match ? '' : 'none';
+    if (ir) ir.style.display = (match && window._selectedMaterial===m.name) ? '' : 'none';
+  });
+}
+
+function renderMatInline(m, idx) {
+  var panel = document.getElementById('mat-inline-'+idx);
+  if (!panel) return;
+  var unit = matUnit(m.name);
+  function fmt(v){ return v>0?Math.round(v).toLocaleString()+' '+unit:'\u2014'; }
+  var monthKeys = window._matMonthKeys || [];
+  var monthLabels = window._matMonthLabels || [];
+  var chartData = monthKeys.map(function(k){ return Math.round(m.byMonth[k]||0); });
+
+  // Build quarterly rollup from byMonth
   var now = new Date();
   var curQk = getQuarterKey(now);
-  var cutoff = new Date(2025, 0, 1);
+  var qtrMap = {};
+  Object.keys(m.byMonth).forEach(function(mk) {
+    var parts = mk.split('-');
+    var dt = new Date(parseInt(parts[0]), parseInt(parts[1])-1, 1);
+    var qk = getQuarterKey(dt);
+    if (!qtrMap[qk]) qtrMap[qk] = 0;
+    qtrMap[qk] += m.byMonth[mk];
+  });
+  var allQks = Object.keys(qtrMap).sort();
+  if (!allQks.length) allQks = [curQk];
+  var firstQk = allQks[0];
+  var displayQks = [];
+  var dq = new Date(parseInt(firstQk.split('-')[0]), (parseInt(firstQk.split('Q')[1])-1)*3, 1);
+  while (getQuarterKey(dq) <= curQk) {
+    displayQks.push(getQuarterKey(dq));
+    dq.setMonth(dq.getMonth() + 3);
+  }
+  var maxQtrKg = Math.max.apply(null, displayQks.map(function(qk){ return qtrMap[qk]||0; })) || 1;
+
+  var qtrRows = displayQks.map(function(qk, qi) {
+    var kg = Math.round(qtrMap[qk]||0);
+    var isCur = qk === curQk;
+    var tdB = 'padding:6px 10px;border-bottom:0.5px solid #2c2c2a;white-space:nowrap;font-size:12px;';
+    var rBg = isCur ? 'background:#1a2030;' : '';
+    var prevKg = null;
+    for (var pi=qi-1; pi>=0; pi--) {
+      var pv = Math.round(qtrMap[displayQks[pi]]||0);
+      if (pv > 0) { prevKg = pv; break; }
+    }
+    var delta = '';
+    if (kg > 0 && isCur) {
+      delta = '<span style="font-size:10px;color:#5f5e5a;">In progress</span>';
+    } else if (kg > 0 && prevKg !== null) {
+      var p = (kg-prevKg)/prevKg*100, pos = p>=0;
+      delta = '<span style="display:inline-block;padding:1px 5px;border-radius:4px;font-size:10px;font-weight:500;background:'+(pos?'#085041':'#791F1F')+';color:'+(pos?'#9FE1CB':'#F09595')+'">'+(pos?'+':'')+p.toFixed(1)+'%</span>';
+    } else if (kg > 0) {
+      delta = '<span style="display:inline-block;padding:1px 5px;border-radius:4px;font-size:10px;font-weight:500;background:#0C447C;color:#85B7EB;">new</span>';
+    }
+    var bw = kg ? Math.round((kg/maxQtrKg)*88) : 0;
+    var bCol = isCur ? '#378ADD' : '#4A6580';
+    return '<tr>'
+      + '<td style="'+tdB+rBg+'padding-left:14px;color:'+(isCur?'#378ADD':'#888780')+';font-weight:'+(isCur?'500':'400')+';">'
+        + (isCur?'<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#378ADD;margin-right:5px;vertical-align:middle;"></span>':'')
+        + quarterLabel(qk)+(isCur?' <span style="font-size:10px;color:#5f5e5a;font-weight:400;">partial</span>':'')
+      + '</td>'
+      + '<td style="'+tdB+rBg+'text-align:right;color:#e8e6e0;">'+(kg?kg.toLocaleString()+' '+unit:'\u2014')+'</td>'
+      + '<td style="'+tdB+rBg+'text-align:right;">'+delta+'</td>'
+      + '<td style="'+tdB+rBg+'padding-right:14px;width:120px;">'
+        + '<div style="height:4px;background:#2c2c2a;border-radius:2px;overflow:hidden;">'
+          + '<div style="height:100%;width:'+bw+'%;background:'+bCol+';border-radius:2px;"></div>'
+        + '</div>'
+      + '</td>'
+      + '</tr>';
+  }).join('');
+
+  var qtrTableHTML = '<div style="margin-top:14px;border-top:0.5px solid #2c2c2a;padding-top:10px;">'
+    + '<div style="font-size:10px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.04em;font-family:system-ui;margin-bottom:6px;">Quarterly summary</div>'
+    + '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">'
+    + '<thead><tr style="border-bottom:0.5px solid #2c2c2a;">'
+      + '<th style="text-align:left;padding:4px 10px 4px 14px;font-size:10px;color:#5f5e5a;font-weight:500;font-family:system-ui;white-space:nowrap;">Quarter</th>'
+      + '<th style="text-align:right;padding:4px 10px;font-size:10px;color:#5f5e5a;font-weight:500;font-family:system-ui;white-space:nowrap;">Total '+unit+'</th>'
+      + '<th style="text-align:right;padding:4px 10px;font-size:10px;color:#5f5e5a;font-weight:500;font-family:system-ui;white-space:nowrap;">vs prev</th>'
+      + '<th style="padding:4px 10px 4px 14px;font-size:10px;color:#5f5e5a;font-weight:500;font-family:system-ui;white-space:nowrap;">Volume</th>'
+    + '</tr></thead>'
+    + '<tbody>'+qtrRows+'</tbody>'
+    + '</table></div></div>';
+
+  // Per-part breakdown table (grouped SKUs only)
+  var breakdownHTML = '';
+  if (m.isGroup) {
+    var parts = Object.values(m.partBreakdown).sort(function(a,b){ return b.totalKg - a.totalKg; });
+    var breakdownRows = parts.map(function(pb) {
+      var pct = m.totalKg ? ((pb.totalKg / m.totalKg) * 100).toFixed(1) : '0';
+      var bw2 = m.totalKg ? Math.round((pb.totalKg / m.totalKg) * 100) : 0;
+      var matLabel = pb.label.indexOf(' \u2014 ') !== -1 ? pb.label.split(' \u2014 ')[1] : pb.label;
+      return '<tr style="border-bottom:0.5px solid #2c2c2a;">'
+        + '<td style="padding:5px 10px;font-size:11px;font-weight:500;color:#e8e6e0;white-space:nowrap;">'+esc(pb.partNum)+'</td>'
+        + '<td style="padding:5px 10px;font-size:11px;color:#888780;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(matLabel)+'</td>'
+        + '<td style="padding:5px 10px;font-size:11px;text-align:right;color:#e8e6e0;white-space:nowrap;">'+fmt(pb.lastMonth)+'</td>'
+        + '<td style="padding:5px 10px;font-size:11px;text-align:right;color:#888780;white-space:nowrap;">'+fmt(pb.avg3)+'</td>'
+        + '<td style="padding:5px 10px;font-size:11px;text-align:right;color:#888780;white-space:nowrap;">'+fmt(pb.totalKg)+'</td>'
+        + '<td style="padding:5px 10px;font-size:11px;text-align:right;color:#888780;">'+pb.lotCount+'</td>'
+        + '<td style="padding:5px 14px;width:120px;">'
+          + '<div style="display:flex;align-items:center;gap:6px;">'
+            + '<div style="flex:1;background:#2c2c2a;border-radius:2px;height:4px;overflow:hidden;">'
+              + '<div style="height:100%;width:'+bw2+'%;background:#378ADD;border-radius:2px;"></div>'
+            + '</div>'
+            + '<span style="font-size:10px;color:#5f5e5a;white-space:nowrap;width:32px;text-align:right;">'+pct+'%</span>'
+          + '</div>'
+        + '</td>'
+        + '</tr>';
+    }).join('');
+    breakdownHTML = '<div style="margin-top:14px;border-top:0.5px solid #2c2c2a;padding-top:10px;">'
+      + '<div style="font-size:10px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.04em;font-family:system-ui;margin-bottom:6px;">Breakdown by part #</div>'
+      + '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">'
+      + '<thead><tr style="border-bottom:0.5px solid #2c2c2a;">'
+        + '<th style="text-align:left;padding:4px 10px;font-size:10px;color:#5f5e5a;font-weight:500;font-family:system-ui;">Part #</th>'
+        + '<th style="text-align:left;padding:4px 10px;font-size:10px;color:#5f5e5a;font-weight:500;font-family:system-ui;">Material name</th>'
+        + '<th style="text-align:right;padding:4px 10px;font-size:10px;color:#5f5e5a;font-weight:500;font-family:system-ui;white-space:nowrap;">Last mo</th>'
+        + '<th style="text-align:right;padding:4px 10px;font-size:10px;color:#5f5e5a;font-weight:500;font-family:system-ui;white-space:nowrap;">3-mo avg</th>'
+        + '<th style="text-align:right;padding:4px 10px;font-size:10px;color:#5f5e5a;font-weight:500;font-family:system-ui;white-space:nowrap;">Window total</th>'
+        + '<th style="text-align:right;padding:4px 10px;font-size:10px;color:#5f5e5a;font-weight:500;font-family:system-ui;">Lots</th>'
+        + '<th style="text-align:right;padding:4px 10px;font-size:10px;color:#5f5e5a;font-weight:500;font-family:system-ui;padding-right:14px;">% of group</th>'
+      + '</tr></thead>'
+      + '<tbody>'+breakdownRows+'</tbody>'
+      + '</table></div></div>';
+  }
+
+  panel.innerHTML =
+    '<div style="padding:12px 14px 14px 56px;background:#141618;border-bottom:0.5px solid #2c2c2a;">'
+      + '<div style="display:flex;align-items:center;gap:16px;margin-bottom:12px;flex-wrap:wrap;">'
+        + '<div><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;font-family:system-ui;margin-bottom:2px;">Last month</div>'
+          + '<div style="font-size:15px;font-weight:500;color:#378ADD;font-family:system-ui;">'+fmt(m.lastMonth)+'</div></div>'
+        + '<div style="width:0.5px;background:#2c2c2a;height:28px;"></div>'
+        + '<div><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;font-family:system-ui;margin-bottom:2px;">3-mo avg</div>'
+          + '<div style="font-size:15px;font-weight:500;color:#e8e6e0;font-family:system-ui;">'+fmt(m.avg3)+'</div></div>'
+        + '<div style="width:0.5px;background:#2c2c2a;height:28px;"></div>'
+        + '<div><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;font-family:system-ui;margin-bottom:2px;">6-mo avg</div>'
+          + '<div style="font-size:15px;font-weight:500;color:#e8e6e0;font-family:system-ui;">'+fmt(m.avg6)+'</div></div>'
+        + '<div style="width:0.5px;background:#2c2c2a;height:28px;"></div>'
+        + '<div><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;font-family:system-ui;margin-bottom:2px;">Window total</div>'
+          + '<div style="font-size:15px;font-weight:500;color:#e8e6e0;font-family:system-ui;">'+fmt(m.totalKg)+'</div></div>'
+        + '<div style="width:0.5px;background:#2c2c2a;height:28px;"></div>'
+        + '<div><div style="font-size:10px;color:#888780;text-transform:uppercase;letter-spacing:.04em;font-family:system-ui;margin-bottom:2px;">Lots</div>'
+          + '<div style="font-size:15px;font-weight:500;color:#e8e6e0;font-family:system-ui;">'+m.lotCount+'</div></div>'
+      + '</div>'
+      + '<div style="position:relative;height:160px;"><canvas id="mat-chart-'+idx+'" role="img" aria-label="Monthly '+esc(unit)+' for '+esc(m.name)+'">Trend.</canvas></div>'
+      + '<div id="mat-month-drill-'+idx+'" style="margin-top:0;"></div>'
+      + qtrTableHTML
+      + breakdownHTML
+    + '</div>';
+
+  // Restore drill state if it was open before refresh
+  if (window._matDrillState && window._matDrillState[idx]) {
+    var ds = window._matDrillState[idx];
+    setTimeout(function(){ renderMatMonthDrill(m, idx, ds.mk, ds.label, ds.barIdx); }, 50);
+  }
+  if (window['matChart_'+idx]) { window['matChart_'+idx].destroy(); window['matChart_'+idx]=null; }
+  var ctx = document.getElementById('mat-chart-'+idx);
+  if (!ctx) return;
+  var skipLabels = monthKeys.length > 12;
+  window['matChart_'+idx] = new Chart(ctx, {
+    type:'bar',
+    data:{labels:monthLabels,datasets:[{data:chartData,backgroundColor:monthKeys.map(function(){ return '#1a3a5c'; }),borderColor:'#378ADD',borderWidth:1,borderRadius:3}]},
+    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:20}},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return Math.round(c.raw).toLocaleString()+' '+unit+' \u2014 click to see products';}}}},
+      onClick:function(evt, elements) {
+        if (!elements || !elements.length) return;
+        var barIdx = elements[0].index;
+        var mk = monthKeys[barIdx];
+        var label = monthLabels[barIdx];
+        renderMatMonthDrill(m, idx, mk, label, barIdx);
+      },
+      scales:{
+        x:{ticks:{color:'#5f5e5a',font:{size:10,family:'system-ui'},autoSkip:skipLabels,maxRotation:skipLabels?45:0},grid:{color:'#1a1a1a'},border:{color:'#2c2c2a'}},
+        y:{ticks:{color:'#5f5e5a',font:{size:10,family:'system-ui'},callback:function(v){return Math.round(v).toLocaleString();}},grid:{color:'#1a1a1a'},border:{color:'#2c2c2a'}}
+      }},
+    plugins:[{id:'topLabels',afterDatasetsDraw:function(chart){
+      if(skipLabels) return;
+      var c2=chart.ctx;c2.save();c2.font='500 9px system-ui';c2.fillStyle='#888780';c2.textAlign='center';
+      chart.data.datasets[0].data.forEach(function(val,i){
+        if(!val) return;
+        var bar=chart.getDatasetMeta(0).data[i];
+        c2.fillText(Math.round(val).toLocaleString(),bar.x,bar.y-4);
+      });
+      c2.restore();
+    }}]
+  });
+}
+
+function renderMatMonthDrill(m, idx, mk, label, barIdx) {
+  var drill = document.getElementById('mat-month-drill-'+idx);
+  if (!drill) return;
+
+  // Toggle off if same bar clicked again
+  if (drill.dataset.activeMonth === mk) {
+    drill.innerHTML = '';
+    drill.dataset.activeMonth = '';
+    if (window._matDrillState) delete window._matDrillState[idx];
+    // Reset bar colors
+    var chart = window['matChart_'+idx];
+    if (chart) {
+      var monthKeys = window._matMonthKeys || [];
+      chart.data.datasets[0].backgroundColor = monthKeys.map(function(){ return '#1a3a5c'; });
+      chart.update();
+    }
+    return;
+  }
+  drill.dataset.activeMonth = mk;
+  window._matDrillState = window._matDrillState || {};
+  window._matDrillState[idx] = {mk:mk, label:label, barIdx:barIdx};
+
+  // Highlight clicked bar
+  var chart = window['matChart_'+idx];
+  if (chart) {
+    var monthKeys = window._matMonthKeys || [];
+    chart.data.datasets[0].backgroundColor = monthKeys.map(function(k, i){ return i === barIdx ? '#378ADD' : '#1a3a5c'; });
+    chart.update();
+  }
+
+  // Build lot list for this material in this month (use ALL materialsData, not window-filtered)
+  var yr = parseInt(mk.split('-')[0]);
+  var mo = parseInt(mk.split('-')[1]);
+  var matchingLots = {};
+  materialsData.forEach(function(r) {
+    if (!r.date) return;
+    if (r.date.getFullYear() !== yr || r.date.getMonth()+1 !== mo) return;
+    // Match by group name or direct material name
+    var groupName = r.partNum && SKU_GROUPS[r.partNum] ? SKU_GROUPS[r.partNum] : r.material;
+    if (groupName !== m.name && r.material !== m.name) return;
+    var lot = r.lot; if (!lot) return;
+    if (!matchingLots[lot]) matchingLots[lot] = 0;
+    matchingLots[lot] += r.qty;
+  });
+
+  // Join to production data to get product names + final-unit totals.
+  // Materials drilldowns can span prior years (Dec 2025 view shown in 2026), so
+  // we have to look at both allRows (current year) and allRows25 (prior year).
+  // Pre-build a lot→units sum across the combined set to avoid an O(n*m) scan
+  // when the drill has many lots.
+  var allRowsCombined = allRows.concat(allRows25);
+  var unitsByLot = {};
+  var productByLot = {};
+  allRowsCombined.forEach(function(r) {
+    var lot = (r['Lot Number']||'').trim(); if (!lot) return;
+    unitsByLot[lot] = (unitsByLot[lot] || 0) + num(r['Final Units']);
+    if (!productByLot[lot] && r['Product']) productByLot[lot] = (r['Product']||'').trim();
+  });
+  // Resolve each material lot to a Customer/Product pair. Lookup order:
+  //   1. Production CSV row (allRowsCombined → productByLot / lotMap)
+  //   2. Lot # reference sheet (lotIndex) — catches bulk-powder shipments and
+  //      other lots that never hit the production line
+  //   3. "Unknown (lot N)" placeholder so the lot is still traceable
+  var byProduct = {};
+  Object.keys(matchingLots).forEach(function(lot) {
+    var kg = matchingLots[lot];
+    var productionProd = productByLot[lot] || (lotMap[lot] && lotMap[lot].product);
+    var lotIdxEntry = lotIndex[lot];
+    var product = productionProd
+               || (lotIdxEntry && lotIdxEntry.combined)
+               || ('Unknown (lot '+lot+')');
+    var parts = product.split('-');
+    var customer = parts[0].trim();
+    var prodName = parts.slice(1).join('-').trim() || product;
+    var key = product;
+    // Units source depends on where the lot resolved:
+    //   - Production: use summed Final Units from the production CSV
+    //   - Lot # sheet only (bulk): use the Amt field ("185,125 servings", "25.2k servings", etc.)
+    var lotUnits = 0;
+    var lotUnitLabel = '';
+    if (productionProd) {
+      lotUnits = unitsByLot[lot] || 0;
+    } else if (lotIdxEntry && lotIdxEntry.amt) {
+      var parsed = parseAmt(lotIdxEntry.amt);
+      if (parsed) { lotUnits = parsed.value; lotUnitLabel = parsed.unit; }
+    }
+    if (!byProduct[key]) byProduct[key] = {product:prodName, customer:customer, lots:new Set(), kg:0, units:0, unitLabel:''};
+    byProduct[key].lots.add(lot);
+    byProduct[key].kg += kg;
+    byProduct[key].units += lotUnits;
+    if (lotUnitLabel && !byProduct[key].unitLabel) byProduct[key].unitLabel = lotUnitLabel;
+  });
+
+  var sorted = Object.values(byProduct).sort(function(a,b){ return b.kg - a.kg; });
+  var unit = matUnit(m.name);
+  var totalKg = sorted.reduce(function(s,p){ return s+p.kg; }, 0);
+
+  if (!sorted.length) {
+    drill.innerHTML = '<div style="margin-top:10px;border-top:0.5px solid #2c2c2a;padding-top:10px;font-size:11px;color:#5f5e5a;font-family:system-ui;">No production data found for this month.</div>';
+    return;
+  }
+
+  var rows = sorted.map(function(p) {
+    var pct = totalKg ? ((p.kg/totalKg)*100).toFixed(1) : '0';
+    var bw = totalKg ? Math.round((p.kg/totalKg)*100) : 0;
+    var lotList = Array.from(p.lots).sort().map(esc).join(', ');
+    return '<tr style="border-bottom:0.5px solid #2c2c2a;">'
+      + '<td style="padding:5px 10px;font-size:11px;color:#5f5e5a;white-space:nowrap;vertical-align:top;">'+esc(p.customer)+'</td>'
+      + '<td style="padding:5px 10px;font-size:12px;font-weight:500;color:#e8e6e0;vertical-align:top;">'+esc(p.product)+'</td>'
+      + '<td style="padding:5px 10px;font-size:11px;color:#888780;vertical-align:top;">'+lotList+'</td>'
+      + '<td style="padding:5px 10px;font-size:11px;text-align:right;color:#e8e6e0;white-space:nowrap;vertical-align:top;">'+(p.units?(p.units.toLocaleString()+(p.unitLabel?' '+esc(p.unitLabel):'')):'—')+'</td>'
+      + '<td style="padding:5px 10px;font-size:11px;text-align:right;color:#e8e6e0;white-space:nowrap;">'+Math.round(p.kg).toLocaleString()+' '+unit+'</td>'
+      + '<td style="padding:5px 14px;width:120px;">'
+        + '<div style="display:flex;align-items:center;gap:6px;">'
+          + '<div style="flex:1;background:#2c2c2a;border-radius:2px;height:4px;overflow:hidden;">'
+            + '<div style="height:100%;width:'+bw+'%;background:#378ADD;border-radius:2px;"></div>'
+          + '</div>'
+          + '<span style="font-size:10px;color:#5f5e5a;white-space:nowrap;width:32px;text-align:right;">'+pct+'%</span>'
+        + '</div>'
+      + '</td>'
+      + '</tr>';
+  }).join('');
+
+  drill.innerHTML = '<div style="margin-top:10px;border-top:0.5px solid #2c2c2a;padding-top:10px;">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">'
+      + '<div style="font-size:10px;font-weight:500;color:#888780;text-transform:uppercase;letter-spacing:.04em;font-family:system-ui;">Products using this material \u2014 '+label+'</div>'
+      + '<button onclick="document.getElementById(\'mat-month-drill-'+idx+'\').dataset.activeMonth=\'\';document.getElementById(\'mat-month-drill-'+idx+'\').innerHTML=\'\';if(window._matDrillState)delete window._matDrillState['+idx+'];" style="font-size:10px;color:#5f5e5a;background:none;border:none;cursor:pointer;font-family:system-ui;padding:0;">&#x2715; close</button>'
+    + '</div>'
+    + '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">'
+    + '<thead><tr style="border-bottom:0.5px solid #2c2c2a;">'
+      + '<th style="text-align:left;padding:4px 10px;font-size:10px;color:#5f5e5a;font-weight:500;font-family:system-ui;">Customer</th>'
+      + '<th style="text-align:left;padding:4px 10px;font-size:10px;color:#5f5e5a;font-weight:500;font-family:system-ui;">Product</th>'
+      + '<th style="text-align:left;padding:4px 10px;font-size:10px;color:#5f5e5a;font-weight:500;font-family:system-ui;">Lot #</th>'
+      + '<th style="text-align:right;padding:4px 10px;font-size:10px;color:#5f5e5a;font-weight:500;font-family:system-ui;white-space:nowrap;">Units</th>'
+      + '<th style="text-align:right;padding:4px 10px;font-size:10px;color:#5f5e5a;font-weight:500;font-family:system-ui;white-space:nowrap;">kg used</th>'
+      + '<th style="padding:4px 10px;font-size:10px;color:#5f5e5a;font-weight:500;font-family:system-ui;padding-right:14px;">Share</th>'
+    + '</tr></thead>'
+    + '<tbody>'+rows+'</tbody>'
+    + '</table></div></div>';
+}
+
+function renderMaterials() {
+  var content = document.getElementById('content');
+  if (!content) return;
+  var rows = materialsData;
+  if (!rows.length) {
+    content.innerHTML = '<div style="padding:2rem;text-align:center;font-family:system-ui;">'
+      +'<div style="font-size:13px;color:#5f5e5a;margin-bottom:16px;">Material data is still loading.</div>'
+      +'<button onclick="fetchMaterialsCSV().then(function(t){materialsData=parseMaterials(t);renderMaterials();}" style="padding:6px 14px;border:0.5px solid #444441;border-radius:8px;background:transparent;color:#e8e6e0;font-size:12px;cursor:pointer;font-family:system-ui;">Retry</button>'
+      +'</div>';
+    return;
+  }
+
+  var now = new Date();
+  // Lookback window
+  var windowEnd = now;
+  var windowStart = matWindow === 0
+    ? new Date(MATERIALS_TRACKING_START)
+    : new Date(now.getFullYear(), now.getMonth() - matWindow + 1, 1);
+
+  var filteredRows = rows.filter(function(r){ return r.date >= windowStart && r.date <= windowEnd; });
+
+  // Build month keys for the window (for sparklines + rolling avgs)
+  var monthKeys = [], monthLabels = [];
+  var mPtr = new Date(windowStart.getFullYear(), windowStart.getMonth(), 1);
+  while (mPtr <= windowEnd) {
+    monthKeys.push(mPtr.getFullYear()+'-'+String(mPtr.getMonth()+1).padStart(2,'0'));
+    monthLabels.push(mPtr.toLocaleDateString('en-US',{month:'short',year:'2-digit'}));
+    mPtr.setMonth(mPtr.getMonth()+1);
+  }
+
+  // Build per-material aggregates (with SKU group rollup)
+  var byMat = {};
+  filteredRows.forEach(function(r){
+    // Resolve display name: grouped part numbers collapse to their group label
+    var groupName = r.partNum && SKU_GROUPS[r.partNum] ? SKU_GROUPS[r.partNum] : r.material;
+    if (!byMat[groupName]) byMat[groupName]={name:groupName,totalKg:0,lots:new Set(),byMonth:{},partNums:new Set(),isGroup:false,partBreakdown:{}};
+    var m=byMat[groupName];
+    if (groupName !== r.material) m.isGroup = true;
+    m.totalKg+=r.qty; m.lots.add(r.lot);
+    if(r.partNum) m.partNums.add(r.partNum);
+    var mk=r.date.getFullYear()+'-'+String(r.date.getMonth()+1).padStart(2,'0');
+    m.byMonth[mk]=(m.byMonth[mk]||0)+r.qty;
+    // Per-part breakdown for expanded view
+    if (r.partNum) {
+      var pk = r.partNum + (r.material !== groupName ? ' — ' + r.material : '');
+      if (!m.partBreakdown[pk]) m.partBreakdown[pk]={partNum:r.partNum,label:pk,totalKg:0,lots:new Set(),byMonth:{}};
+      var pb=m.partBreakdown[pk];
+      pb.totalKg+=r.qty; pb.lots.add(r.lot);
+      pb.byMonth[mk]=(pb.byMonth[mk]||0)+r.qty;
+    }
+  });
+
+  var allMats=Object.values(byMat);
+  allMats.forEach(function(m){
+    m.lotCount=m.lots.size;
+    m.partNums=Array.from(m.partNums).sort();
+    // Finalize part breakdown entries
+    Object.values(m.partBreakdown).forEach(function(pb){
+      pb.lotCount=pb.lots.size;
+      var completedKeys2 = monthKeys.slice(0, monthKeys.length - 1);
+      var lastMoKey2 = completedKeys2.length ? completedKeys2[completedKeys2.length-1] : monthKeys[monthKeys.length-1];
+      pb.lastMonth = Math.round(pb.byMonth[lastMoKey2]||0);
+      var mo3b = completedKeys2.slice(-3).map(function(k){ return pb.byMonth[k]||0; });
+      pb.avg3 = Math.round(mo3b.reduce(function(a,b){return a+b;},0)/3);
+      var mo6b = completedKeys2.slice(-6).map(function(k){ return pb.byMonth[k]||0; });
+      pb.avg6 = Math.round(mo6b.reduce(function(a,b){return a+b;},0)/6);
+    });
+    // Month series for sparkline — last 6 COMPLETED months (exclude current partial month)
+    var completedKeys = monthKeys.slice(0, monthKeys.length - 1);
+    var spark6Keys = completedKeys.slice(-6);
+    m.spark = spark6Keys.map(function(k){ return Math.round(m.byMonth[k]||0); });
+    // Last COMPLETED month
+    var lastMoKey = completedKeys.length ? completedKeys[completedKeys.length-1] : monthKeys[monthKeys.length-1];
+    m.lastMonth = Math.round(m.byMonth[lastMoKey]||0);
+    // 3-month rolling avg — last 3 completed months
+    var mo3 = completedKeys.slice(-3).map(function(k){ return m.byMonth[k]||0; });
+    m.avg3 = Math.round(mo3.reduce(function(a,b){return a+b;},0)/3);
+    // 6-month rolling avg — last 6 completed months
+    var mo6 = completedKeys.slice(-6).map(function(k){ return m.byMonth[k]||0; });
+    m.avg6 = Math.round(mo6.reduce(function(a,b){return a+b;},0)/6);
+    // vs 6-mo avg: compare 3-mo avg to 6-mo avg (is recent pace higher or lower than baseline?)
+    m.vsPct = m.avg6 ? ((m.avg3 - m.avg6) / m.avg6 * 100) : 0;
+    // Trend direction — consistent with vsPct badge (3mo avg vs 6mo avg)
+    m.trend = Math.abs(m.vsPct) < 5 ? 'flat' : m.vsPct > 0 ? 'up' : 'down';
+  });
+
+  var kgMats=allMats.filter(function(m){return !isSoftgel(m.name);}).sort(function(a,b){return b.totalKg-a.totalKg;});
+  var sgMats=allMats.filter(function(m){return isSoftgel(m.name);}).sort(function(a,b){return b.totalKg-a.totalKg;});
+  var matList=kgMats.concat(sgMats);
+  window._matList=matList;
+  window._matMonthKeys=monthKeys;
+  window._matMonthLabels=monthLabels;
+  if (!window._selectedMaterial||!byMat[window._selectedMaterial]) window._selectedMaterial=null;
+
+  function sparkSVG(data, trend) {
+    var w=100,h=28,pad=3;
+    var max=Math.max.apply(null,data)||1, min=Math.min.apply(null,data.filter(function(v){return v>0;}))||0;
+    var range=max-min||1;
+    var pts=data.map(function(v,i){
+      var x=pad+(i/(Math.max(data.length-1,1)))*(w-pad*2);
+      var y=h-pad-(v-min)/range*(h-pad*2);
+      return x.toFixed(1)+','+y.toFixed(1);
+    });
+    var col=trend==='up'?'#1D9E75':trend==='down'?'#E24B4A':trend==='volatile'?'#EF9F27':'#888780';
+    var ld=pts[pts.length-1].split(',');
+    return '<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" style="display:block;">'
+      +'<polyline points="'+pts.join(' ')+'" fill="none" stroke="'+col+'" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>'
+      +'<circle cx="'+ld[0]+'" cy="'+ld[1]+'" r="2.5" fill="'+col+'"/>'
+      +'</svg>';
+  }
+
+  function vsBadge(pct) {
+    if (Math.abs(pct) < 5) return '<span style="font-size:10px;font-weight:500;padding:2px 6px;border-radius:5px;background:#2c2c2a;color:#888780;font-family:system-ui;">~flat</span>';
+    var up=pct>0, bg=up?'#085041':'#791F1F', txt=up?'#9FE1CB':'#F09595';
+    return '<span style="font-size:10px;font-weight:500;padding:2px 6px;border-radius:5px;background:'+bg+';color:'+txt+';font-family:system-ui;">'+(up?'&#8593;':'&#8595;')+' '+Math.abs(Math.round(pct))+'%</span>';
+  }
+
+  var colSpan = 9;
+  var tableRows = matList.map(function(m,i){
+    var isSelected = m.name===window._selectedMaterial;
+    var sg=isSoftgel(m.name), unit=matUnit(m.name);
+    function fmt(v){ return v>0?Math.round(v).toLocaleString()+' '+unit:'—'; }
+    return '<tr id="mat-row-'+i+'" onclick="selectMaterial('+i+')" '
+      +'style="cursor:pointer;background:'+(isSelected?'#1a2535':'transparent')+';border-bottom:0.5px solid #2c2c2a;" '
+      +'onmouseover="if(this.style.background!==\'rgb(26, 37, 53)\')this.style.background=\'#1a1d20\'" '
+      +'onmouseout="if(this.style.background!==\'rgb(26, 37, 53)\')this.style.background=\'transparent\'">'
+      +'<td style="padding:8px 10px;color:#5f5e5a;font-size:11px;width:26px;">'+(i+1)+'</td>'
+      +'<td style="padding:8px 10px;overflow:hidden;">'
+        +'<div class="mat-name" style="font-size:12px;font-weight:500;color:'+(isSelected?'#85B7EB':'#e8e6e0')+';font-family:system-ui;display:flex;align-items:center;gap:6px;overflow:hidden;">'
+          +'<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(m.name)+'</span>'
+          +(sg?'<span style="font-size:9px;font-weight:500;padding:1px 5px;border-radius:4px;background:#26215C;color:#AFA9EC;flex-shrink:0;">softgels</span>':'')
+          +(m.isGroup?'<span style="font-size:9px;font-weight:500;padding:1px 5px;border-radius:4px;background:#0C2240;color:#85B7EB;flex-shrink:0;">'+m.partNums.length+' parts</span>':'')
+        +'</div>'
+        +(m.isGroup
+          ?'<div style="font-size:10px;color:#5f5e5a;font-family:system-ui;margin-top:1px;">'+esc(m.partNums.join(' \xb7 '))+'</div>'
+          :(m.partNums.length?'<div style="font-size:10px;color:#5f5e5a;font-family:system-ui;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(m.partNums.join(' \xb7 '))+'</div>':''))
+      +'</td>'
+      +'<td style="text-align:right;padding:8px 10px;font-size:12px;font-weight:500;color:#e8e6e0;white-space:nowrap;">'+fmt(m.lastMonth)+'</td>'
+      +'<td style="padding:8px 10px;text-align:center;width:110px;">'+sparkSVG(m.spark,m.trend)+'</td>'
+      +'<td style="text-align:right;padding:8px 10px;font-size:12px;color:#888780;white-space:nowrap;">'+fmt(m.avg3)+'</td>'
+      +'<td style="text-align:right;padding:8px 10px;font-size:12px;color:#888780;white-space:nowrap;">'+fmt(m.avg6)+'</td>'
+      +'<td style="text-align:right;padding:8px 10px;">'+vsBadge(m.vsPct)+'</td>'
+      +'<td style="text-align:right;padding:8px 10px;font-size:12px;color:#888780;white-space:nowrap;">'+fmt(m.totalKg)+'</td>'
+      +'<td style="text-align:right;padding:8px 10px;font-size:12px;color:#888780;">'+m.lotCount+'</td>'
+      +'</tr>'
+      +'<tr id="mat-inline-row-'+i+'" style="display:'+(isSelected?'':'none')+';">'
+        +'<td colspan="'+colSpan+'" style="padding:0;"><div id="mat-inline-'+i+'"></div></td>'
+      +'</tr>';
+  }).join('');
+
+  // Compute data date range for "All time" label
+  var matDates = materialsData.map(function(r){ return r.date; }).filter(Boolean);
+  var matMinDate = matDates.length ? new Date(Math.min.apply(null, matDates)) : null;
+  var matMaxDate = matDates.length ? new Date(Math.max.apply(null, matDates)) : null;
+  function fmtMo(d){ return d.toLocaleDateString('en-US',{month:'short',year:'numeric'}); }
+  var allTimeLabel = matMinDate && matMaxDate ? fmtMo(matMinDate)+'–'+fmtMo(matMaxDate) : '';
+  // Snap matWindow=12 back to 6 if we don't have 12 months of data yet
+  if (matWindow===12 && !(matMinDate&&(now-matMinDate)>=1000*60*60*24*365)) matWindow=6;
+
+  var allTimeHint = matWindow===0 && allTimeLabel
+    ? '<span style="font-size:11px;color:#5f5e5a;font-family:system-ui;">'+allTimeLabel+'</span>'
+    : '';
+  var pickerHTML='<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">'
+    +'<div style="display:flex;gap:2px;padding:3px;background:#1a1d20;border:0.5px solid #2c2c2a;border-radius:8px;">'
+    +'<button onclick="matWindow=6;window._selectedMaterial=null;renderMaterials();" style="'+navBtnStyle(matWindow===6)+'">Past 6 months</button>'
+    +(matMinDate&&(now-matMinDate)>=1000*60*60*24*365?'<button onclick="matWindow=12;window._selectedMaterial=null;renderMaterials();" style="'+navBtnStyle(matWindow===12)+'">Past 12 months</button>':'')
+    +'<button onclick="matWindow=0;window._selectedMaterial=null;renderMaterials();" style="'+navBtnStyle(matWindow===0)+'">All time</button>'
+    +'</div>'
+    +allTimeHint
+    +'<div style="position:relative;display:inline-flex;align-items:center;">'
+    +'<input id="matSearchInput" type="text" placeholder="Search ingredient or part \u2026" oninput="matSearch=this.value;filterMaterials();document.getElementById(\'matSearchClear\').style.display=this.value?\'flex\':\'none\';" value="'+esc(matSearch)+'" style="padding:4px 28px 4px 10px;border:0.5px solid #444441;border-radius:8px;background:#1e2124;color:#e8e6e0;font-size:12px;font-family:system-ui;width:220px;height:28px;">'
+    +'<button id="matSearchClear" onclick="matSearch=\'\';document.getElementById(\'matSearchInput\').value=\'\';filterMaterials();this.style.display=\'none\';" style="display:'+(matSearch?'flex':'none')+';position:absolute;right:6px;width:16px;height:16px;border-radius:50%;border:none;background:#444441;cursor:pointer;align-items:center;justify-content:center;padding:0;flex-shrink:0;">'
+    +'<svg width="8" height="8" viewBox="0 0 8 8" fill="none"><line x1="1" y1="1" x2="7" y2="7" stroke="#888780" stroke-width="1.5" stroke-linecap="round"/><line x1="7" y1="1" x2="1" y2="7" stroke="#888780" stroke-width="1.5" stroke-linecap="round"/></svg>'
+    +'</button>'
+    +'</div>'
+    +'</div>';
+
+  content.innerHTML = pickerHTML
+    +'<div style="background:#1e2124;border:0.5px solid #2c2c2a;border-radius:12px;overflow:hidden;">'
+    +'<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-family:system-ui;table-layout:fixed;">'
+    +'<colgroup>'
+    +'<col style="width:28px;">'
+    +'<col style="min-width:180px;">'
+    +'<col style="width:110px;">'
+    +'<col style="width:110px;">'
+    +'<col style="width:100px;">'
+    +'<col style="width:100px;">'
+    +'<col style="width:100px;">'
+    +'<col style="width:110px;">'
+    +'<col style="width:60px;">'
+    +'</colgroup>'
+    +'<thead><tr style="border-bottom:0.5px solid #2c2c2a;">'
+    +'<th style="padding:8px 10px;width:26px;"></th>'
+    +'<th style="text-align:left;padding:8px 10px;font-size:10px;color:#888780;font-weight:500;">Material</th>'
+    +'<th style="text-align:right;padding:8px 10px;font-size:10px;color:#888780;font-weight:500;white-space:nowrap;">Last month</th>'
+    +'<th style="text-align:center;padding:8px 10px;font-size:10px;color:#888780;font-weight:500;">6-mo trend</th>'
+    +'<th style="text-align:right;padding:8px 10px;font-size:10px;color:#888780;font-weight:500;white-space:nowrap;">3-mo avg</th>'
+    +'<th style="text-align:right;padding:8px 10px;font-size:10px;color:#888780;font-weight:500;white-space:nowrap;">6-mo avg</th>'
+    +'<th style="text-align:right;padding:8px 10px;font-size:10px;color:#888780;font-weight:500;white-space:nowrap;">3mo vs 6mo</th>'
+    +'<th style="text-align:right;padding:8px 10px;font-size:10px;color:#888780;font-weight:500;line-height:1.4;">'+(matWindow===0?('All time total'+(allTimeLabel?'<br><span style="font-size:9px;font-weight:400;color:#5f5e5a;">('+allTimeLabel+')</span>':'')):matWindow+' mo total')+'</th>'
+    +'<th style="text-align:right;padding:8px 10px;font-size:10px;color:#888780;font-weight:500;">Lots</th>'
+    +'</tr></thead><tbody>'+tableRows+'</tbody></table></div></div>';
+
+  if (window._selectedMaterial) {
+    var selIdx=matList.findIndex(function(m){return m.name===window._selectedMaterial;});
+    if (selIdx>=0) renderMatInline(matList[selIdx],selIdx);
+  }
+  // Re-apply search filter if one was active (e.g. after auto-refresh rebuilds the DOM)
+  if (matSearch) filterMaterials();
+}
+
+
+function renderProcurement() {
+  if (procView === 'materials') { fetchMaterialsIfNeeded(); fetchLotIndexIfNeeded(); renderMaterials(); return; }
+  var now = new Date();
+  var curQk = getQuarterKey(now);
+  var cutoff = new Date(TRACKING_START);
   var col = procView === 'jars' ? 'jarSize' : procView === 'bottles' ? 'bottleSize' : procView === 'lids' ? 'lidSize' : procView === 'desiccants' ? 'desiccant' : 'neckband';
   var label = procView === 'jars' ? 'jar' : procView === 'bottles' ? 'bottle' : procView === 'lids' ? 'lid' : procView === 'desiccants' ? 'desiccant' : 'neckband';
   var Label = procView === 'jars' ? 'Jar' : procView === 'bottles' ? 'Bottle' : procView === 'lids' ? 'Lid' : procView === 'desiccants' ? 'Desiccant' : 'Neckband';
@@ -3607,7 +4602,7 @@ function renderProcurement() {
       if (!skuQtrFinalUnits[sku]) skuQtrFinalUnits[sku] = {};
       skuQtrFinalUnits[sku][qk] = (skuQtrFinalUnits[sku][qk]||0) + num(r['Final Units']);
     }
-    // Customer + product breakdown — YTD 2026 only
+    // Customer + product breakdown — current-year YTD only
     if (dt >= ytdStart && dt <= now) {
       var prod = (r['Product']||'').trim(); if (!prod) return;
       var cust = prod.split('-')[0].trim();
@@ -3621,7 +4616,7 @@ function renderProcurement() {
 
   // Build all quarters Q1 2025 → current
   var displayQtrs = [];
-  var dq = new Date(2025, 0, 1);
+  var dq = new Date(TRACKING_START);
   while (getQuarterKey(dq) <= curQk) { displayQtrs.push(getQuarterKey(dq)); dq.setMonth(dq.getMonth()+3); }
 
   // Build SKU results
@@ -3836,12 +4831,12 @@ function renderProcurement() {
       var pct = ((c.units / totalCustUnits) * 100).toFixed(1);
       var prodList = c.products.map(function(p){
         var prodName = p[0].indexOf('-') !== -1 ? p[0].split('-').slice(1).join('-').trim() : p[0];
-        return '<span style="font-size:10px;color:#5f5e5a;white-space:nowrap;">'+prodName
+        return '<span style="font-size:10px;color:#5f5e5a;white-space:nowrap;">'+esc(prodName)
           +' <span style="color:#444441;">'+p[1].toLocaleString()+'</span></span>';
       }).join('<span style="color:#2c2c2a;margin:0 4px;">·</span>');
       return '<div style="padding:8px 14px;border-bottom:0.5px solid #2c2c2a;">'
         +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:5px;">'
-          +'<div style="font-size:12px;font-weight:500;color:#e8e6e0;width:140px;flex-shrink:0;">'+c.cust+'</div>'
+          +'<div style="font-size:12px;font-weight:500;color:#e8e6e0;width:140px;flex-shrink:0;">'+esc(c.cust)+'</div>'
           +'<div style="flex:1;height:5px;background:#2c2c2a;border-radius:2px;overflow:hidden;">'
             +'<div style="height:100%;width:'+barW+'%;background:#378ADD;border-radius:2px;opacity:.7;"></div>'
           +'</div>'
@@ -3917,103 +4912,6 @@ function renderProcurement() {
 }
 
 function renderCustomers() {
-  var now = new Date();
-  if (!selectedPerfRange) selectedPerfRange = getDefaultPerfRange();
-  var range = selectedPerfRange;
-  var allRowsCombined = allRows.concat(allRows25);
-  var rangeRows = allRowsCombined.filter(function(r){ var dt=new Date(r['Date']); return !isNaN(dt)&&dt>=range.start&&dt<=range.end; });
-
-  var rangeYear = range.start.getFullYear();
-  var compShift = (rangeYear === 2025) ? 1 : -1;
-  var compStart = new Date(range.start.getTime()); compStart.setFullYear(rangeYear + compShift);
-  var compEnd   = new Date(range.end.getTime());   compEnd.setFullYear(range.end.getFullYear() + compShift);
-  var compYearLabel = String(compStart.getFullYear());
-
-  var rangeRows25 = allRowsCombined.filter(function(r){ var dt=new Date(r['Date']); return !isNaN(dt)&&dt>=compStart&&dt<=compEnd; });
-
-  // Build current-period customer totals from raw rows
-  var byCust = {};
-  rangeRows.forEach(function(r){
-    var prod=(r['Product']||'').trim(); if(!prod) return;
-    var c=prod.split('-')[0].trim(); if(!c) return;
-    if(!byCust[c]) byCust[c]={units:0,lots:new Set()};
-    byCust[c].units+=num(r['Final Units']);
-    var lot=(r['Lot Number']||'').trim(); if(lot) byCust[c].lots.add(lot);
-  });
-  Object.keys(byCust).forEach(function(k){ byCust[k].lots=byCust[k].lots.size; });
-  var allCustSorted=Object.entries(byCust).sort(function(a,b){return b[1].units-a[1].units;});
-  var maxCU=allCustSorted[0]?allCustSorted[0][1].units:1;
-  var totalUnits=allCustSorted.reduce(function(s,e){return s+e[1].units;},0);
-
-  // Build comparison-period customer totals
-  var byCust25raw={};
-  allRowsCombined.filter(function(r){ var dt=new Date(r['Date']); return !isNaN(dt)&&dt>=compStart&&dt<=compEnd; }).forEach(function(r){
-    var prod=(r['Product']||'').trim(); if(!prod) return;
-    var c=prod.split('-')[0].trim(); if(!c) return;
-    var ck=c.toLowerCase();
-    if(!byCust25raw[ck]) byCust25raw[ck]={units:0,lots:new Set(),displayName:c};
-    byCust25raw[ck].units+=num(r['Final Units']);
-    var lot=(r['Lot Number']||'').trim(); if(lot) byCust25raw[ck].lots.add(lot);
-  });
-  Object.keys(byCust25raw).forEach(function(k){ byCust25raw[k].lots=byCust25raw[k].lots.size; });
-  function getCust25(name){ return byCust25raw[(name||'').toLowerCase()]||null; }
-  var total25units=Object.values(byCust25raw).reduce(function(s,v){return s+v.units;},0);
-
-  var visibleCusts = custLimit===0 ? allCustSorted : allCustSorted.slice(0,custLimit);
-  var showSummaryRow = custLimit===0;
-
-  var custHTML = visibleCusts.map(function(e,i){
-    var c=e[0],cd=e[1];
-    var avg2=cd.lots?Math.round(cd.units/cd.lots):0;
-    var bw=Math.round((cd.units/maxCU)*100);
-    var sp=totalUnits?((cd.units/totalUnits)*100).toFixed(1):0;
-    var cd25=getCust25(c);
-    var compUnits  = cd25?'<span style="color:#5f5e5a;font-weight:400"> ('+cd25.units.toLocaleString()+')</span>':'';
-    var avg225     = cd25&&cd25.lots?Math.round(cd25.units/cd25.lots):null;
-    var compAvg    = avg225!==null?'<span style="color:#5f5e5a;font-weight:400"> ('+avg225.toLocaleString()+')</span>':'';
-    var sp25       = total25units&&cd25?((cd25.units/total25units)*100).toFixed(1):null;
-    var compSp     = sp25!==null?'<span style="color:#5f5e5a;font-weight:400"> ('+sp25+'%)</span>':'';
-    var compLots   = cd25?'<span style="color:#5f5e5a;font-weight:400"> ('+cd25.lots+')</span>':'';
-    var yoyCell='<td style="text-align:right">';
-    if(cd25&&cd25.units){
-      var yPos=(cd.units-cd25.units)>=0, yPct=((cd.units-cd25.units)/cd25.units*100);
-      var yBg=yPos?'#085041':'#791F1F', yTxt=yPos?'#9FE1CB':'#F09595';
-      yoyCell+='<span style="display:inline-block;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:500;background:'+yBg+';color:'+yTxt+'">'+(yPos?'+':'')+yPct.toFixed(1)+'%</span>';
-    } else { yoyCell+='\u2014'; }
-    yoyCell+='</td>';
-    return '<tr>'
-      +'<td style="color:#5f5e5a;font-size:11px;width:24px">'+(i+1)+'</td>'
-      +'<td style="font-weight:500">'+c+'</td>'
-      +'<td style="text-align:right">'+cd.units.toLocaleString()+compUnits+'</td>'
-      +'<td style="padding:6px 10px;width:90px"><div style="background:#2c2c2a;border-radius:2px;height:4px;overflow:hidden"><div style="height:100%;width:'+bw+'%;background:#94A3B8;border-radius:2px"></div></div></td>'
-      +yoyCell
-      +'<td style="text-align:right;color:#888780">'+cd.lots+compLots+'</td>'
-      +'<td style="text-align:right;color:#888780">'+avg2.toLocaleString()+compAvg+'</td>'
-      +'<td style="text-align:right;color:#888780">'+sp+'%'+compSp+'</td>'
-      +'</tr>';
-  }).join('');
-
-  if (showSummaryRow) {
-    var sumUnits=allCustSorted.reduce(function(s,e){return s+e[1].units;},0);
-    var sumLots=allCustSorted.reduce(function(s,e){return s+e[1].lots;},0);
-    var sumAvg=sumLots?Math.round(sumUnits/sumLots):0;
-    var sum25units=Object.values(byCust25raw).reduce(function(s,v){return s+v.units;},0);
-    var sum25lots=Object.values(byCust25raw).reduce(function(s,v){return s+v.lots;},0);
-    var sum25avg=sum25lots?Math.round(sum25units/sum25lots):0;
-    var sPos=(sumUnits-sum25units)>=0, sPct=((sumUnits-sum25units)/sum25units*100);
-    var sBg=sPos?'#085041':'#791F1F', sTxt2=sPos?'#9FE1CB':'#F09595';
-    custHTML+='<tr style="border-top:1.5px solid #444441;background:#1a1d1f;">'
-      +'<td></td><td style="font-weight:500;color:#e8e6e0;font-size:12px;">All '+allCustSorted.length+' customers</td>'
-      +'<td style="text-align:right;font-weight:500">'+sumUnits.toLocaleString()+(sum25units?'<span style="color:#5f5e5a;font-weight:400"> ('+sum25units.toLocaleString()+')</span>':'')+'</td>'
-      +'<td></td>'
-      +'<td style="text-align:right">'+(sum25units?'<span style="display:inline-block;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:500;background:'+sBg+';color:'+sTxt2+'">'+(sPos?'+':'')+sPct.toFixed(1)+'%</span>':'\u2014')+'</td>'
-      +'<td style="text-align:right;color:#888780;font-weight:500">'+sumLots+(sum25lots?'<span style="color:#5f5e5a;font-weight:400"> ('+sum25lots+')</span>':'')+'</td>'
-      +'<td style="text-align:right;color:#888780;font-weight:500">'+sumAvg.toLocaleString()+(sum25avg?'<span style="color:#5f5e5a;font-weight:400"> ('+sum25avg.toLocaleString()+')</span>':'')+'</td>'
-      +'<td style="text-align:right;color:#888780;font-weight:500">100%</td>'
-      +'</tr>';
-  }
-
-  // ── Customer overview ──
   var healthData = computeCustomerData();
 
   if (selectedCustomer) {
@@ -4033,7 +4931,7 @@ function toggleProcExportPopover(e) {
   var labelPl = procView === 'jars' ? 'Jars' : procView === 'bottles' ? 'Bottles' : procView === 'lids' ? 'Lids' : procView === 'desiccants' ? 'Desiccants' : 'Neckbands';
   var now = new Date();
   var isDes  = procView === 'desiccants';
-  var cutoff = new Date(2025,0,1);
+  var cutoff = new Date(TRACKING_START);
   var ytdStart = new Date(now.getFullYear(),0,1);
   var allRowsCombined = allRows.concat(allRows25);
   function getSku2(r) {
@@ -4084,6 +4982,7 @@ function closeProcExportPopover() {
 
 function toggleExportPopover(e) {
   e.stopPropagation();
+  var existing = document.getElementById('export-popover');
   if (existing) { existing.remove(); return; }
   var lots = getFilteredLots();
   var count = lots.length;
