@@ -2705,11 +2705,13 @@ function renderWeekly() {
   var neededPerDay=daysRemaining>0?Math.round(unitsNeeded/daysRemaining):0;
 
   // On pace = cumulative actual >= cumulative daily targets through completed days
-  // (mirrors per-line logic — skips today since it's still in progress)
+  // (mirrors per-line logic — skips today only while it's still in progress,
+  // i.e. before 4PM ET on the live week; after that, today counts as a full
+  // completed day — matches the Daily tab's "Day complete" threshold).
   var cumTarget=0, cumActual=0;
   wkDates.slice(0, daysElapsed).forEach(function(d){
     var dk=dateKey(d);
-    if(isLiveWeek && dk===dateKey(now)) return; // skip today — still in progress
+    if(isLiveWeek && !todayComplete && dk===dateKey(now)) return;
     var dayTotal=ALL_LINES.reduce(function(s,line){return s+((dailyTargets[dk]||{})[line]||0);},0);
     cumTarget+=dayTotal;
   });
@@ -2719,7 +2721,7 @@ function renderWeekly() {
     var dt=new Date(r['Date']); if(isNaN(dt)) return s;
     return dateKey(dt)===todayKey?s+num(r['Final Units']):s;
   },0):0;
-  cumActual=weekUnits-(isLiveWeek?todayUnitsWeek:0);
+  cumActual=weekUnits-((isLiveWeek && !todayComplete)?todayUnitsWeek:0);
   var onPace = daysRemaining===0
     ? weekUnits>=weeklyTarget*TARGET_HIT_THRESHOLD
     : cumTarget===0
@@ -2895,7 +2897,7 @@ function renderWeekly() {
       var lineCumTarget=0, lineCumActual=u;
       wkDates.slice(0,daysElapsed).forEach(function(d){
         var dk=dateKey(d);
-        if(isLiveWeek&&dk===dateKey(now)) return; // skip today — still in progress
+        if(isLiveWeek && !todayComplete && dk===dateKey(now)) return; // skip only if today still in progress
         var row=dailyTargets[dk]||{};
         lineCumTarget+=(row[line]||0);
       });
@@ -2917,11 +2919,13 @@ function renderWeekly() {
         var dayTgt=(dailyTargets[dk]||{})[line]||0;
         var hasDayData=dayU>0;
         var isFuture=isLiveWeek&&d>now;
-        var isToday=isLiveWeek&&dateKey(d)===dateKey(now);
-        var hitDay=dayTgt>0&&hasDayData&&!isToday&&(dayU/dayTgt)>=TARGET_HIT_THRESHOLD;
-        var devPct=dayTgt&&hasDayData&&!isToday?Math.round((dayU-dayTgt)/dayTgt*100):null;
+        // "Today still in progress" = live week AND today AND before 4PM ET.
+        // Once today is complete, it's treated like any other finished day.
+        var isTodayLive=isLiveWeek&&dateKey(d)===dateKey(now)&&!todayComplete;
+        var hitDay=dayTgt>0&&hasDayData&&!isTodayLive&&(dayU/dayTgt)>=TARGET_HIT_THRESHOLD;
+        var devPct=dayTgt&&hasDayData&&!isTodayLive?Math.round((dayU-dayTgt)/dayTgt*100):null;
         var devColor=devPct===null?'#888780':devPct>=-1?'#1D9E75':'#EF9F27';
-        var devStr=isToday&&hasDayData?'In progress':devPct===null?'':(devPct>=0?'+':'')+devPct+'% of tgt';
+        var devStr=isTodayLive&&hasDayData?'In progress':devPct===null?'':(devPct>=0?'+':'')+devPct+'% of tgt';
         if(hitDay) daysHit++;
         var cellBg=hitDay?'background:#041f18;border:0.5px solid #1D9E75;box-shadow:0 0 6px 1px rgba(29,158,117,0.18);':'background:#141618;border:0.5px solid #2c2c2a;';
         return '<div style="text-align:center;border-radius:6px;padding:5px 2px;'+cellBg+'">'
@@ -2941,7 +2945,7 @@ function renderWeekly() {
         +'</div>';
       }).join('');
       var daysWithData=wkDates.filter(function(d){
-        if(isLiveWeek&&dateKey(d)===dateKey(now)) return false; // today is in progress, not counted
+        if(isLiveWeek && !todayComplete && dateKey(d)===dateKey(now)) return false; // exclude today only while in progress
         var dk=dateKey(d); return ((dayLineUnits[line]||{})[dk]||0)>0;
       }).length;
       // Only show days hit counter when daily targets exist to compare against
@@ -3623,11 +3627,11 @@ function renderPerformance() {
     if (Math.abs(_pct30vsYtd) <= 5) {
       _momentumBadge = '<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:500;background:#2c2c2a;color:#888780;">Steady pace</span>';
     } else if (_pct30vsYtd < -10) {
-      _momentumBadge = '<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:500;background:#633806;color:#FAC775;">&#x25BC; Slowing \u2014 '+Math.abs(_pct30vsYtd).toFixed(0)+'% below YTD pace</span>';
+      _momentumBadge = '<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:500;background:#633806;color:#FAC775;">&#x25BC; '+Math.abs(_pct30vsYtd).toFixed(0)+'% below pace</span>';
     } else if (_pct30vsYtd < 0) {
-      _momentumBadge = '<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:500;background:#2c2c2a;color:#888780;">&#x25BC; Slowing \u2014 '+Math.abs(_pct30vsYtd).toFixed(0)+'% below YTD pace</span>';
+      _momentumBadge = '<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:500;background:#2c2c2a;color:#888780;">&#x25BC; '+Math.abs(_pct30vsYtd).toFixed(0)+'% below pace</span>';
     } else {
-      _momentumBadge = '<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:500;background:#085041;color:#9FE1CB;">&#x25B2; Accelerating \u2014 '+_pct30vsYtd.toFixed(0)+'% above YTD pace</span>';
+      _momentumBadge = '<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:500;background:#085041;color:#9FE1CB;">&#x25B2; '+_pct30vsYtd.toFixed(0)+'% above pace</span>';
     }
     var _col4Sub  = (toTarget >= 0 ? '+' : '') + toTarget.toLocaleString() + ' &middot; ' + targetPct + '% of target';
     var _colLbl   = 'font-size:11px;color:#888780;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;';
@@ -3636,7 +3640,7 @@ function renderPerformance() {
 
     // CSS grid gives ironclad equal column widths — flex had drift when
     // column contents varied in intrinsic width.
-    var _colsRow = '<div style="display:grid;grid-template-columns:120px 1px 1fr 1px 1fr 1px 1fr 1px 1.5fr;gap:20px;align-items:center;margin-bottom:1.25rem;">'
+    var _colsRow = '<div style="display:grid;grid-template-columns:120px 1px 1fr 1px 1fr 1px 1fr 1px 1.5fr;gap:20px;align-items:center;margin-bottom:16px;">'
       // Col 1: Day of year
       +'<div style="min-width:0;text-align:center;">'
         +'<div style="'+_colLbl+'">Day of year</div>'
@@ -3690,12 +3694,31 @@ function renderPerformance() {
       +'<div style="position:absolute;top:0;left:0;height:100%;width:'+actualPct.toFixed(1)+'%;background:#888780;border-radius:8px 0 0 8px"></div>'
       +'<div style="position:absolute;top:-4px;left:'+tOnBar.toFixed(1)+'%;height:22px;width:2px;background:#e8e6e0;border-radius:1px;opacity:0.4"></div>'
       +'<div style="position:absolute;top:-4px;left:'+actualPct.toFixed(1)+'%;height:22px;width:2px;background:#888780;border-radius:1px"></div>'
+      +'<div style="position:absolute;top:-4px;right:0;width:2px;height:22px;background:#1D9E75;border-radius:1px;z-index:2;"></div>'
       +'</div></div>'
-      +'<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;margin-top:10px;">'
-        +'<span style="color:#5f5e5a;">To date: '+totalUnits.toLocaleString()+'</span>'
-        +'<span style="color:#e8e6e0;font-weight:500;">Target: 3,927,000</span>'
-        +'<span style="color:#1D9E75;font-weight:500;">Projected: '+yearProj.toLocaleString()+' ('+targetPct+'%)</span>'
-      +'</div>';
+      // Anchored bar labels — each sits below its corresponding marker.
+      // Hide "Units to date" when its endpoint is within 10% of the target
+      // marker so the two labels don't overlap visually.
+      +(function(){
+        var _hideFill = Math.abs(actualPct - tOnBar) < 10;
+        return '<div style="position:relative;height:28px;margin-top:5px;">'
+          // Left: anchored to gray-fill endpoint
+          +'<div style="position:absolute;top:0;left:'+actualPct.toFixed(1)+'%;transform:translateX(-50%);text-align:center;white-space:nowrap;'+(_hideFill?'display:none;':'')+'">'
+            +'<div style="font-size:11px;font-weight:500;color:#378ADD;font-variant-numeric:tabular-nums;">'+totalUnits.toLocaleString()+'</div>'
+            +'<div style="font-size:9px;color:#5f5e5a;">Units to date</div>'
+          +'</div>'
+          // Center: anchored to white target marker
+          +'<div style="position:absolute;top:0;left:'+tOnBar.toFixed(1)+'%;transform:translateX(-50%);text-align:center;white-space:nowrap;">'
+            +'<div style="font-size:11px;font-weight:500;color:#e8e6e0;font-variant-numeric:tabular-nums;">3,927,000</div>'
+            +'<div style="font-size:9px;color:#5f5e5a;">Year-end target</div>'
+          +'</div>'
+          // Right: anchored to right edge (projection end)
+          +'<div style="position:absolute;top:0;right:0;text-align:right;white-space:nowrap;">'
+            +'<div style="font-size:11px;font-weight:500;color:#1D9E75;font-variant-numeric:tabular-nums;">'+yearProj.toLocaleString()+'</div>'
+            +'<div style="font-size:9px;color:#5f5e5a;">Projected</div>'
+          +'</div>'
+        +'</div>';
+      })();
 
     yearEndHTML = _colsRow + _barHTML;
   } else {
@@ -3893,7 +3916,7 @@ function renderPerformance() {
     +'<div style="font-size:11px;color:#5f5e5a;">Comparing to same period in '+compYearLabel+'</div>'
     +'</div>'
     +'<div class="metrics">'+metricsHTML+'</div>'
-    +'<div class="full-card"><h3>Year-end projection vs target</h3>'+yearEndHTML+'</div>'
+    +'<div class="full-card" style="margin-top:36px;"><h3>Year-end projection vs target</h3>'+yearEndHTML+'</div>'
     // Two-column side-by-side layout: left card = Product Type Split + line
     // breakdown table; right card = Product Mix (toggle + donut + distribution).
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">'
